@@ -1,0 +1,6 @@
+@GymAppApi.WebApi_HostAddress = http://localhost:5195
+
+GET {{GymAppApi.WebApi_HostAddress}}/api/branches
+Accept: application/json
+
+###

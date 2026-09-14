@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Core/">
+    <Project Path="Core/GymAppApi.Application/GymAppApi.Application.csproj" />
+    <Project Path="Core/GymAppApi.Domain/GymAppApi.Domain.csproj" />
+  </Folder>
+  <Folder Name="/Infrastructure/">
+    <Project Path="Infrastructure/GymAppApi.Infrastructure/GymAppApi.Infrastructure.csproj" />
+    <Project Path="Infrastructure/GymAppApi.Persistence/GymAppApi.Persistence.csproj" />
+  </Folder>
+  <Folder Name="/Presentation/">
+    <Project Path="Presentation/GymAppApi.WebApi/GymAppApi.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/GymAppApi.IntegrationTests/GymAppApi.IntegrationTests.csproj" />
+    <Project Path="Tests/GymAppApi.UnitTests/GymAppApi.UnitTests.csproj" />
+  </Folder>
+</Solution>
