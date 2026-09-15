@@ -62,6 +62,19 @@ public class LoginCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenUserNotFound_StillCallsVerify_ToAvoidTimingLeak()
+    {
+        var (uow, _, _, hasher, jwt) = Wire(foundUser: null);
+        hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("dummy-hash");
+        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object);
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
+            handler.Handle(new LoginCommand { Identifier = "+905550000000", Password = "x" }, CancellationToken.None));
+
+        hasher.Verify(h => h.Verify("dummy-hash", "x"), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_WhenCredentialsMatch_ReturnsTokenPair()
     {
         var (uow, _, refreshWriteRepo, hasher, jwt) = Wire(ExistingUser());

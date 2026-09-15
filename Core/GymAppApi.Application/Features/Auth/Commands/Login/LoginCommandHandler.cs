@@ -8,6 +8,16 @@ namespace GymAppApi.Application.Features.Auth.Commands.Login;
 
 public class LoginCommandHandler : IRequestHandler<LoginCommand, RegisterCommandResult>
 {
+    // Lazily computed once via the injected hasher (never a hand-typed
+    // string — must be a real, correctly-formatted hash) and reused for
+    // every "user not found" case, so that path takes comparable time to a
+    // real Verify call. Without this, a null user short-circuits instantly
+    // while a found-user-wrong-password path pays real PBKDF2 cost, letting
+    // an attacker distinguish "no such account" from "wrong password" by
+    // timing alone — exactly the enumeration leak login must not have.
+    private static string? _dummyHash;
+    private static readonly object DummyHashLock = new();
+
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
@@ -24,7 +34,10 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, RegisterCommand
         var user = await _unitOfWork.GetReadRepository<User>()
             .GetAsync(u => u.Phone == request.Identifier || u.Email == request.Identifier, cancellationToken: cancellationToken);
 
-        if (user is null || !_passwordHasher.Verify(user.PasswordHash, request.Password))
+        var hashToVerify = user?.PasswordHash ?? GetDummyHash();
+        var passwordMatches = _passwordHasher.Verify(hashToVerify, request.Password);
+
+        if (user is null || !passwordMatches)
         {
             throw new InvalidCredentialsException();
         }
@@ -46,5 +59,17 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, RegisterCommand
             ExpiresAtUtc = access.ExpiresAtUtc,
             RefreshToken = rawRefreshToken,
         };
+    }
+
+    private string GetDummyHash()
+    {
+        if (_dummyHash is null)
+        {
+            lock (DummyHashLock)
+            {
+                _dummyHash ??= _passwordHasher.Hash("dummy-password-for-constant-time-verification");
+            }
+        }
+        return _dummyHash;
     }
 }
