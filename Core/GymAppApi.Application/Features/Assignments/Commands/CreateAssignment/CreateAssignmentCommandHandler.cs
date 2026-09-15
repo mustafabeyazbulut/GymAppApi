@@ -1,3 +1,4 @@
+using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
@@ -14,6 +15,21 @@ public class CreateAssignmentCommandHandler : IRequestHandler<CreateAssignmentCo
 
     public async Task<CreateAssignmentCommandResult> Handle(CreateAssignmentCommand request, CancellationToken cancellationToken)
     {
+        // The [Authorize] policy only confirms the caller holds SOME
+        // GymAdmin/SuperAdmin assignment — re-check it's scoped to THIS
+        // company (SuperAdmin's own CompanyId is null/platform-wide, so it
+        // bypasses the company match) before allowing the assignment.
+        var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
+            a => a.UserId == request.RequestedByUserId && a.IsActive,
+            cancellationToken: cancellationToken);
+        var callerIsAuthorizedForThisCompany = callerAssignments.Any(a =>
+            a.Role == AssignmentRole.SuperAdmin ||
+            (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId));
+        if (!callerIsAuthorizedForThisCompany)
+        {
+            throw new ForbiddenException("Bu firma için atama yapma yetkiniz yok.");
+        }
+
         var userExists = await _unitOfWork.GetReadRepository<User>().AnyAsync(u => u.Id == request.UserId, cancellationToken);
         if (!userExists)
         {

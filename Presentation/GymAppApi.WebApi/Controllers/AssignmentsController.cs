@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Assignments.Commands.CreateAssignment;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -14,9 +15,12 @@ public class AssignmentsController : ControllerBase
 
     public AssignmentsController(IMediator mediator) => _mediator = mediator;
 
+    private int CurrentUserId => int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
+
     [HttpPost]
     public async Task<IActionResult> Create(CreateAssignmentCommand command, CancellationToken cancellationToken)
     {
+        command.RequestedByUserId = CurrentUserId;
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }
