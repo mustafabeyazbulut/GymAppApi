@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GymAppApi.Persistence.Migrations
 {
     [DbContext(typeof(GymAppApiDbContext))]
-    [Migration("20260915105006_AddXminConcurrencyTokenToRefreshToken")]
+    [Migration("20260915112152_AddXminConcurrencyTokenToRefreshToken")]
     partial class AddXminConcurrencyTokenToRefreshToken
     {
         /// <inheritdoc />

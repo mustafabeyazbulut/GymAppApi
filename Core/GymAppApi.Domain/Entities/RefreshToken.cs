@@ -15,4 +15,14 @@ public class RefreshToken : EntityBase
     public DateTime ExpiresAt { get; set; }
     public DateTime? RevokedAt { get; set; }
     public string? ReplacedByTokenHash { get; set; }
+
+    // Postgres xmin concurrency token (see RefreshTokenConfiguration) —
+    // MUST be a real CLR property, not a shadow property. This repository
+    // pattern reads via AsNoTracking() by default and later calls Update()
+    // on the same detached instance; a shadow property has no CLR storage
+    // to round-trip through that gap, so EF has no "original value" to
+    // compare and the concurrency check fails on every update, not just
+    // races. A mapped CLR property gets materialized into the object even
+    // when untracked, so Update() sees the real loaded value.
+    public uint ConcurrencyToken { get; set; }
 }

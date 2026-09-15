@@ -29,9 +29,12 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         // Npgsql's NpgsqlPostgresModelFinalizingConvention auto-detects any
         // uint property configured ValueGeneratedOnAddOrUpdate + concurrency
         // token and maps it to the existing "xmin" system column — no new
-        // DB column, no migration needed for the mapping itself. A shadow
-        // property is used (rather than a CLR property on RefreshToken) to
-        // keep this a pure persistence-layer concern.
-        builder.Property<uint>("ConcurrencyToken").IsRowVersion();
+        // DB column, no migration needed for the mapping itself. This MUST
+        // be a real CLR property (RefreshToken.ConcurrencyToken), not a
+        // shadow property — see that property's own doc comment for why a
+        // shadow property silently breaks the concurrency check on every
+        // Update() call through this codebase's AsNoTracking()-by-default
+        // repository pattern, not just under a race.
+        builder.Property(x => x.ConcurrencyToken).IsRowVersion();
     }
 }
