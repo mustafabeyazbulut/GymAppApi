@@ -32,4 +32,11 @@ public class AuthController : ControllerBase
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword(GymAppApi.Application.Features.Auth.Commands.ForgotPassword.ForgotPasswordCommand command, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(command, cancellationToken));
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(GymAppApi.Application.Features.Auth.Commands.ResetPassword.ResetPasswordCommand command, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(command, cancellationToken);
+        return NoContent();
+    }
 }
