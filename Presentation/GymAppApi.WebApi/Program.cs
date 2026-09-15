@@ -34,7 +34,13 @@ builder.Services
             ClockSkew = TimeSpan.FromSeconds(30),
         };
     });
-builder.Services.AddAuthorization();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, GymAppApi.WebApi.Authorization.AssignmentRoleAuthorizationHandler>();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("GymAdminOrSuperAdmin", policy => policy.Requirements.Add(
+        new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
+            GymAppApi.Domain.Enums.AssignmentRole.GymAdmin, GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
+});
 
 builder.Services.AddRateLimiter(options =>
 {
