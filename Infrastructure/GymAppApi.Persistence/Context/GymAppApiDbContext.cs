@@ -13,6 +13,7 @@ public class GymAppApiDbContext : DbContext
         typeof(User),
         typeof(OtpVerification),
         typeof(DeviceToken),
+        typeof(RefreshToken),
     };
 
     private readonly ITenantContext _tenantContext;
@@ -30,6 +31,7 @@ public class GymAppApiDbContext : DbContext
     public DbSet<OtpVerification> OtpVerifications => Set<OtpVerification>();
     public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

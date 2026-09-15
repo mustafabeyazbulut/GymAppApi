@@ -15,5 +15,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.PreferredLanguage).IsRequired().HasMaxLength(10).HasDefaultValue("tr");
 
         builder.HasIndex(x => x.Phone).IsUnique();
+        builder.HasIndex(x => x.Email).IsUnique().HasFilter("\"Email\" IS NOT NULL");
     }
 }
