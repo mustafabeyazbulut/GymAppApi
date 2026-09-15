@@ -1,11 +1,13 @@
 using GymAppApi.Application.Features.Auth.Commands.Register;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace GymAppApi.WebApi.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly IMediator _mediator;
