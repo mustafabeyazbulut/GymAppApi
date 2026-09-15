@@ -31,9 +31,27 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
             return new ForgotPasswordCommandResult { Message = GenericMessage };
         }
 
+        var otpWriteRepo = _unitOfWork.GetWriteRepository<OtpVerification>();
+
+        // Invalidate any still-live reset codes for this user first, so at
+        // most one PasswordReset OtpVerification row is ever valid at once.
+        // Without this, requesting a new code twice (e.g. "didn't get the
+        // SMS, send again") leaves multiple valid rows and ResetPassword's
+        // single-row lookup (no ORDER BY) could match the wrong one,
+        // rejecting a genuinely correct code and burning an attempt against
+        // a row the user can never satisfy.
+        var priorLiveOtps = await _unitOfWork.GetReadRepository<OtpVerification>().GetAllAsync(
+            o => o.UserId == user.Id && o.Purpose == OtpPurpose.PasswordReset && !o.IsUsed && o.ExpiresAt > DateTime.UtcNow,
+            cancellationToken: cancellationToken);
+        foreach (var prior in priorLiveOtps)
+        {
+            prior.IsUsed = true;
+            otpWriteRepo.Update(prior);
+        }
+
         var code = Random.Shared.Next(100000, 999999).ToString();
 
-        await _unitOfWork.GetWriteRepository<OtpVerification>().AddAsync(new OtpVerification
+        await otpWriteRepo.AddAsync(new OtpVerification
         {
             UserId = user.Id,
             Code = code,
