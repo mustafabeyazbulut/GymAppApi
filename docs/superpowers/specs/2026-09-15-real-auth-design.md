@@ -66,6 +66,7 @@ Her iki entity de EF Core Configuration + migration ile eklenir (Backend Foundat
 | POST | `/api/auth/reset-password` | Yok | Kimlik + kod + yeni şifre → kod doğrulanır (hash karşılaştırma, süre/kullanım kontrolü), `User.PasswordHash` güncellenir, o kullanıcının tüm refresh token'ları iptal edilir (güvenlik). |
 | POST | `/api/assignments` | **GymAdmin veya SuperAdmin JWT gerekli** | `{ userId, companyId, branchId? }` → `Assignment(Role=Member, IsActive=true)` oluşturur. Kullanıcı zaten o Company'de aktif bir Assignment'a sahipse hata (idempotent değil, açık hata). |
 | GET | `/api/auth/me` | Access JWT gerekli | Giriş yapmış kullanıcının profili + aktif `Assignment` listesi (mobilin "hangi tenant'a bağlıyım / hiç bağlı değilim" durumunu belirlemesi için). |
+| DELETE | `/api/auth/me` | Access JWT gerekli | **Hesap silme.** Kullanıcının kendi hesabını kalıcı olarak silmesi — `User` + tüm `Assignment`/`RefreshToken`/`PasswordResetCode` satırları cascade silinir. Bkz. "App Store / Play Store Yayın Standartları". |
 
 ## Auth/Yetkilendirme Altyapısı
 
@@ -81,6 +82,15 @@ Her iki entity de EF Core Configuration + migration ile eklenir (Backend Foundat
 ## Test Stratejisi
 
 Branch feature'ının deseniyle aynı: her Command/Query Handler için `GymAppApi.UnitTests`'te mocktail ile repository/UoW mock'lanarak testler; `/api/auth/refresh` rotation mantığı ve `/api/assignments`'ın yetkilendirme reddi (401/403) için `GymAppApi.IntegrationTests`'te gerçek (InMemory veya test container) DB'ye karşı testler — Task 12'nin Branch create/list testlerindeki 9 unit + 4 integration deseniyle aynı seviye titizlik.
+
+## App Store / Play Store Yayın Standartları
+
+Uygulama Android ve iOS mağazalarında yayınlanacağı için, self-servis kayıt eklenmesi mağaza inceleme kurallarını doğrudan etkiliyor:
+
+- **Hesap silme zorunlu (Apple App Store Guideline 5.1.1(v)):** Uygulama içi hesap oluşturma varsa, uygulama içi hesap silme de sunulmalı — dışarıda bir web formuna yönlendirmek yeterli değil. Bu yüzden `DELETE /api/auth/me` bu planın kapsamına eklendi (ayrı bir "sonra ekleriz" işi değil). Google Play'in Kullanıcı Verisi politikası da eşdeğer bir silme yolu istiyor; uygulama-içi silme her ikisini de karşılar, ayrıca bir web sayfası gerekmez.
+- **Şifre politikası:** Mağazaların sabit bir minimum şifre uzunluğu şartı yok, ama kayıt validasyonunda makul bir minimum (örn. 8 karakter) uygulanacak — `CreateUserCommandValidator`'da (Branch feature'ın `CreateBranchCommandValidator`'ıyla aynı desen).
+- **Kimlik verisi güvenliği:** Şifre hash'i asla dönülmez/loglanmaz (zaten `PasswordHasher` ile çözülüyor), refresh/reset token'ları DB'de sadece hash olarak tutuluyor (zaten yukarıda tasarlandı) — mağaza gizlilik beyanlarında ("Data Safety" / "Privacy Nutrition Label") "şifreler şifrelenmiş/hash'li saklanıyor" beyanını doğru kılıyor.
+- Gizlilik politikası metninin kendisi (Play Store Data Safety formu, App Store Privacy Nutrition Label) bu planın kapsamı dışında — bu bir hukuki/metin işi, mağaza hesabı açılışında ayrıca ele alınmalı, backend/mobil kod değişikliği gerektirmiyor.
 
 ## Açık Notlar / Gelecekte Gözden Geçirilecek
 
