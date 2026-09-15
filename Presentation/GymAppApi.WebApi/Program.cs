@@ -22,6 +22,14 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Without this, the default inbound claim mapping silently renames the
+        // "sub" claim to ClaimTypes.NameIdentifier on the validated
+        // ClaimsPrincipal, so every FindFirst(JwtRegisteredClaimNames.Sub)
+        // lookup (AuthController, AssignmentsController,
+        // AssignmentRoleAuthorizationHandler) returns null — which makes
+        // role-gated endpoints fail closed (403) even for correctly
+        // authorized callers.
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
