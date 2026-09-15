@@ -7,14 +7,23 @@ namespace GymAppApi.Persistence.Configurations;
 
 // Seeds exactly one SuperAdmin account so POST /api/assignments (GymAdmin/
 // SuperAdmin-gated) can be exercised at all before any real admin-management
-// tooling exists. PASSWORD IS A PLACEHOLDER — "ChangeMe123!SuperAdmin" is
-// documented here in plaintext deliberately (so a future reader knows to
-// change it) but MUST be rotated before any real production deployment; see
-// the backend spec's "App Store / Play Store Yayın Standartları" section.
+// tooling exists. PASSWORD IS A PLACEHOLDER — MUST be rotated before any
+// real production deployment (see the backend spec's "App Store / Play
+// Store Yayın Standartları" section). The plaintext value is deliberately
+// NOT repeated here (only its hash is stored below) to avoid leaving a
+// permanently grep-able credential in version control forever; the actual
+// placeholder value is documented once, in
+// docs/superpowers/plans/2026-09-15-real-auth.md's Task 12.
 public class SuperAdminSeedConfiguration : IEntityTypeConfiguration<User>
 {
-    public const int SeedUserId = 1_000_000; // far outside normal auto-increment range, avoids collision
-    public const int SeedAssignmentId = 1_000_000;
+    // Negative sentinel IDs — Postgres IDENTITY sequences default to
+    // MINVALUE 1, so nextval() can never produce a negative number. This
+    // makes "never collides with a real auto-generated row" a provable
+    // guarantee, not just an improbable one (a large positive placeholder
+    // like 1_000_000 would eventually collide once the sequence counts
+    // that high from real registrations).
+    public const int SeedUserId = -1;
+    public const int SeedAssignmentId = -1;
 
     public void Configure(EntityTypeBuilder<User> builder)
     {

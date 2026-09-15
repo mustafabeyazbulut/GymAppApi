@@ -68,11 +68,11 @@ namespace GymAppApi.Persistence.Migrations
                     b.HasData(
                         new
                         {
-                            Id = 1000000,
+                            Id = -1,
                             CreatedAt = new DateTime(2026, 9, 15, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsActive = true,
                             Role = "SuperAdmin",
-                            UserId = 1000000
+                            UserId = -1
                         });
                 });
 
@@ -379,7 +379,7 @@ namespace GymAppApi.Persistence.Migrations
                     b.HasData(
                         new
                         {
-                            Id = 1000000,
+                            Id = -1,
                             CreatedAt = new DateTime(2026, 9, 15, 0, 0, 0, 0, DateTimeKind.Utc),
                             Email = "admin@gymapp.local",
                             FullName = "GymApp SuperAdmin",
