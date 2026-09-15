@@ -74,4 +74,33 @@ public class AssignmentsAuthorizationTests : IClassFixture<CustomWebApplicationF
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
+
+    // Regression test for the cross-company privilege-escalation fix
+    // (f39c638): a GymAdmin of one company must not be able to assign
+    // members into an unrelated company. This is also the first real-host
+    // exercise of CreateAssignmentCommandHandler's own ForbiddenException ->
+    // ExceptionMiddleware -> 403 path (the other tests' 401/403 come from
+    // ASP.NET Core's built-in auth challenge/forbid, not a thrown exception).
+    [Fact]
+    public async Task Create_WithGymAdminTokenForDifferentCompany_Returns403()
+    {
+        var (_, memberUserId, _, gymAdminToken) = await SeedAsync();
+
+        int otherCompanyId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
+            var otherCompany = new Company { Name = "Other Company", IsActive = true };
+            db.Companies.Add(otherCompany);
+            await db.SaveChangesAsync();
+            otherCompanyId = otherCompany.Id;
+        }
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminToken);
+
+        var response = await client.PostAsJsonAsync("/api/assignments", new { userId = memberUserId, companyId = otherCompanyId, branchId = (int?)null });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }
