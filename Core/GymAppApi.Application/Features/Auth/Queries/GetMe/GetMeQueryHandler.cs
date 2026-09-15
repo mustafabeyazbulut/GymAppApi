@@ -34,8 +34,8 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
                 .Where(a => a.IsActive)
                 .Select(a => new MeAssignmentDto
                 {
-                    CompanyId = a.CompanyId ?? 0,
-                    CompanyName = a.Company?.Name ?? string.Empty,
+                    CompanyId = a.CompanyId,
+                    CompanyName = a.Company?.Name,
                     BranchId = a.BranchId,
                     Role = a.Role.ToString(),
                 })

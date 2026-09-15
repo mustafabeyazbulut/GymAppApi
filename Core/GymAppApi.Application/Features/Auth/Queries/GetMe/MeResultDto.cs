@@ -11,8 +11,11 @@ public class MeResultDto
 
 public class MeAssignmentDto
 {
-    public int CompanyId { get; set; }
-    public string CompanyName { get; set; } = null!;
+    // Nullable: a SuperAdmin assignment is platform-wide (Assignment.CompanyId
+    // is null by design for that role) — coercing null to 0 would make a
+    // SuperAdmin's own profile indistinguishable from a data-integrity bug.
+    public int? CompanyId { get; set; }
+    public string? CompanyName { get; set; }
     public int? BranchId { get; set; } // no BranchName — mobile only needs to know a branch id exists, not its label, for the "do I have an active membership" check this DTO exists for
     public string Role { get; set; } = null!;
 }
