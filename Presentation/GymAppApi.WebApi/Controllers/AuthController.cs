@@ -18,4 +18,8 @@ public class AuthController : ControllerBase
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login(GymAppApi.Application.Features.Auth.Commands.Login.LoginCommand command, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(command, cancellationToken));
 }
