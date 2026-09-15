@@ -22,4 +22,8 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(GymAppApi.Application.Features.Auth.Commands.Login.LoginCommand command, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(command, cancellationToken));
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh(GymAppApi.Application.Features.Auth.Commands.Refresh.RefreshCommand command, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(command, cancellationToken));
 }
