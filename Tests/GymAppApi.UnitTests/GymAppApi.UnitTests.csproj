@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\GymAppApi.Application\GymAppApi.Application.csproj" />
     <ProjectReference Include="..\..\Core\GymAppApi.Domain\GymAppApi.Domain.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\GymAppApi.Infrastructure\GymAppApi.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
