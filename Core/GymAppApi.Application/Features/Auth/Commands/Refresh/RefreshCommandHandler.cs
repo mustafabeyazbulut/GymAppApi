@@ -3,6 +3,7 @@ using GymAppApi.Application.Features.Auth.Commands.Register;
 using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Auth.Commands.Refresh;
 
@@ -75,7 +76,18 @@ public class RefreshCommandHandler : IRequestHandler<RefreshCommand, RegisterCom
             ExpiresAt = DateTime.UtcNow.AddDays(30),
         }, cancellationToken);
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another concurrent request rotated this exact token first
+            // (xmin mismatch) — treat the loser the same as an invalid
+            // token rather than silently letting both requests "succeed"
+            // and issue two live children from one now-stale parent.
+            throw new InvalidRefreshTokenException();
+        }
 
         return new RegisterCommandResult
         {

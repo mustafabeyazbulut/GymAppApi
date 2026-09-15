@@ -18,5 +18,20 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
 
         builder.HasIndex(x => x.TokenHash).IsUnique();
         builder.HasIndex(x => x.UserId);
+
+        // Postgres system column, no new DB column — protects against a
+        // TOCTOU race where two concurrent refresh requests both read this
+        // row as not-yet-revoked and both proceed to rotate it, which would
+        // let a stolen token's reuse-detection never fire (see the Real
+        // Auth backend plan's Task 7 code-quality review for the full
+        // scenario).
+        //
+        // Npgsql's NpgsqlPostgresModelFinalizingConvention auto-detects any
+        // uint property configured ValueGeneratedOnAddOrUpdate + concurrency
+        // token and maps it to the existing "xmin" system column — no new
+        // DB column, no migration needed for the mapping itself. A shadow
+        // property is used (rather than a CLR property on RefreshToken) to
+        // keep this a pure persistence-layer concern.
+        builder.Property<uint>("ConcurrencyToken").IsRowVersion();
     }
 }

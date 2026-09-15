@@ -2,6 +2,7 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.Auth.Commands.Refresh;
 using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 
 namespace GymAppApi.UnitTests.Features.Auth;
@@ -83,5 +84,20 @@ public class RefreshCommandHandlerTests
         Assert.Equal("new-raw-refresh-token", result.RefreshToken);
         tokenWriteRepo.Verify(r => r.Update(It.Is<RefreshToken>(t => t.Id == 7 && t.RevokedAt != null && t.ReplacedByTokenHash == "hash-of-new")), Times.Once);
         tokenWriteRepo.Verify(r => r.AddAsync(It.Is<RefreshToken>(t => t.TokenHash == "hash-of-new" && t.UserId == 1), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenConcurrentRotationDetected_ThrowsInvalidRefreshTokenException()
+    {
+        var valid = new RefreshToken { Id = 7, UserId = 1, TokenHash = "hash-of-valid", ExpiresAt = DateTime.UtcNow.AddDays(10), RevokedAt = null };
+        var (uow, tokenReadRepo, tokenWriteRepo, _, hasher, jwt) = Wire(valid);
+        hasher.Setup(h => h.Verify("hash-of-valid", "valid-raw-value")).Returns(true);
+        hasher.Setup(h => h.Hash("new-raw-refresh-token")).Returns("hash-of-new");
+        uow.Setup(u => u.SaveChangesAsync(default)).ThrowsAsync(new DbUpdateConcurrencyException());
+
+        var handler = new RefreshCommandHandler(uow.Object, hasher.Object, jwt.Object);
+
+        await Assert.ThrowsAsync<InvalidRefreshTokenException>(() =>
+            handler.Handle(new RefreshCommand { RefreshToken = "valid-raw-value" }, CancellationToken.None));
     }
 }
