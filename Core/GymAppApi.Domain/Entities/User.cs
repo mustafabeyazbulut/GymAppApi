@@ -17,6 +17,7 @@ public class User : EntityBase
     public Gender Gender { get; set; } = Gender.Unspecified;
     public string PreferredLanguage { get; set; } = "tr";
     public bool PhoneVerified { get; set; }
+    public bool EmailVerified { get; set; }
 
     public ICollection<Assignment> Assignments { get; set; } = new List<Assignment>();
 }
