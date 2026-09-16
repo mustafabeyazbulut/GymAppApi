@@ -14,7 +14,7 @@ public class ResetPasswordCommandHandlerTests
     private static (Mock<IUnitOfWork> uow, Mock<IReadRepository<User>> userReadRepo, Mock<IWriteRepository<User>> userWriteRepo,
         Mock<IReadRepository<OtpVerification>> otpReadRepo, Mock<IWriteRepository<OtpVerification>> otpWriteRepo,
         Mock<IReadRepository<RefreshToken>> refreshReadRepo, Mock<IWriteRepository<RefreshToken>> refreshWriteRepo,
-        Mock<IPasswordHasher> hasher) Wire(User? user, OtpVerification? otp)
+        Mock<IPasswordHasher> hasher, Mock<IPhoneNumberNormalizer> phoneNormalizer) Wire(User? user, OtpVerification? otp)
     {
         var userReadRepo = new Mock<IReadRepository<User>>();
         userReadRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<User, bool>>>(), null, false, default)).ReturnsAsync(user);
@@ -40,14 +40,17 @@ public class ResetPasswordCommandHandlerTests
 
         var hasher = new Mock<IPasswordHasher>();
 
-        return (uow, userReadRepo, userWriteRepo, otpReadRepo, otpWriteRepo, refreshReadRepo, refreshWriteRepo, hasher);
+        var phoneNormalizer = new Mock<IPhoneNumberNormalizer>();
+        phoneNormalizer.Setup(p => p.NormalizeIfPhone(It.IsAny<string>())).Returns((string s) => s);
+
+        return (uow, userReadRepo, userWriteRepo, otpReadRepo, otpWriteRepo, refreshReadRepo, refreshWriteRepo, hasher, phoneNormalizer);
     }
 
     [Fact]
     public async Task Handle_WhenUserNotFound_ThrowsInvalidResetCodeException()
     {
-        var (uow, _, _, _, _, _, _, hasher) = Wire(user: null, otp: null);
-        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object);
+        var (uow, _, _, _, _, _, _, hasher, phoneNormalizer) = Wire(user: null, otp: null);
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object);
 
         await Assert.ThrowsAsync<InvalidResetCodeException>(() =>
             handler.Handle(new ResetPasswordCommand { Identifier = "nope", Code = "123456", NewPassword = "YeniSifre123!" }, CancellationToken.None));
@@ -57,9 +60,9 @@ public class ResetPasswordCommandHandlerTests
     public async Task Handle_WhenCodeWrong_IncrementsAttemptCount_AndThrows()
     {
         var otp = new OtpVerification { Id = 9, UserId = 1, Code = "111111", ExpiresAt = DateTime.UtcNow.AddMinutes(5), Purpose = OtpPurpose.PasswordReset, IsUsed = false, AttemptCount = 0 };
-        var (uow, _, _, otpReadRepo, otpWriteRepo, _, _, hasher) = Wire(Owner(), otp);
+        var (uow, _, _, otpReadRepo, otpWriteRepo, _, _, hasher, phoneNormalizer) = Wire(Owner(), otp);
 
-        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object);
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object);
 
         await Assert.ThrowsAsync<InvalidResetCodeException>(() =>
             handler.Handle(new ResetPasswordCommand { Identifier = "ayse@test.com", Code = "999999", NewPassword = "YeniSifre123!" }, CancellationToken.None));
@@ -71,8 +74,8 @@ public class ResetPasswordCommandHandlerTests
     public async Task Handle_WhenAttemptCountAtLimit_ThrowsWithoutCheckingCode()
     {
         var otp = new OtpVerification { Id = 9, UserId = 1, Code = "111111", ExpiresAt = DateTime.UtcNow.AddMinutes(5), Purpose = OtpPurpose.PasswordReset, IsUsed = false, AttemptCount = 5 };
-        var (uow, _, _, _, _, _, _, hasher) = Wire(Owner(), otp);
-        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object);
+        var (uow, _, _, _, _, _, _, hasher, phoneNormalizer) = Wire(Owner(), otp);
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object);
 
         await Assert.ThrowsAsync<InvalidResetCodeException>(() =>
             handler.Handle(new ResetPasswordCommand { Identifier = "ayse@test.com", Code = "111111", NewPassword = "YeniSifre123!" }, CancellationToken.None));
@@ -83,12 +86,12 @@ public class ResetPasswordCommandHandlerTests
     {
         var otp = new OtpVerification { Id = 9, UserId = 1, Code = "111111", ExpiresAt = DateTime.UtcNow.AddMinutes(5), Purpose = OtpPurpose.PasswordReset, IsUsed = false, AttemptCount = 2 };
         var activeToken = new RefreshToken { Id = 3, UserId = 1, TokenHash = "h", ExpiresAt = DateTime.UtcNow.AddDays(5), RevokedAt = null };
-        var (uow, _, userWriteRepo, _, otpWriteRepo, refreshReadRepo, refreshWriteRepo, hasher) = Wire(Owner(), otp);
+        var (uow, _, userWriteRepo, _, otpWriteRepo, refreshReadRepo, refreshWriteRepo, hasher, phoneNormalizer) = Wire(Owner(), otp);
         refreshReadRepo.Setup(r => r.GetAllAsync(It.IsAny<System.Linq.Expressions.Expression<Func<RefreshToken, bool>>>(), null, null, false, default))
             .ReturnsAsync(new List<RefreshToken> { activeToken });
         hasher.Setup(h => h.Hash("YeniSifre123!")).Returns("new-hash");
 
-        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object);
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object);
         await handler.Handle(new ResetPasswordCommand { Identifier = "ayse@test.com", Code = "111111", NewPassword = "YeniSifre123!" }, CancellationToken.None);
 
         userWriteRepo.Verify(r => r.Update(It.Is<User>(u => u.PasswordHash == "new-hash")), Times.Once);

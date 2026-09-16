@@ -28,6 +28,7 @@ public static class Registration
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<ISmsSender, LoggingSmsSender>();
         services.AddSingleton<IEmailSender, LoggingEmailSender>();
+        services.AddSingleton<IPhoneNumberNormalizer, PhoneNumberNormalizer>();
 
         return services;
     }

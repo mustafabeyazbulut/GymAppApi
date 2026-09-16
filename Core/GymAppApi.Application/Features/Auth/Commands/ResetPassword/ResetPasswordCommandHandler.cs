@@ -12,17 +12,21 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand>
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
 
-    public ResetPasswordCommandHandler(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher)
+    public ResetPasswordCommandHandler(
+        IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IPhoneNumberNormalizer phoneNumberNormalizer)
     {
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
+        _phoneNumberNormalizer = phoneNumberNormalizer;
     }
 
     public async Task Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
     {
+        var identifier = _phoneNumberNormalizer.NormalizeIfPhone(request.Identifier);
         var user = await _unitOfWork.GetReadRepository<User>()
-            .GetAsync(u => u.Phone == request.Identifier || u.Email == request.Identifier, cancellationToken: cancellationToken);
+            .GetAsync(u => u.Phone == identifier || u.Email == identifier, cancellationToken: cancellationToken);
         if (user is null)
         {
             throw new InvalidResetCodeException();

@@ -21,18 +21,27 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTokenResult
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
 
-    public LoginCommandHandler(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IJwtTokenService jwtTokenService)
+    public LoginCommandHandler(
+        IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IJwtTokenService jwtTokenService,
+        IPhoneNumberNormalizer phoneNumberNormalizer)
     {
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
+        _phoneNumberNormalizer = phoneNumberNormalizer;
     }
 
     public async Task<AuthTokenResult> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
+        // Lets a user type their phone in any common local format
+        // ("05551234567", "5551234567", "+905551234567") regardless of how
+        // it was originally stored - normalizing the lookup value, not the
+        // stored one, means this works uniformly for every account.
+        var identifier = _phoneNumberNormalizer.NormalizeIfPhone(request.Identifier);
         var user = await _unitOfWork.GetReadRepository<User>()
-            .GetAsync(u => u.Phone == request.Identifier || u.Email == request.Identifier, cancellationToken: cancellationToken);
+            .GetAsync(u => u.Phone == identifier || u.Email == identifier, cancellationToken: cancellationToken);
 
         var hashToVerify = user?.PasswordHash ?? GetDummyHash();
         var passwordMatches = _passwordHasher.Verify(hashToVerify, request.Password);

@@ -12,18 +12,23 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISmsSender _smsSender;
     private readonly IEmailSender _emailSender;
+    private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
 
-    public ForgotPasswordCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IEmailSender emailSender)
+    public ForgotPasswordCommandHandler(
+        IUnitOfWork unitOfWork, ISmsSender smsSender, IEmailSender emailSender,
+        IPhoneNumberNormalizer phoneNumberNormalizer)
     {
         _unitOfWork = unitOfWork;
         _smsSender = smsSender;
         _emailSender = emailSender;
+        _phoneNumberNormalizer = phoneNumberNormalizer;
     }
 
     public async Task<ForgotPasswordCommandResult> Handle(ForgotPasswordCommand request, CancellationToken cancellationToken)
     {
+        var identifier = _phoneNumberNormalizer.NormalizeIfPhone(request.Identifier);
         var user = await _unitOfWork.GetReadRepository<User>()
-            .GetAsync(u => u.Phone == request.Identifier || u.Email == request.Identifier, cancellationToken: cancellationToken);
+            .GetAsync(u => u.Phone == identifier || u.Email == identifier, cancellationToken: cancellationToken);
 
         // Never reveal whether the identifier matched an account.
         if (user is null)
