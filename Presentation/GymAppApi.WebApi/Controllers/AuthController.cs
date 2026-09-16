@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Auth.Commands.DeleteMe;
+using GymAppApi.Application.Features.Auth.Commands.DeleteMeRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.ForgotPassword;
 using GymAppApi.Application.Features.Auth.Commands.FreezeAccount;
 using GymAppApi.Application.Features.Auth.Commands.FreezeAccountRequestOtp;
@@ -73,10 +74,19 @@ public class AuthController : ControllerBase
         => Ok(await _mediator.Send(new GetMeQuery { UserId = CurrentUserId }, cancellationToken));
 
     [Authorize]
-    [HttpDelete("me")]
-    public async Task<IActionResult> DeleteMe(CancellationToken cancellationToken)
+    [HttpPost("me/delete/request-otp")]
+    public async Task<IActionResult> RequestDeleteMeOtp(CancellationToken cancellationToken)
     {
-        await _mediator.Send(new DeleteMeCommand { UserId = CurrentUserId }, cancellationToken);
+        await _mediator.Send(new DeleteMeRequestOtpCommand { UserId = CurrentUserId }, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpDelete("me")]
+    public async Task<IActionResult> DeleteMe(DeleteMeCommand command, CancellationToken cancellationToken)
+    {
+        command.UserId = CurrentUserId;
+        await _mediator.Send(command, cancellationToken);
         return NoContent();
     }
 
