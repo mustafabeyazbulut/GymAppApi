@@ -1,5 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
-using GymAppApi.Application.Features.Auth.Commands.Register;
+using GymAppApi.Application.Features.Auth.Common;
 using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
 using MediatR;
@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Auth.Commands.Refresh;
 
-public class RefreshCommandHandler : IRequestHandler<RefreshCommand, RegisterCommandResult>
+public class RefreshCommandHandler : IRequestHandler<RefreshCommand, AuthTokenResult>
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
@@ -20,7 +20,7 @@ public class RefreshCommandHandler : IRequestHandler<RefreshCommand, RegisterCom
         _jwtTokenService = jwtTokenService;
     }
 
-    public async Task<RegisterCommandResult> Handle(RefreshCommand request, CancellationToken cancellationToken)
+    public async Task<AuthTokenResult> Handle(RefreshCommand request, CancellationToken cancellationToken)
     {
         var tokenReadRepo = _unitOfWork.GetReadRepository<RefreshToken>();
         var tokenWriteRepo = _unitOfWork.GetWriteRepository<RefreshToken>();
@@ -89,7 +89,7 @@ public class RefreshCommandHandler : IRequestHandler<RefreshCommand, RegisterCom
             throw new InvalidRefreshTokenException();
         }
 
-        return new RegisterCommandResult
+        return new AuthTokenResult
         {
             AccessToken = access.Token,
             ExpiresAtUtc = access.ExpiresAtUtc,

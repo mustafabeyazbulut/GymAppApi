@@ -1,12 +1,12 @@
 using GymAppApi.Application.Common.Interfaces;
-using GymAppApi.Application.Features.Auth.Commands.Register;
+using GymAppApi.Application.Features.Auth.Common;
 using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
 using MediatR;
 
 namespace GymAppApi.Application.Features.Auth.Commands.Login;
 
-public class LoginCommandHandler : IRequestHandler<LoginCommand, RegisterCommandResult>
+public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTokenResult>
 {
     // Lazily computed once via the injected hasher (never a hand-typed
     // string — must be a real, correctly-formatted hash) and reused for
@@ -29,7 +29,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, RegisterCommand
         _jwtTokenService = jwtTokenService;
     }
 
-    public async Task<RegisterCommandResult> Handle(LoginCommand request, CancellationToken cancellationToken)
+    public async Task<AuthTokenResult> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var user = await _unitOfWork.GetReadRepository<User>()
             .GetAsync(u => u.Phone == request.Identifier || u.Email == request.Identifier, cancellationToken: cancellationToken);
@@ -53,7 +53,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, RegisterCommand
         }, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new RegisterCommandResult
+        return new AuthTokenResult
         {
             AccessToken = access.Token,
             ExpiresAtUtc = access.ExpiresAtUtc,
