@@ -1,3 +1,4 @@
+using GymAppApi.Application.Common.ContactVerification;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.Auth.Common;
 using GymAppApi.Application.Features.Auth.Exceptions;
@@ -9,8 +10,6 @@ namespace GymAppApi.Application.Features.Auth.Commands.RegisterComplete;
 
 public class RegisterCompleteCommandHandler : IRequestHandler<RegisterCompleteCommand, AuthTokenResult>
 {
-    private const int MaxAttempts = 5;
-
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
@@ -31,7 +30,7 @@ public class RegisterCompleteCommandHandler : IRequestHandler<RegisterCompleteCo
 
         var phonePending = await pendingReadRepo.GetAsync(
             p => p.Channel == ContactChannel.Phone && p.Target == request.Phone, cancellationToken: cancellationToken);
-        var phoneValid = TryConsumeAttempt(phonePending, request.PhoneCode, pendingWriteRepo);
+        var phoneValid = PendingVerificationCodeService.TryConsumeAttempt(phonePending, request.PhoneCode, pendingWriteRepo);
 
         PendingContactVerification? emailPending = null;
         var emailValid = true;
@@ -39,7 +38,7 @@ public class RegisterCompleteCommandHandler : IRequestHandler<RegisterCompleteCo
         {
             emailPending = await pendingReadRepo.GetAsync(
                 p => p.Channel == ContactChannel.Email && p.Target == normalizedEmail, cancellationToken: cancellationToken);
-            emailValid = TryConsumeAttempt(emailPending, request.EmailCode!, pendingWriteRepo);
+            emailValid = PendingVerificationCodeService.TryConsumeAttempt(emailPending, request.EmailCode!, pendingWriteRepo);
         }
 
         if (!phoneValid || !emailValid)
@@ -108,22 +107,5 @@ public class RegisterCompleteCommandHandler : IRequestHandler<RegisterCompleteCo
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
             throw;
         }
-    }
-
-    private static bool TryConsumeAttempt(PendingContactVerification? pending, string code, IWriteRepository<PendingContactVerification> writeRepo)
-    {
-        if (pending is null || pending.ExpiresAt <= DateTime.UtcNow || pending.AttemptCount >= MaxAttempts)
-        {
-            return false;
-        }
-
-        if (pending.Code != code)
-        {
-            pending.AttemptCount += 1;
-            writeRepo.Update(pending);
-            return false;
-        }
-
-        return true;
     }
 }

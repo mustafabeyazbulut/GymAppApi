@@ -7,4 +7,5 @@ namespace GymAppApi.Application.Features.Auth.Commands.UnfreezeAccount;
 public class UnfreezeAccountCommand : IRequest
 {
     public int UserId { get; set; }
+    public string Code { get; set; } = null!;
 }

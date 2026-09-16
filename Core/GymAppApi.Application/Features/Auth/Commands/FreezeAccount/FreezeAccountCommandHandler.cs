@@ -1,6 +1,9 @@
+using GymAppApi.Application.Common.ContactVerification;
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
+using GymAppApi.Domain.Enums;
 using MediatR;
 
 namespace GymAppApi.Application.Features.Auth.Commands.FreezeAccount;
@@ -20,8 +23,22 @@ public class FreezeAccountCommandHandler : IRequestHandler<FreezeAccountCommand>
             throw new NotFoundException($"Kullanıcı {request.UserId} bulunamadı.");
         }
 
+        var pendingReadRepo = _unitOfWork.GetReadRepository<PendingContactVerification>();
+        var pendingWriteRepo = _unitOfWork.GetWriteRepository<PendingContactVerification>();
+        var pending = await pendingReadRepo.GetAsync(
+            p => p.Channel == ContactChannel.Phone && p.Target == user.Phone, cancellationToken: cancellationToken);
+        var codeValid = PendingVerificationCodeService.TryConsumeAttempt(pending, request.Code, pendingWriteRepo);
+        if (!codeValid)
+        {
+            // No ambient transaction here - this save commits immediately so
+            // the AttemptCount increment above survives the throw right after.
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            throw new InvalidContactVerificationCodeException(phoneFailed: true, emailFailed: false);
+        }
+
         user.IsAccountFrozen = true;
         _unitOfWork.GetWriteRepository<User>().Update(user);
+        pendingWriteRepo.Remove(pending!);
 
         // Freezing takes effect everywhere immediately, not just for future
         // requests - revoke every currently-active session, matching

@@ -2,12 +2,14 @@ using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Auth.Commands.DeleteMe;
 using GymAppApi.Application.Features.Auth.Commands.ForgotPassword;
 using GymAppApi.Application.Features.Auth.Commands.FreezeAccount;
+using GymAppApi.Application.Features.Auth.Commands.FreezeAccountRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.Login;
 using GymAppApi.Application.Features.Auth.Commands.Refresh;
 using GymAppApi.Application.Features.Auth.Commands.RegisterComplete;
 using GymAppApi.Application.Features.Auth.Commands.RegisterRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.ResetPassword;
 using GymAppApi.Application.Features.Auth.Commands.UnfreezeAccount;
+using GymAppApi.Application.Features.Auth.Commands.UnfreezeAccountRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.UpdatePreferredLanguage;
 using GymAppApi.Application.Features.Auth.Queries.GetMe;
 using MediatR;
@@ -88,18 +90,36 @@ public class AuthController : ControllerBase
     }
 
     [Authorize]
-    [HttpPost("me/freeze")]
-    public async Task<IActionResult> FreezeAccount(CancellationToken cancellationToken)
+    [HttpPost("me/freeze/request-otp")]
+    public async Task<IActionResult> RequestFreezeOtp(CancellationToken cancellationToken)
     {
-        await _mediator.Send(new FreezeAccountCommand { UserId = CurrentUserId }, cancellationToken);
+        await _mediator.Send(new FreezeAccountRequestOtpCommand { UserId = CurrentUserId }, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("me/freeze")]
+    public async Task<IActionResult> FreezeAccount(FreezeAccountCommand command, CancellationToken cancellationToken)
+    {
+        command.UserId = CurrentUserId;
+        await _mediator.Send(command, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("me/unfreeze/request-otp")]
+    public async Task<IActionResult> RequestUnfreezeOtp(CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new UnfreezeAccountRequestOtpCommand { UserId = CurrentUserId }, cancellationToken);
         return NoContent();
     }
 
     [Authorize]
     [HttpPost("me/unfreeze")]
-    public async Task<IActionResult> UnfreezeAccount(CancellationToken cancellationToken)
+    public async Task<IActionResult> UnfreezeAccount(UnfreezeAccountCommand command, CancellationToken cancellationToken)
     {
-        await _mediator.Send(new UnfreezeAccountCommand { UserId = CurrentUserId }, cancellationToken);
+        command.UserId = CurrentUserId;
+        await _mediator.Send(command, cancellationToken);
         return NoContent();
     }
 }
