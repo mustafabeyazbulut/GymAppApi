@@ -31,6 +31,7 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
             Phone = user.Phone,
             Email = user.Email,
             PreferredLanguage = user.PreferredLanguage,
+            IsAccountFrozen = user.IsAccountFrozen,
             Assignments = user.Assignments
                 .Where(a => a.IsActive)
                 .Select(a => new MeAssignmentDto

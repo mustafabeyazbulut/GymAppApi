@@ -1,11 +1,13 @@
 using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Auth.Commands.DeleteMe;
 using GymAppApi.Application.Features.Auth.Commands.ForgotPassword;
+using GymAppApi.Application.Features.Auth.Commands.FreezeAccount;
 using GymAppApi.Application.Features.Auth.Commands.Login;
 using GymAppApi.Application.Features.Auth.Commands.Refresh;
 using GymAppApi.Application.Features.Auth.Commands.RegisterComplete;
 using GymAppApi.Application.Features.Auth.Commands.RegisterRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.ResetPassword;
+using GymAppApi.Application.Features.Auth.Commands.UnfreezeAccount;
 using GymAppApi.Application.Features.Auth.Commands.UpdatePreferredLanguage;
 using GymAppApi.Application.Features.Auth.Queries.GetMe;
 using MediatR;
@@ -82,6 +84,22 @@ public class AuthController : ControllerBase
     {
         command.UserId = CurrentUserId;
         await _mediator.Send(command, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("me/freeze")]
+    public async Task<IActionResult> FreezeAccount(CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new FreezeAccountCommand { UserId = CurrentUserId }, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("me/unfreeze")]
+    public async Task<IActionResult> UnfreezeAccount(CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new UnfreezeAccountCommand { UserId = CurrentUserId }, cancellationToken);
         return NoContent();
     }
 }

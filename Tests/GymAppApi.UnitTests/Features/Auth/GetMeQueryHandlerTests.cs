@@ -41,11 +41,11 @@ public class GetMeQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ReturnsPreferredLanguage()
+    public async Task Handle_ReturnsPreferredLanguageAndIsAccountFrozen()
     {
         var user = new User
         {
-            Id = 1, FullName = "Ayşe", Phone = "+905551112233", PasswordHash = "x", PreferredLanguage = "en",
+            Id = 1, FullName = "Ayşe", Phone = "+905551112233", PasswordHash = "x", PreferredLanguage = "en", IsAccountFrozen = true,
             Assignments = new List<Assignment>(),
         };
         var userReadRepo = new Mock<IReadRepository<User>>();
@@ -58,6 +58,7 @@ public class GetMeQueryHandlerTests
         var result = await handler.Handle(new GetMeQuery { UserId = 1 }, CancellationToken.None);
 
         Assert.Equal("en", result.PreferredLanguage);
+        Assert.True(result.IsAccountFrozen);
     }
 
     [Fact]

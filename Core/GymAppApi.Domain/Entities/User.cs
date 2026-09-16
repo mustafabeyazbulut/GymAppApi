@@ -19,5 +19,13 @@ public class User : EntityBase
     public bool PhoneVerified { get; set; }
     public bool EmailVerified { get; set; }
 
+    // Self-service, temporary "deactivate my account" (distinct from an
+    // Assignment/membership freeze, which pauses a gym package). Login is
+    // never blocked by this flag — the mobile client checks it via GetMe
+    // and gates navigation behind a reactivation screen instead, mirroring
+    // Instagram's "temporarily disable" pattern. See
+    // docs/superpowers/specs/2026-09-16-account-freeze-design.md.
+    public bool IsAccountFrozen { get; set; }
+
     public ICollection<Assignment> Assignments { get; set; } = new List<Assignment>();
 }
