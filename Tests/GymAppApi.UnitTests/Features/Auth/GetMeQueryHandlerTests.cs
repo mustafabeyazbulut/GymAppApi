@@ -41,6 +41,26 @@ public class GetMeQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ReturnsPreferredLanguage()
+    {
+        var user = new User
+        {
+            Id = 1, FullName = "Ayşe", Phone = "+905551112233", PasswordHash = "x", PreferredLanguage = "en",
+            Assignments = new List<Assignment>(),
+        };
+        var userReadRepo = new Mock<IReadRepository<User>>();
+        userReadRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<User, bool>>>(), It.IsAny<Func<IQueryable<User>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<User, object>>?>(), false, default))
+            .ReturnsAsync(user);
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
+
+        var handler = new GetMeQueryHandler(uow.Object);
+        var result = await handler.Handle(new GetMeQuery { UserId = 1 }, CancellationToken.None);
+
+        Assert.Equal("en", result.PreferredLanguage);
+    }
+
+    [Fact]
     public async Task Handle_MapsActiveAssignmentsWithRoleAsString()
     {
         var company = new Company { Id = 3, Name = "MAT & MOVE Kadıköy", IsActive = true };

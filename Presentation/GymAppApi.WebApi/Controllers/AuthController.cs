@@ -6,6 +6,7 @@ using GymAppApi.Application.Features.Auth.Commands.Refresh;
 using GymAppApi.Application.Features.Auth.Commands.RegisterComplete;
 using GymAppApi.Application.Features.Auth.Commands.RegisterRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.ResetPassword;
+using GymAppApi.Application.Features.Auth.Commands.UpdatePreferredLanguage;
 using GymAppApi.Application.Features.Auth.Queries.GetMe;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -72,6 +73,15 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> DeleteMe(CancellationToken cancellationToken)
     {
         await _mediator.Send(new DeleteMeCommand { UserId = CurrentUserId }, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPatch("me/language")]
+    public async Task<IActionResult> UpdatePreferredLanguage(UpdatePreferredLanguageCommand command, CancellationToken cancellationToken)
+    {
+        command.UserId = CurrentUserId;
+        await _mediator.Send(command, cancellationToken);
         return NoContent();
     }
 }

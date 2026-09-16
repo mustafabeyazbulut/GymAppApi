@@ -30,6 +30,7 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
             FullName = user.FullName,
             Phone = user.Phone,
             Email = user.Email,
+            PreferredLanguage = user.PreferredLanguage,
             Assignments = user.Assignments
                 .Where(a => a.IsActive)
                 .Select(a => new MeAssignmentDto

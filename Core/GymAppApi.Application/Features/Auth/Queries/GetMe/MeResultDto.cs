@@ -6,6 +6,7 @@ public class MeResultDto
     public string FullName { get; set; } = null!;
     public string Phone { get; set; } = null!;
     public string? Email { get; set; }
+    public string PreferredLanguage { get; set; } = null!;
     public IReadOnlyList<MeAssignmentDto> Assignments { get; set; } = new List<MeAssignmentDto>();
 }
 
