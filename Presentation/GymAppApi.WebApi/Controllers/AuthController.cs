@@ -3,7 +3,8 @@ using GymAppApi.Application.Features.Auth.Commands.DeleteMe;
 using GymAppApi.Application.Features.Auth.Commands.ForgotPassword;
 using GymAppApi.Application.Features.Auth.Commands.Login;
 using GymAppApi.Application.Features.Auth.Commands.Refresh;
-using GymAppApi.Application.Features.Auth.Commands.Register;
+using GymAppApi.Application.Features.Auth.Commands.RegisterComplete;
+using GymAppApi.Application.Features.Auth.Commands.RegisterRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.ResetPassword;
 using GymAppApi.Application.Features.Auth.Queries.GetMe;
 using MediatR;
@@ -28,8 +29,15 @@ public class AuthController : ControllerBase
 
     private int CurrentUserId => int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
 
-    [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterCommand command, CancellationToken cancellationToken)
+    [HttpPost("register/request-otp")]
+    public async Task<IActionResult> RequestRegistrationOtp(RegisterRequestOtpCommand command, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(command, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("register/complete")]
+    public async Task<IActionResult> CompleteRegistration(RegisterCompleteCommand command, CancellationToken cancellationToken)
     {
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
