@@ -1422,14 +1422,14 @@ git commit -m "Add POST /api/assignments/staff for GymAdmin/BranchManager/SuperA
 
 **Do this task LAST, only after the mobile plan has already shipped its "Add Company"/"Add Staff Member" screens and removed its own Register screen** (mobile plan's own last task) — until then, self-registration is still the only way anyone can create a test account on a fresh database, including for this very plan's own manual verification in Task 10.
 
-**Status check (2026-09-17): still blocked.** `C:\Users\MBEYAZBULUT\Documents\GitHub\GymApp` has only added its plan file (commit `4805d08` "Add Tenant Onboarding (Mobile) implementation plan") — no screens implemented yet, no memory entry tracking its progress. Do not start this task until that repo's own progress memory (once it exists) or its git log shows the Add Company/Add Staff Member screens shipped and Register screen removed.
+**Status check (2026-09-17): unblocked, DONE.** `GymApp` shipped all 6 of its plan's tasks (see its own `docs/superpowers/plans/2026-09-17-tenant-onboarding.md` and `.claude/memory/project-tenant-onboarding-mobile-status.md`), including Task 6 (Register screen removed, commit `3034443` there). This task executed in commit `345c6f5`.
 
-- [ ] **Step 1: Confirm nothing else references what's about to be deleted**
+- [x] **Step 1: Confirm nothing else references what's about to be deleted** — done. **Deviation from the plan's own file list, per this step's own escape clause:** `EmailAlreadyRegisteredException` is NOT safe to delete — unlike when this plan was written, it's now also used by `CreateCompanyCommandHandler` and `AddStaffMemberCommandHandler` (added in this same plan's Tasks 6/8). Kept that file; deleted everything else in the original list (`PhoneAlreadyRegisteredException` was register-only, confirmed by the same grep, and was deleted).
 
 Run: `grep -rn "PhoneAlreadyRegisteredException\|EmailAlreadyRegisteredException\|RegisterRequestOtpCommand\|RegisterCompleteCommand" --include=*.cs .`
 Expected: every hit is inside one of the files listed above to be deleted, or `AuthController.cs` (handled in Step 2). If anything else references them, stop and re-scope this step — do not delete something still in use.
 
-- [ ] **Step 2: Remove the two routes from `AuthController`**
+- [x] **Step 2: Remove the two routes from `AuthController`**
 
 Remove these two actions (and their now-unused `using` lines for `RegisterComplete`/`RegisterRequestOtp`) from `Presentation/GymAppApi.WebApi/Controllers/AuthController.cs`:
 
@@ -1449,7 +1449,7 @@ Remove these two actions (and their now-unused `using` lines for `RegisterComple
     }
 ```
 
-- [ ] **Step 3: Delete the files listed above**
+- [x] **Step 3: Delete the files listed above** — done, minus `EmailAlreadyRegisteredException.cs` (kept, see Step 1's note).
 
 ```bash
 git rm -r Core/GymAppApi.Application/Features/Auth/Commands/RegisterRequestOtp
@@ -1462,17 +1462,18 @@ git rm Tests/GymAppApi.IntegrationTests/RegisterCompleteAttemptPersistenceTests.
 git rm Tests/GymAppApi.IntegrationTests/RegisterCompleteMaxAttemptsPipelineTests.cs
 ```
 
-- [ ] **Step 4: Build and run the full suite**
+- [x] **Step 4: Build and run the full suite** — done: `dotnet build` 0 errors, `dotnet test` 93 unit + 21 integration, all green (down from 107/24 — exactly the removed register tests, no other regressions).
 
-Run: `dotnet build && dotnet test`
-Expected: build succeeds with 0 errors (confirms nothing else referenced the deleted types), full suite passes.
-
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** — done, commit `345c6f5`.
 
 ```bash
 git add -A
 git commit -m "Retire self-service registration - accounts are now staff-created via CreateCompany/AddStaffMember"
 ```
+
+## PLAN COMPLETE (2026-09-17) — all 11 tasks done
+
+Tasks 1-9 done same day as this plan's writing; Task 10 (manual e2e verification) and Task 11 (this task) done later the same day, after mobile's own plan shipped. Nothing pending in this plan.
 
 ---
 
