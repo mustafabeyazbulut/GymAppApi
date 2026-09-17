@@ -1,4 +1,6 @@
+using System.Linq.Expressions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Application.Features.Companies.Commands.CreateCompany;
 using GymAppApi.Domain.Entities;
 using Moq;
@@ -73,5 +75,71 @@ public class CreateCompanyCommandHandlerTests
         Assert.Equal(55, result.GymAdminUserId);
         userWriteRepo.Verify(r => r.AddAsync(It.IsAny<User>(), default), Times.Never);
         assignmentWriteRepo.Verify(r => r.AddAsync(It.Is<Assignment>(a => a.UserId == 55), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_CallsSmsSenderOnlyAfterTheTransactionHasBeenCommitted()
+    {
+        var (uow, _, _, _, _, _) = Wire(phoneAlreadyExists: false);
+        var passwordHasher = new Mock<IPasswordHasher>();
+        passwordHasher.Setup(p => p.Hash(It.IsAny<string>())).Returns("hashed");
+        var smsSender = new Mock<ISmsSender>();
+
+        // A MockSequence on loose mocks only re-routes matching calls; an
+        // out-of-order call would still be silently satisfied by Moq's
+        // default async fallback (Task.CompletedTask) instead of failing.
+        // Recording actual invocation order is what genuinely fails this
+        // test if SendAsync were ever called before CommitTransactionAsync.
+        var callOrder = new List<string>();
+        uow.Setup(u => u.CommitTransactionAsync(default))
+            .Callback(() => callOrder.Add("commit"))
+            .Returns(Task.CompletedTask);
+        smsSender.Setup(s => s.SendAsync(It.IsAny<string>(), It.IsAny<string>(), default))
+            .Callback(() => callOrder.Add("sms"))
+            .Returns(Task.CompletedTask);
+
+        var handler = new CreateCompanyCommandHandler(uow.Object, passwordHasher.Object, smsSender.Object);
+
+        await handler.Handle(ValidCommand(), CancellationToken.None);
+
+        Assert.Equal(new[] { "commit", "sms" }, callOrder);
+    }
+
+    [Fact]
+    public async Task Handle_WhenAWriteFailsMidTransaction_RollsBackAndNeverSendsSms()
+    {
+        var (uow, _, _, _, _, assignmentWriteRepo) = Wire(phoneAlreadyExists: false);
+        assignmentWriteRepo.Setup(r => r.AddAsync(It.IsAny<Assignment>(), default))
+            .ThrowsAsync(new InvalidOperationException("boom"));
+        var passwordHasher = new Mock<IPasswordHasher>();
+        passwordHasher.Setup(p => p.Hash(It.IsAny<string>())).Returns("hashed");
+        var smsSender = new Mock<ISmsSender>();
+        var handler = new CreateCompanyCommandHandler(uow.Object, passwordHasher.Object, smsSender.Object);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
+
+        uow.Verify(u => u.RollbackTransactionAsync(default), Times.Once);
+        uow.Verify(u => u.CommitTransactionAsync(default), Times.Never);
+        smsSender.Verify(s => s.SendAsync(It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenGymAdminEmailAlreadyBelongsToAnotherUser_ThrowsAndCreatesNothing()
+    {
+        var (uow, userReadRepo, userWriteRepo, companyWriteRepo, _, assignmentWriteRepo) = Wire(phoneAlreadyExists: false);
+        userReadRepo.Setup(r => r.AnyAsync(It.IsAny<Expression<Func<User, bool>>>(), default))
+            .ReturnsAsync(true);
+        var passwordHasher = new Mock<IPasswordHasher>();
+        var smsSender = new Mock<ISmsSender>();
+        var handler = new CreateCompanyCommandHandler(uow.Object, passwordHasher.Object, smsSender.Object);
+        var command = ValidCommand();
+        command.GymAdminEmail = "taken@example.com";
+
+        await Assert.ThrowsAsync<EmailAlreadyRegisteredException>(() => handler.Handle(command, CancellationToken.None));
+
+        companyWriteRepo.Verify(r => r.AddAsync(It.IsAny<Company>(), default), Times.Never);
+        userWriteRepo.Verify(r => r.AddAsync(It.IsAny<User>(), default), Times.Never);
+        assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        smsSender.Verify(s => s.SendAsync(It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
     }
 }

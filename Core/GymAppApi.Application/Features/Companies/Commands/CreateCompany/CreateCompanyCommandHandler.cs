@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -25,8 +26,18 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
         // has no per-company scope to violate, so the policy's own fresh
         // per-request Assignment re-query (AssignmentRoleAuthorizationHandler)
         // is already the complete check.
-        var existingGymAdmin = await _unitOfWork.GetReadRepository<User>()
+        var userReadRepo = _unitOfWork.GetReadRepository<User>();
+        var existingGymAdmin = await userReadRepo
             .GetAsync(u => u.Phone == request.GymAdminPhone, cancellationToken: cancellationToken);
+
+        // Only relevant on the new-user-creation path: if we're reusing an
+        // existing user found by phone, that user's own email (if any) is
+        // not being changed here, so there's nothing to collide with.
+        if (existingGymAdmin is null && !string.IsNullOrWhiteSpace(request.GymAdminEmail)
+            && await userReadRepo.AnyAsync(u => u.Email == request.GymAdminEmail, cancellationToken))
+        {
+            throw new EmailAlreadyRegisteredException();
+        }
 
         await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
@@ -76,7 +87,7 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
 
             await _smsSender.SendAsync(
                 request.GymAdminPhone,
-                $"GymApp hesabınız oluşturuldu. Şifrenizi belirlemek için 'Şifremi Unuttum' akışını kullanın.",
+                "GymApp hesabınız oluşturuldu. Şifrenizi belirlemek için 'Şifremi Unuttum' akışını kullanın.",
                 cancellationToken);
 
             return new CreateCompanyCommandResult
