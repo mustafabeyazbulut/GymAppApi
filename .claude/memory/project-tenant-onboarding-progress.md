@@ -28,6 +28,8 @@ metadata:
 
 **Follow-up done (2026-09-17, commit `d4ce7e9`):** `CreateCompanyCommand`/`AddStaffMemberCommand` reworked — they now look up the Gym Admin/Member/Trainer by phone and **404 if no such registered user exists**, instead of silently creating a brand-new `User`. `GymAdminFullName`/`GymAdminEmail` (CreateCompany) and `FullName`/`Email` (AddStaffMember) were removed from both commands/validators since there's no longer a creation path that needs them. `IPasswordHasher` is no longer a dependency of either handler for the same reason. SMS wording changed from "hesabınız oluşturuldu" (account created) to "atandınız" (assigned), since the account already existed. User confirmed this scope before the rework (see [[feedback-never-remove-registration-pointer]]).
 
+**Second follow-up done (2026-09-17, same day):** the "atandınız" wording above was itself superseded a few hours later — neither command attaches the found user immediately anymore, both now require the invitee to confirm an SMS code first. Full detail in [[project-assignment-invitation-security]].
+
 ## Known permanent local state (not a bug, don't "fix")
 
 `Presentation/GymAppApi.WebApi/Program.cs` always carries an **uncommitted, local-only** dev CORS block (`AddCors("DevClients", AllowAnyOrigin/Header/Method)` + `app.UseCors("DevClients")` inside the `IsDevelopment()` block) — used to let the mobile app hit this API from a LAN device during manual testing. It was accidentally committed once and reverted (commit 135b67a "Remove accidentally-committed dev-only CORS block from Program.cs"). When staging/committing any other Program.cs change, split the diff so this block stays uncommitted (edit it out, stage, commit, then paste it back in) rather than committing it or deleting it.

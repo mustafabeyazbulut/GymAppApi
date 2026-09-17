@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
+using GymAppApi.Infrastructure.Tenancy;
 using GymAppApi.Persistence.Context;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -77,6 +78,49 @@ public class CompaniesAuthorizationTests : IClassFixture<CustomWebApplicationFac
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var notification = db.Notifications.Single(n => n.UserId == futureGymAdmin.Id);
         Assert.False(notification.IsRead);
+
+        // Assignment is ITenantScoped - this scope's own AmbientTenantContext
+        // was never populated by TenantContextMiddleware (that only runs for
+        // real HTTP requests), so it defaults fail-closed and would hide any
+        // company-scoped row regardless of whether one exists. Flip it to
+        // SuperAdmin to get an honest read for this assertion.
+        scope.ServiceProvider.GetRequiredService<AmbientTenantContext>().IsSuperAdmin = true;
+        Assert.False(db.Assignments.Any(a => a.UserId == futureGymAdmin.Id));
+    }
+
+    [Fact]
+    public async Task Create_ThenConfirmWithTheInvitedUsersOwnCode_CreatesTheGymAdminAssignment()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
+        var superAdmin = new User { FullName = "Super Admin", Phone = "+905550002244", PasswordHash = "x" };
+        var futureGymAdmin = new User { FullName = "Future Gym Admin", Phone = "+905559998866", PasswordHash = "x" };
+        db.Users.AddRange(superAdmin, futureGymAdmin);
+        await db.SaveChangesAsync();
+        db.Assignments.Add(new Assignment { UserId = superAdmin.Id, CompanyId = null, Role = AssignmentRole.SuperAdmin, IsActive = true });
+        await db.SaveChangesAsync();
+
+        var jwtService = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var superAdminToken = jwtService.GenerateAccessToken(new AccessTokenClaims(superAdmin.Id, superAdmin.FullName, superAdmin.Email, superAdmin.Phone)).Token;
+        var gymAdminToken = jwtService.GenerateAccessToken(new AccessTokenClaims(futureGymAdmin.Id, futureGymAdmin.FullName, futureGymAdmin.Email, futureGymAdmin.Phone)).Token;
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", superAdminToken);
+        var createResponse = await client.PostAsJsonAsync("/api/companies", ValidBody(gymAdminPhone: "+905559998866"));
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateCompanyResultDto>();
+
+        var code = db.PendingAssignmentInvitations.Single(p => p.TargetUserId == futureGymAdmin.Id).Code;
+
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminToken);
+        var confirmResponse = await client.PostAsJsonAsync("/api/assignments/confirm", new { code });
+
+        Assert.Equal(HttpStatusCode.Created, confirmResponse.StatusCode);
+
+        // See the AmbientTenantContext note in Create_WithSuperAdminToken_Returns201.
+        scope.ServiceProvider.GetRequiredService<AmbientTenantContext>().IsSuperAdmin = true;
+        var assignment = db.Assignments.Single(a => a.UserId == futureGymAdmin.Id);
+        Assert.Equal(created!.CompanyId, assignment.CompanyId);
+        Assert.Equal(AssignmentRole.GymAdmin, assignment.Role);
     }
 
     [Fact]
@@ -190,6 +234,8 @@ public class CompaniesAuthorizationTests : IClassFixture<CustomWebApplicationFac
         var detail = await getResponse.Content.ReadFromJsonAsync<CompanyDetailDto>();
         Assert.False(detail!.IsActive);
     }
+
+    private record CreateCompanyResultDto(int CompanyId, int BranchId, int GymAdminUserId, string GymAdminPhone);
 
     private record CompanyListItemDto(int Id, string Name, bool IsActive, int BranchCount);
 

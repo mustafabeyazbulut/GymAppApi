@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Companies.Commands.CreateCompany;
 using GymAppApi.Application.Features.Companies.Commands.SetCompanyActive;
 using GymAppApi.Application.Features.Companies.Commands.UpdateCompanyName;
@@ -18,6 +19,8 @@ public class CompaniesController : ControllerBase
 
     public CompaniesController(IMediator mediator) => _mediator = mediator;
 
+    private int CurrentUserId => int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
+
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetCompaniesQuery(), cancellationToken));
@@ -29,6 +32,7 @@ public class CompaniesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateCompanyCommand command, CancellationToken cancellationToken)
     {
+        command.RequestedByUserId = CurrentUserId;
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }

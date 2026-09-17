@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Invitations;
 using GymAppApi.Application.Common.Notifications;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -54,25 +55,28 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
             };
             await _unitOfWork.GetWriteRepository<Branch>().AddAsync(branch, cancellationToken);
 
+            // Security requirement: SuperAdmin knowing this phone number is
+            // never enough by itself to make someone a GymAdmin - the
+            // Assignment only comes into existence once the invitee confirms
+            // this code themselves (ConfirmAssignmentInvitationCommand).
             // GymAdmin's BranchId is null by design (Assignment.cs's own
             // comment: a GymAdmin assignment has CompanyId set, BranchId
             // null, meaning "all branches of this company").
-            await _unitOfWork.GetWriteRepository<Assignment>().AddAsync(new Assignment
-            {
-                UserId = gymAdminUser.Id,
-                CompanyId = company.Id,
-                BranchId = null,
-                Role = AssignmentRole.GymAdmin,
-                IsActive = true,
-            }, cancellationToken);
+            var code = await AssignmentInvitationService.IssueAsync(
+                _unitOfWork, gymAdminUser.Id, company.Id, null, AssignmentRole.GymAdmin, request.RequestedByUserId, cancellationToken);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-            var notificationText = $"GymApp'te '{request.CompanyName}' firmasının Gym Admin'i olarak atandınız.";
-            await _smsSender.SendAsync(request.GymAdminPhone, notificationText, cancellationToken);
+            await _smsSender.SendAsync(
+                request.GymAdminPhone,
+                $"GymApp'te '{request.CompanyName}' firmasının Gym Admin'i olmak üzeresiniz. Onay kodu: {code} (10 dakika geçerli).",
+                cancellationToken);
             await NotificationDispatcher.NotifyUserAsync(
-                _unitOfWork, _pushNotificationSender, gymAdminUser.Id, "Yeni firma ataması", notificationText, cancellationToken);
+                _unitOfWork, _pushNotificationSender, gymAdminUser.Id,
+                "Yeni firma daveti",
+                "Bir firmanın Gym Admin'i olmanız için davet gönderildi. Telefonunuza gelen kodla onaylayabilirsiniz.",
+                cancellationToken);
 
             return new CreateCompanyCommandResult
             {

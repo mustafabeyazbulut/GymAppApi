@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Assignments.Commands.AddStaffMember;
+using GymAppApi.Application.Features.Assignments.Commands.ConfirmAssignmentInvitation;
 using GymAppApi.Application.Features.Assignments.Commands.CreateAssignment;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -31,6 +32,18 @@ public class AssignmentsController : ControllerBase
     public async Task<IActionResult> AddStaffMember(AddStaffMemberCommand command, CancellationToken cancellationToken)
     {
         command.RequestedByUserId = CurrentUserId;
+        var result = await _mediator.Send(command, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    // Any authenticated user can call this - it's how the INVITEE (not the
+    // inviter) confirms a pending GymAdmin/Member/Trainer invitation sent to
+    // their own phone. See ConfirmAssignmentInvitationCommand.
+    [Authorize]
+    [HttpPost("confirm")]
+    public async Task<IActionResult> ConfirmInvitation(ConfirmAssignmentInvitationCommand command, CancellationToken cancellationToken)
+    {
+        command.UserId = CurrentUserId;
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }

@@ -10,7 +10,8 @@ public class CreateCompanyCommandHandlerTests
 {
     private static (Mock<IUnitOfWork> uow, Mock<IReadRepository<User>> userReadRepo,
         Mock<IWriteRepository<Company>> companyWriteRepo, Mock<IWriteRepository<Branch>> branchWriteRepo,
-        Mock<IWriteRepository<Assignment>> assignmentWriteRepo, Mock<IWriteRepository<Notification>> notificationWriteRepo) Wire(User? existingGymAdmin)
+        Mock<IWriteRepository<Assignment>> assignmentWriteRepo, Mock<IWriteRepository<Notification>> notificationWriteRepo,
+        Mock<IWriteRepository<PendingAssignmentInvitation>> invitationWriteRepo) Wire(User? existingGymAdmin)
     {
         var userReadRepo = new Mock<IReadRepository<User>>();
         userReadRepo.Setup(r => r.GetAsync(
@@ -32,11 +33,22 @@ public class CreateCompanyCommandHandlerTests
                 It.IsAny<System.Linq.Expressions.Expression<Func<DeviceToken, bool>>>(), null, null, false, default))
             .ReturnsAsync(new List<DeviceToken>());
         uow.Setup(u => u.GetReadRepository<DeviceToken>()).Returns(deviceTokenReadRepo.Object);
+
+        var invitationReadRepo = new Mock<IReadRepository<PendingAssignmentInvitation>>();
+        invitationReadRepo.Setup(r => r.GetAllAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<PendingAssignmentInvitation, bool>>>(), null, null, false, default))
+            .ReturnsAsync(new List<PendingAssignmentInvitation>());
+        uow.Setup(u => u.GetReadRepository<PendingAssignmentInvitation>()).Returns(invitationReadRepo.Object);
+        var invitationWriteRepo = new Mock<IWriteRepository<PendingAssignmentInvitation>>();
+        uow.Setup(u => u.GetWriteRepository<PendingAssignmentInvitation>()).Returns(invitationWriteRepo.Object);
+
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
         uow.Setup(u => u.BeginTransactionAsync(default)).ReturnsAsync(Mock.Of<IAsyncDisposable>());
 
-        return (uow, userReadRepo, companyWriteRepo, branchWriteRepo, assignmentWriteRepo, notificationWriteRepo);
+        return (uow, userReadRepo, companyWriteRepo, branchWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo);
     }
+
+    private const int SuperAdminId = 1;
 
     private static CreateCompanyCommand ValidCommand() => new()
     {
@@ -44,13 +56,14 @@ public class CreateCompanyCommandHandlerTests
         BranchName = "Merkez",
         BranchAddress = "Adres",
         GymAdminPhone = "+905551112233",
+        RequestedByUserId = SuperAdminId,
     };
 
     [Fact]
-    public async Task Handle_WhenGymAdminPhoneBelongsToAnExistingUser_CreatesCompanyBranchAndGymAdminAssignment()
+    public async Task Handle_WhenGymAdminPhoneBelongsToAnExistingUser_CreatesCompanyBranchAndIssuesAPendingInvitation()
     {
         var existingGymAdmin = new User { Id = 55, FullName = "Ada Admin", Phone = "+905551112233", PasswordHash = "x" };
-        var (uow, _, companyWriteRepo, branchWriteRepo, assignmentWriteRepo, notificationWriteRepo) = Wire(existingGymAdmin);
+        var (uow, _, companyWriteRepo, branchWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo) = Wire(existingGymAdmin);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
@@ -60,8 +73,9 @@ public class CreateCompanyCommandHandlerTests
         Assert.Equal(55, result.GymAdminUserId);
         companyWriteRepo.Verify(r => r.AddAsync(It.Is<Company>(c => c.Name == "Test Gym" && c.IsActive), default), Times.Once);
         branchWriteRepo.Verify(r => r.AddAsync(It.Is<Branch>(b => b.Name == "Merkez" && b.Address == "Adres"), default), Times.Once);
-        assignmentWriteRepo.Verify(r => r.AddAsync(It.Is<Assignment>(a =>
-            a.UserId == 55 && a.Role == GymAppApi.Domain.Enums.AssignmentRole.GymAdmin && a.BranchId == null), default), Times.Once);
+        assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        invitationWriteRepo.Verify(r => r.AddAsync(It.Is<PendingAssignmentInvitation>(p =>
+            p.TargetUserId == 55 && p.Role == GymAppApi.Domain.Enums.AssignmentRole.GymAdmin && p.BranchId == null), default), Times.Once);
         smsSender.Verify(s => s.SendAsync("+905551112233", It.IsAny<string>(), default), Times.Once);
         notificationWriteRepo.Verify(r => r.AddAsync(It.Is<Notification>(n => n.UserId == 55 && !n.IsRead), default), Times.Once);
     }
@@ -69,7 +83,7 @@ public class CreateCompanyCommandHandlerTests
     [Fact]
     public async Task Handle_WhenGymAdminPhoneDoesNotBelongToAnyRegisteredUser_ThrowsNotFoundException()
     {
-        var (uow, _, companyWriteRepo, _, assignmentWriteRepo, notificationWriteRepo) = Wire(existingGymAdmin: null);
+        var (uow, _, companyWriteRepo, _, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo) = Wire(existingGymAdmin: null);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
@@ -78,6 +92,7 @@ public class CreateCompanyCommandHandlerTests
 
         companyWriteRepo.Verify(r => r.AddAsync(It.IsAny<Company>(), default), Times.Never);
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
         smsSender.Verify(s => s.SendAsync(It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
         notificationWriteRepo.Verify(r => r.AddAsync(It.IsAny<Notification>(), default), Times.Never);
     }
@@ -86,7 +101,7 @@ public class CreateCompanyCommandHandlerTests
     public async Task Handle_CallsSmsSenderOnlyAfterTheTransactionHasBeenCommitted()
     {
         var existingGymAdmin = new User { Id = 55, FullName = "Ada Admin", Phone = "+905551112233", PasswordHash = "x" };
-        var (uow, _, _, _, _, _) = Wire(existingGymAdmin);
+        var (uow, _, _, _, _, _, _) = Wire(existingGymAdmin);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
 
@@ -114,11 +129,10 @@ public class CreateCompanyCommandHandlerTests
     public async Task Handle_WhenAWriteFailsMidTransaction_RollsBackAndNeverSendsSmsOrNotifies()
     {
         var existingGymAdmin = new User { Id = 55, FullName = "Ada Admin", Phone = "+905551112233", PasswordHash = "x" };
-        var (uow, _, _, _, assignmentWriteRepo, notificationWriteRepo) = Wire(existingGymAdmin);
-        assignmentWriteRepo.Setup(r => r.AddAsync(It.IsAny<Assignment>(), default))
-            .ThrowsAsync(new InvalidOperationException("boom"));
+        var (uow, _, _, _, _, notificationWriteRepo, _) = Wire(existingGymAdmin);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
+        uow.Setup(u => u.GetWriteRepository<Branch>()).Returns(() => throw new InvalidOperationException("boom"));
         var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(ValidCommand(), CancellationToken.None));

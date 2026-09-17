@@ -13,7 +13,7 @@ public class AddStaffMemberCommandHandlerTests
     private const int CallerId = 42;
     private const int BranchIdInCompany1 = 10;
 
-    private static (Mock<IUnitOfWork> uow, Mock<IReadRepository<User>> userReadRepo, Mock<IWriteRepository<Assignment>> assignmentWriteRepo, Mock<IWriteRepository<Notification>> notificationWriteRepo) Wire(
+    private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<Assignment>> assignmentWriteRepo, Mock<IWriteRepository<PendingAssignmentInvitation>> invitationWriteRepo) Wire(
         IReadOnlyList<Assignment> callerAssignments, Branch? branch, User? existingUser, bool alreadyAssigned)
     {
         var uow = new Mock<IUnitOfWork>();
@@ -40,6 +40,14 @@ public class AddStaffMemberCommandHandlerTests
             .ReturnsAsync(existingUser);
         uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
 
+        var invitationReadRepo = new Mock<IReadRepository<PendingAssignmentInvitation>>();
+        invitationReadRepo.Setup(r => r.GetAllAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<PendingAssignmentInvitation, bool>>>(), null, null, false, default))
+            .ReturnsAsync(new List<PendingAssignmentInvitation>());
+        uow.Setup(u => u.GetReadRepository<PendingAssignmentInvitation>()).Returns(invitationReadRepo.Object);
+        var invitationWriteRepo = new Mock<IWriteRepository<PendingAssignmentInvitation>>();
+        uow.Setup(u => u.GetWriteRepository<PendingAssignmentInvitation>()).Returns(invitationWriteRepo.Object);
+
         var notificationWriteRepo = new Mock<IWriteRepository<Notification>>();
         uow.Setup(u => u.GetWriteRepository<Notification>()).Returns(notificationWriteRepo.Object);
         var deviceTokenReadRepo = new Mock<IReadRepository<DeviceToken>>();
@@ -50,7 +58,7 @@ public class AddStaffMemberCommandHandlerTests
 
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
 
-        return (uow, userReadRepo, assignmentWriteRepo, notificationWriteRepo);
+        return (uow, assignmentWriteRepo, invitationWriteRepo);
     }
 
     private static Branch Branch1() => new() { Id = BranchIdInCompany1, CompanyId = 1, Name = "Merkez", Address = "..." };
@@ -64,11 +72,11 @@ public class AddStaffMemberCommandHandlerTests
     };
 
     [Fact]
-    public async Task Handle_WhenCallerIsGymAdminOfTheBranchsCompany_AttachesTheExistingUserAsAssignment()
+    public async Task Handle_WhenCallerIsGymAdminOfTheBranchsCompany_IssuesAPendingInvitationInsteadOfAnAssignment()
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var existingUser = new User { Id = 7, FullName = "Existing", Phone = "+905550003333", PasswordHash = "x" };
-        var (uow, _, assignmentWriteRepo, notificationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false);
+        var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new AddStaffMemberCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
@@ -77,42 +85,43 @@ public class AddStaffMemberCommandHandlerTests
 
         Assert.Equal(1, result.CompanyId);
         Assert.Equal(7, result.UserId);
-        assignmentWriteRepo.Verify(r => r.AddAsync(It.Is<Assignment>(a =>
-            a.UserId == 7 && a.Role == AssignmentRole.Trainer && a.BranchId == BranchIdInCompany1), default), Times.Once);
+        assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        invitationWriteRepo.Verify(r => r.AddAsync(It.Is<PendingAssignmentInvitation>(p =>
+            p.TargetUserId == 7 && p.CompanyId == 1 && p.BranchId == BranchIdInCompany1 &&
+            p.Role == AssignmentRole.Trainer && p.RequestedByUserId == CallerId), default), Times.Once);
         smsSender.Verify(s => s.SendAsync("+905550003333", It.IsAny<string>(), default), Times.Once);
-        notificationWriteRepo.Verify(r => r.AddAsync(It.Is<Notification>(n => n.UserId == 7 && !n.IsRead), default), Times.Once);
     }
 
     [Fact]
     public async Task Handle_WhenPhoneDoesNotBelongToAnyRegisteredUser_ThrowsNotFoundException()
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
-        var (uow, _, assignmentWriteRepo, notificationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser: null, alreadyAssigned: false);
+        var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser: null, alreadyAssigned: false);
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object);
 
         await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
-        notificationWriteRepo.Verify(r => r.AddAsync(It.IsAny<Notification>(), default), Times.Never);
+        invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
     }
 
     [Fact]
     public async Task Handle_WhenCallerIsBranchManagerOfADifferentBranch_ThrowsForbiddenException()
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, BranchId = 999, Role = AssignmentRole.BranchManager, IsActive = true } };
-        var (uow, _, assignmentWriteRepo, _) = Wire(callerAssignments, Branch1(), existingUser: null, alreadyAssigned: false);
+        var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser: null, alreadyAssigned: false);
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object);
 
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
-        assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
     }
 
     [Fact]
     public async Task Handle_WhenBranchDoesNotExist_ThrowsNotFoundException()
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
-        var (uow, _, _, _) = Wire(callerAssignments, branch: null, existingUser: null, alreadyAssigned: false);
+        var (uow, _, _) = Wire(callerAssignments, branch: null, existingUser: null, alreadyAssigned: false);
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object);
 
@@ -124,11 +133,12 @@ public class AddStaffMemberCommandHandlerTests
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var existingUser = new User { Id = 7, FullName = "Existing", Phone = "+905550003333", PasswordHash = "x" };
-        var (uow, _, assignmentWriteRepo, _) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: true);
+        var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: true);
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object);
 
         await Assert.ThrowsAsync<UserAlreadyAssignedException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
     }
 }

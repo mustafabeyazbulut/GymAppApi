@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Invitations;
 using GymAppApi.Application.Common.Notifications;
 using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
@@ -62,29 +63,30 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
             throw new UserAlreadyAssignedException();
         }
 
-        var assignment = new Assignment
-        {
-            UserId = user.Id,
-            CompanyId = branch.CompanyId,
-            BranchId = branch.Id,
-            Role = request.Role,
-            IsActive = true,
-        };
-        await _unitOfWork.GetWriteRepository<Assignment>().AddAsync(assignment, cancellationToken);
+        // Security requirement: the caller knowing this phone number is
+        // never enough by itself to attach the person - the Assignment only
+        // comes into existence once the invitee confirms this code
+        // themselves (ConfirmAssignmentInvitationCommand).
+        var code = await AssignmentInvitationService.IssueAsync(
+            _unitOfWork, user.Id, branch.CompanyId, branch.Id, request.Role, request.RequestedByUserId, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var notificationText = $"GymApp'te bir şubeye {request.Role} olarak atandınız.";
-        await _smsSender.SendAsync(request.Phone, notificationText, cancellationToken);
+        await _smsSender.SendAsync(
+            request.Phone,
+            $"GymApp'te bir şubeye {request.Role} olarak eklenmek üzeresiniz. Onay kodu: {code} (10 dakika geçerli).",
+            cancellationToken);
         await NotificationDispatcher.NotifyUserAsync(
-            _unitOfWork, _pushNotificationSender, user.Id, "Yeni şube ataması", notificationText, cancellationToken);
+            _unitOfWork, _pushNotificationSender, user.Id,
+            "Yeni şube daveti",
+            "Bir şubeye eklenmeniz için davet gönderildi. Telefonunuza gelen kodla onaylayabilirsiniz.",
+            cancellationToken);
 
         return new AddStaffMemberCommandResult
         {
-            AssignmentId = assignment.Id,
             UserId = user.Id,
             CompanyId = branch.CompanyId,
             BranchId = branch.Id,
-            Role = assignment.Role.ToString(),
+            Role = request.Role.ToString(),
         };
     }
 }
