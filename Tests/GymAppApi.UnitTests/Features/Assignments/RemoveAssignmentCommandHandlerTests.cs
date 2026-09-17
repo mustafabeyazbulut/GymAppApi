@@ -134,4 +134,57 @@ public class RemoveAssignmentCommandHandlerTests
         Assert.False(target.IsActive);
         assignmentWriteRepo.Verify(r => r.Update(target), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_WhenCallerOnlyHasATrainerAssignment_ThrowsForbiddenException()
+    {
+        var target = new Assignment { Id = 1, UserId = 7, CompanyId = 1, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true };
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true } };
+        var (uow, assignmentWriteRepo) = Wire(target, callerAssignments);
+        var handler = new RemoveAssignmentCommandHandler(uow.Object, Mock.Of<IPushNotificationSender>());
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            handler.Handle(new RemoveAssignmentCommand { AssignmentId = 1, RequestedByUserId = CallerId }, CancellationToken.None));
+        assignmentWriteRepo.Verify(r => r.Update(It.IsAny<Assignment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenGymAdminRemovesTheirOwnAssignment_SucceedsWhenAnotherGymAdminExists()
+    {
+        var target = new Assignment { Id = 1, UserId = CallerId, CompanyId = 1, BranchId = null, Role = AssignmentRole.GymAdmin, IsActive = true };
+        var callerAssignments = new List<Assignment> { target };
+        var (uow, assignmentWriteRepo) = Wire(target, callerAssignments, otherActiveGymAdminExists: true);
+        var handler = new RemoveAssignmentCommandHandler(uow.Object, Mock.Of<IPushNotificationSender>());
+
+        await handler.Handle(new RemoveAssignmentCommand { AssignmentId = 1, RequestedByUserId = CallerId }, CancellationToken.None);
+
+        Assert.False(target.IsActive);
+        assignmentWriteRepo.Verify(r => r.Update(target), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenSoleGymAdminRemovesTheirOwnAssignment_ThrowsLastGymAdminException()
+    {
+        var target = new Assignment { Id = 1, UserId = CallerId, CompanyId = 1, BranchId = null, Role = AssignmentRole.GymAdmin, IsActive = true };
+        var callerAssignments = new List<Assignment> { target };
+        var (uow, assignmentWriteRepo) = Wire(target, callerAssignments, otherActiveGymAdminExists: false);
+        var handler = new RemoveAssignmentCommandHandler(uow.Object, Mock.Of<IPushNotificationSender>());
+
+        await Assert.ThrowsAsync<LastGymAdminException>(() =>
+            handler.Handle(new RemoveAssignmentCommand { AssignmentId = 1, RequestedByUserId = CallerId }, CancellationToken.None));
+        assignmentWriteRepo.Verify(r => r.Update(It.IsAny<Assignment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenTargetIsSuperAdmin_ThrowsForbiddenExceptionEvenForASuperAdminCaller()
+    {
+        var target = new Assignment { Id = 1, UserId = 7, CompanyId = null, BranchId = null, Role = AssignmentRole.SuperAdmin, IsActive = true };
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = null, Role = AssignmentRole.SuperAdmin, IsActive = true } };
+        var (uow, assignmentWriteRepo) = Wire(target, callerAssignments);
+        var handler = new RemoveAssignmentCommandHandler(uow.Object, Mock.Of<IPushNotificationSender>());
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            handler.Handle(new RemoveAssignmentCommand { AssignmentId = 1, RequestedByUserId = CallerId }, CancellationToken.None));
+        assignmentWriteRepo.Verify(r => r.Update(It.IsAny<Assignment>()), Times.Never);
+    }
 }

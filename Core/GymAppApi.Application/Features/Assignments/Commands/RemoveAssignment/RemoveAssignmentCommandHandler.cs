@@ -52,6 +52,10 @@ public class RemoveAssignmentCommandHandler : IRequestHandler<RemoveAssignmentCo
             throw new ForbiddenException("Bu atamayı kaldırma yetkiniz yok.");
         }
 
+        // Self-removal (a GymAdmin/BranchManager removing their own assignment)
+        // is intentionally allowed - it is just "stepping down" - and remains
+        // subject to the same last-GymAdmin protection below, so it is safe by
+        // construction rather than an oversight.
         // A company must always keep at least one active GymAdmin - unless
         // SuperAdmin is the one removing it (the explicit platform-level
         // override the user asked for, e.g. to force a replacement later).
