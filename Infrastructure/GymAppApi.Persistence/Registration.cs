@@ -1,6 +1,7 @@
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Persistence.Context;
 using GymAppApi.Persistence.Repositories;
+using GymAppApi.Persistence.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,7 @@ public static class Registration
         services.AddScoped(typeof(IReadRepository<>), typeof(ReadRepository<>));
         services.AddScoped(typeof(IWriteRepository<>), typeof(WriteRepository<>));
         services.AddScoped<IUnitOfWork, GymAppApi.Persistence.UnitOfWork.UnitOfWork>();
+        services.AddScoped<ITenantResolutionService, TenantResolutionService>();
 
         return services;
     }
