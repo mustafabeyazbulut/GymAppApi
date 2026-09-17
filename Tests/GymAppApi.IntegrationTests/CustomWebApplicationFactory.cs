@@ -1,6 +1,7 @@
 using GymAppApi.Persistence.Context;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,7 +48,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 services.Remove(descriptor);
             }
 
-            services.AddDbContext<GymAppApiDbContext>(options => options.UseInMemoryDatabase(DbName));
+            // EF Core's InMemory provider doesn't implement real transactions and,
+            // by default, throws on Database.BeginTransactionAsync() to flag that
+            // (InMemoryEventId.TransactionIgnoredWarning). Handlers reached through
+            // this factory's real HTTP pipeline (e.g. CreateCompanyCommandHandler)
+            // genuinely call BeginTransactionAsync/CommitTransactionAsync around
+            // their success path, so this warning must be downgraded to a no-op -
+            // matching how every other provider actually behaves - to exercise
+            // that code path here. See RegisterCompleteAttemptPersistenceTests for
+            // the same rationale applied to a directly-constructed context.
+            services.AddDbContext<GymAppApiDbContext>(options => options
+                .UseInMemoryDatabase(DbName)
+                .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
         });
     }
 }
