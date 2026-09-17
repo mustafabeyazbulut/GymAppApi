@@ -14,6 +14,12 @@ public class SetBranchActiveCommandHandler : IRequestHandler<SetBranchActiveComm
 
     public async Task Handle(SetBranchActiveCommand request, CancellationToken cancellationToken)
     {
+        // Branch is ICompanyScoped, IDeactivatable: its global query filter hides an
+        // inactive branch from every non-SuperAdmin caller. This means a GymAdmin who
+        // deactivates their own branch will get NotFoundException here if they try to
+        // reactivate it themselves - only SuperAdmin (who bypasses the filter) can
+        // successfully call this to flip it back. Intentional, matches how Company
+        // deactivation already behaves, not a bug.
         var branch = await _unitOfWork.GetReadRepository<Branch>()
             .GetAsync(b => b.Id == request.BranchId, cancellationToken: cancellationToken);
         if (branch is null)
