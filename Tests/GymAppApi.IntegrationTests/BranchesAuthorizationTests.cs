@@ -1,0 +1,117 @@
+using System.Net;
+using System.Net.Http.Json;
+using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Domain.Entities;
+using GymAppApi.Domain.Enums;
+using GymAppApi.Persistence.Context;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+namespace GymAppApi.IntegrationTests;
+
+public class BranchesAuthorizationTests : IClassFixture<CustomWebApplicationFactory>
+{
+    private readonly CustomWebApplicationFactory _factory;
+
+    public BranchesAuthorizationTests(CustomWebApplicationFactory factory) => _factory = factory;
+
+    // This factory's DB is shared across every test method in this class -
+    // a fresh random phone per call avoids one test's seed silently matching
+    // a stale row from another test's SeedAsync() call.
+    private static string UniquePhone() => $"+9055502{Random.Shared.Next(10000, 99999)}";
+
+    private async Task<(Company companyA, string gymAdminAToken, string gymAdminBToken, string memberToken, string superAdminToken)> SeedAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
+
+        var companyA = new Company { Name = "Company A", IsActive = true };
+        var companyB = new Company { Name = "Company B", IsActive = true };
+        db.Companies.AddRange(companyA, companyB);
+        await db.SaveChangesAsync();
+
+        var gymAdminA = new User { FullName = "Gym Admin A", Phone = UniquePhone(), PasswordHash = "x" };
+        var gymAdminB = new User { FullName = "Gym Admin B", Phone = UniquePhone(), PasswordHash = "x" };
+        var member = new User { FullName = "Plain Member", Phone = UniquePhone(), PasswordHash = "x" };
+        var superAdmin = new User { FullName = "Super Admin", Phone = UniquePhone(), PasswordHash = "x" };
+        db.Users.AddRange(gymAdminA, gymAdminB, member, superAdmin);
+        await db.SaveChangesAsync();
+
+        db.Assignments.AddRange(
+            new Assignment { UserId = gymAdminA.Id, CompanyId = companyA.Id, Role = AssignmentRole.GymAdmin, IsActive = true },
+            new Assignment { UserId = gymAdminB.Id, CompanyId = companyB.Id, Role = AssignmentRole.GymAdmin, IsActive = true },
+            new Assignment { UserId = superAdmin.Id, CompanyId = null, Role = AssignmentRole.SuperAdmin, IsActive = true });
+        await db.SaveChangesAsync();
+
+        var jwtService = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var gymAdminAToken = jwtService.GenerateAccessToken(new AccessTokenClaims(gymAdminA.Id, gymAdminA.FullName, gymAdminA.Email, gymAdminA.Phone)).Token;
+        var gymAdminBToken = jwtService.GenerateAccessToken(new AccessTokenClaims(gymAdminB.Id, gymAdminB.FullName, gymAdminB.Email, gymAdminB.Phone)).Token;
+        var memberToken = jwtService.GenerateAccessToken(new AccessTokenClaims(member.Id, member.FullName, member.Email, member.Phone)).Token;
+        var superAdminToken = jwtService.GenerateAccessToken(new AccessTokenClaims(superAdmin.Id, superAdmin.FullName, superAdmin.Email, superAdmin.Phone)).Token;
+
+        return (companyA, gymAdminAToken, gymAdminBToken, memberToken, superAdminToken);
+    }
+
+    private static object Body(int companyId) => new { companyId, name = "Merkez Şube", address = "Adres 1" };
+
+    [Fact]
+    public async Task Create_WithoutToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/branches", Body(1));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithPlainMemberToken_Returns403()
+    {
+        var (companyA, _, _, memberToken, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", memberToken);
+
+        var response = await client.PostAsJsonAsync("/api/branches", Body(companyA.Id));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_AsGymAdminOfOwnCompany_Returns201()
+    {
+        var (companyA, gymAdminAToken, _, _, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminAToken);
+
+        var response = await client.PostAsJsonAsync("/api/branches", Body(companyA.Id));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_AsGymAdminOfADifferentCompany_Returns404()
+    {
+        // Not 403: Company itself is tenant-scoped (SetCompanySelfFilter), so
+        // a GymAdmin of a DIFFERENT company can't even see companyA exists -
+        // CompanyMustExistAsync's own query already hides it, same as any
+        // other cross-tenant read in this API. This avoids confirming
+        // another tenant's existence to someone unauthorized for it.
+        var (companyA, _, gymAdminBToken, _, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminBToken);
+
+        var response = await client.PostAsJsonAsync("/api/branches", Body(companyA.Id));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_AsSuperAdmin_Returns201ForAnyCompany()
+    {
+        var (companyA, _, _, _, superAdminToken) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", superAdminToken);
+
+        var response = await client.PostAsJsonAsync("/api/branches", Body(companyA.Id));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+}

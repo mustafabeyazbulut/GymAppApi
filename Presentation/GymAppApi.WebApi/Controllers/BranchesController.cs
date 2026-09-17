@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Branches.Commands.CreateBranch;
 using GymAppApi.Application.Features.Branches.Queries.GetBranches;
 using MediatR;
@@ -15,13 +16,17 @@ public class BranchesController : ControllerBase
 
     public BranchesController(IMediator mediator) => _mediator = mediator;
 
+    private int CurrentUserId => int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
+
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetBranchesQuery(), cancellationToken));
 
+    [Authorize(Policy = "GymAdminOrSuperAdmin")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateBranchCommand command, CancellationToken cancellationToken)
     {
+        command.RequestedByUserId = CurrentUserId;
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }

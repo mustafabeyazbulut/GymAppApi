@@ -19,8 +19,6 @@ public class CompaniesAuthorizationTests : IClassFixture<CustomWebApplicationFac
     private static object ValidBody(string gymAdminPhone = "+905559998877") => new
     {
         companyName = "New Gym",
-        branchName = "Merkez",
-        branchAddress = "Adres 1",
         gymAdminPhone,
     };
 
@@ -235,7 +233,7 @@ public class CompaniesAuthorizationTests : IClassFixture<CustomWebApplicationFac
         Assert.False(detail!.IsActive);
     }
 
-    private record CreateCompanyResultDto(int CompanyId, int BranchId, int GymAdminUserId, string GymAdminPhone);
+    private record CreateCompanyResultDto(int CompanyId, int GymAdminUserId, string GymAdminPhone);
 
     private record CompanyListItemDto(int Id, string Name, bool IsActive, int BranchCount);
 

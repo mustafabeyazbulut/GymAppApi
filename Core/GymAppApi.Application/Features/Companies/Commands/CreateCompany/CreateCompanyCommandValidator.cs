@@ -7,8 +7,6 @@ public class CreateCompanyCommandValidator : AbstractValidator<CreateCompanyComm
     public CreateCompanyCommandValidator()
     {
         RuleFor(x => x.CompanyName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.BranchName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.BranchAddress).NotEmpty().MaximumLength(500);
         RuleFor(x => x.GymAdminPhone).NotEmpty().Matches(@"^\+[1-9]\d{7,14}$");
     }
 }

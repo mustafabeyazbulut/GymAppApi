@@ -44,24 +44,15 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
         {
             var company = new Company { Name = request.CompanyName, IsActive = true };
             await _unitOfWork.GetWriteRepository<Company>().AddAsync(company, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken); // need company.Id for the branch
-
-            var branch = new Branch
-            {
-                CompanyId = company.Id,
-                Name = request.BranchName,
-                Address = request.BranchAddress,
-                IsActive = true,
-            };
-            await _unitOfWork.GetWriteRepository<Branch>().AddAsync(branch, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken); // need company.Id for the invitation
 
             // Security requirement: SuperAdmin knowing this phone number is
             // never enough by itself to make someone a GymAdmin - the
             // Assignment only comes into existence once the invitee confirms
             // this code themselves (ConfirmAssignmentInvitationCommand).
-            // GymAdmin's BranchId is null by design (Assignment.cs's own
-            // comment: a GymAdmin assignment has CompanyId set, BranchId
-            // null, meaning "all branches of this company").
+            // No Branch is created here either - that's the new GymAdmin's
+            // own call once they've confirmed (POST /api/branches), not
+            // something SuperAdmin decides on their behalf.
             var code = await AssignmentInvitationService.IssueAsync(
                 _unitOfWork, gymAdminUser.Id, company.Id, null, AssignmentRole.GymAdmin, request.RequestedByUserId, cancellationToken);
 
@@ -81,7 +72,6 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
             return new CreateCompanyCommandResult
             {
                 CompanyId = company.Id,
-                BranchId = branch.Id,
                 GymAdminUserId = gymAdminUser.Id,
                 GymAdminPhone = gymAdminUser.Phone,
             };

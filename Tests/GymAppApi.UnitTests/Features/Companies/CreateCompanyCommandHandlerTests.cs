@@ -8,9 +8,11 @@ namespace GymAppApi.UnitTests.Features.Companies;
 
 public class CreateCompanyCommandHandlerTests
 {
+    private const int SuperAdminId = 1;
+
     private static (Mock<IUnitOfWork> uow, Mock<IReadRepository<User>> userReadRepo,
-        Mock<IWriteRepository<Company>> companyWriteRepo, Mock<IWriteRepository<Branch>> branchWriteRepo,
-        Mock<IWriteRepository<Assignment>> assignmentWriteRepo, Mock<IWriteRepository<Notification>> notificationWriteRepo,
+        Mock<IWriteRepository<Company>> companyWriteRepo, Mock<IWriteRepository<Assignment>> assignmentWriteRepo,
+        Mock<IWriteRepository<Notification>> notificationWriteRepo,
         Mock<IWriteRepository<PendingAssignmentInvitation>> invitationWriteRepo) Wire(User? existingGymAdmin)
     {
         var userReadRepo = new Mock<IReadRepository<User>>();
@@ -22,8 +24,6 @@ public class CreateCompanyCommandHandlerTests
         uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
         var companyWriteRepo = new Mock<IWriteRepository<Company>>();
         uow.Setup(u => u.GetWriteRepository<Company>()).Returns(companyWriteRepo.Object);
-        var branchWriteRepo = new Mock<IWriteRepository<Branch>>();
-        uow.Setup(u => u.GetWriteRepository<Branch>()).Returns(branchWriteRepo.Object);
         var assignmentWriteRepo = new Mock<IWriteRepository<Assignment>>();
         uow.Setup(u => u.GetWriteRepository<Assignment>()).Returns(assignmentWriteRepo.Object);
         var notificationWriteRepo = new Mock<IWriteRepository<Notification>>();
@@ -45,25 +45,21 @@ public class CreateCompanyCommandHandlerTests
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
         uow.Setup(u => u.BeginTransactionAsync(default)).ReturnsAsync(Mock.Of<IAsyncDisposable>());
 
-        return (uow, userReadRepo, companyWriteRepo, branchWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo);
+        return (uow, userReadRepo, companyWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo);
     }
-
-    private const int SuperAdminId = 1;
 
     private static CreateCompanyCommand ValidCommand() => new()
     {
         CompanyName = "Test Gym",
-        BranchName = "Merkez",
-        BranchAddress = "Adres",
         GymAdminPhone = "+905551112233",
         RequestedByUserId = SuperAdminId,
     };
 
     [Fact]
-    public async Task Handle_WhenGymAdminPhoneBelongsToAnExistingUser_CreatesCompanyBranchAndIssuesAPendingInvitation()
+    public async Task Handle_WhenGymAdminPhoneBelongsToAnExistingUser_CreatesCompanyAndIssuesAPendingInvitation()
     {
         var existingGymAdmin = new User { Id = 55, FullName = "Ada Admin", Phone = "+905551112233", PasswordHash = "x" };
-        var (uow, _, companyWriteRepo, branchWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo) = Wire(existingGymAdmin);
+        var (uow, _, companyWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo) = Wire(existingGymAdmin);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
@@ -72,7 +68,6 @@ public class CreateCompanyCommandHandlerTests
 
         Assert.Equal(55, result.GymAdminUserId);
         companyWriteRepo.Verify(r => r.AddAsync(It.Is<Company>(c => c.Name == "Test Gym" && c.IsActive), default), Times.Once);
-        branchWriteRepo.Verify(r => r.AddAsync(It.Is<Branch>(b => b.Name == "Merkez" && b.Address == "Adres"), default), Times.Once);
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
         invitationWriteRepo.Verify(r => r.AddAsync(It.Is<PendingAssignmentInvitation>(p =>
             p.TargetUserId == 55 && p.Role == GymAppApi.Domain.Enums.AssignmentRole.GymAdmin && p.BranchId == null), default), Times.Once);
@@ -83,7 +78,7 @@ public class CreateCompanyCommandHandlerTests
     [Fact]
     public async Task Handle_WhenGymAdminPhoneDoesNotBelongToAnyRegisteredUser_ThrowsNotFoundException()
     {
-        var (uow, _, companyWriteRepo, _, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo) = Wire(existingGymAdmin: null);
+        var (uow, _, companyWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo) = Wire(existingGymAdmin: null);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
         var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
@@ -101,7 +96,7 @@ public class CreateCompanyCommandHandlerTests
     public async Task Handle_CallsSmsSenderOnlyAfterTheTransactionHasBeenCommitted()
     {
         var existingGymAdmin = new User { Id = 55, FullName = "Ada Admin", Phone = "+905551112233", PasswordHash = "x" };
-        var (uow, _, _, _, _, _, _) = Wire(existingGymAdmin);
+        var (uow, _, _, _, _, _) = Wire(existingGymAdmin);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
 
@@ -129,10 +124,10 @@ public class CreateCompanyCommandHandlerTests
     public async Task Handle_WhenAWriteFailsMidTransaction_RollsBackAndNeverSendsSmsOrNotifies()
     {
         var existingGymAdmin = new User { Id = 55, FullName = "Ada Admin", Phone = "+905551112233", PasswordHash = "x" };
-        var (uow, _, _, _, _, notificationWriteRepo, _) = Wire(existingGymAdmin);
+        var (uow, _, _, _, notificationWriteRepo, _) = Wire(existingGymAdmin);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
-        uow.Setup(u => u.GetWriteRepository<Branch>()).Returns(() => throw new InvalidOperationException("boom"));
+        uow.Setup(u => u.GetWriteRepository<PendingAssignmentInvitation>()).Returns(() => throw new InvalidOperationException("boom"));
         var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
