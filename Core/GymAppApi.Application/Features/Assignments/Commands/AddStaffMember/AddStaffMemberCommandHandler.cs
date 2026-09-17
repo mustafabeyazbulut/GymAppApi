@@ -37,13 +37,20 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
         // exact branch (BranchManager). SuperAdmin bypasses both checks.
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
-        var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
-            (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId) ||
-            (a.Role == AssignmentRole.BranchManager && a.BranchId == branch.Id));
+        // A BranchManager may add Trainers to their own branch, but must
+        // never be able to create peer/other BranchManagers - only GymAdmin
+        // (of this company) or SuperAdmin can assign that role.
+        var callerIsAuthorized = request.Role == AssignmentRole.BranchManager
+            ? callerAssignments.Any(a =>
+                a.Role == AssignmentRole.SuperAdmin ||
+                (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId))
+            : callerAssignments.Any(a =>
+                a.Role == AssignmentRole.SuperAdmin ||
+                (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId) ||
+                (a.Role == AssignmentRole.BranchManager && a.BranchId == branch.Id));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu şubeye üye/antrenör ekleme yetkiniz yok.");
+            throw new ForbiddenException("Bu şubeye personel ekleme yetkiniz yok.");
         }
 
         // Never creates a new User — staff attach an already-registered

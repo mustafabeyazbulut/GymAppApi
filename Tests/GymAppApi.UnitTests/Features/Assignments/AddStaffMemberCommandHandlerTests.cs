@@ -141,4 +141,35 @@ public class AddStaffMemberCommandHandlerTests
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
         invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_WhenAssigningBranchManagerAsAGymAdminOfTheCompany_Succeeds()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var existingUser = new User { Id = 7, FullName = "Existing", Phone = "+905550003333", PasswordHash = "x" };
+        var (uow, assignmentWriteRepo, _) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false);
+        var command = ValidCommand();
+        command.Role = AssignmentRole.BranchManager;
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+
+        await handler.Handle(command, CancellationToken.None);
+
+        assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenAssigningBranchManagerAsAPeerBranchManager_ThrowsForbiddenException()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, BranchId = BranchIdInCompany1, Role = AssignmentRole.BranchManager, IsActive = true } };
+        var existingUser = new User { Id = 7, FullName = "Existing", Phone = "+905550003333", PasswordHash = "x" };
+        var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false);
+        var command = ValidCommand();
+        command.Role = AssignmentRole.BranchManager;
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(command, CancellationToken.None));
+
+        assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
+    }
 }
