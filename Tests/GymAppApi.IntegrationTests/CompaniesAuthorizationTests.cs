@@ -75,6 +75,8 @@ public class CompaniesAuthorizationTests : IClassFixture<CustomWebApplicationFac
         var response = await client.PostAsJsonAsync("/api/companies", ValidBody());
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var notification = db.Notifications.Single(n => n.UserId == futureGymAdmin.Id);
+        Assert.False(notification.IsRead);
     }
 
     [Fact]

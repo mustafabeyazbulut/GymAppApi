@@ -15,6 +15,7 @@ public class GymAppApiDbContext : DbContext
         typeof(DeviceToken),
         typeof(RefreshToken),
         typeof(PendingContactVerification),
+        typeof(Notification),
     };
 
     private readonly ITenantContext _tenantContext;
@@ -34,6 +35,7 @@ public class GymAppApiDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<PendingContactVerification> PendingContactVerifications => Set<PendingContactVerification>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Notifications;
 using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -11,11 +12,13 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISmsSender _smsSender;
+    private readonly IPushNotificationSender _pushNotificationSender;
 
-    public AddStaffMemberCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender)
+    public AddStaffMemberCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IPushNotificationSender pushNotificationSender)
     {
         _unitOfWork = unitOfWork;
         _smsSender = smsSender;
+        _pushNotificationSender = pushNotificationSender;
     }
 
     public async Task<AddStaffMemberCommandResult> Handle(AddStaffMemberCommand request, CancellationToken cancellationToken)
@@ -70,10 +73,10 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
         await _unitOfWork.GetWriteRepository<Assignment>().AddAsync(assignment, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await _smsSender.SendAsync(
-            request.Phone,
-            $"GymApp'te bir şubeye {request.Role} olarak atandınız.",
-            cancellationToken);
+        var notificationText = $"GymApp'te bir şubeye {request.Role} olarak atandınız.";
+        await _smsSender.SendAsync(request.Phone, notificationText, cancellationToken);
+        await NotificationDispatcher.NotifyUserAsync(
+            _unitOfWork, _pushNotificationSender, user.Id, "Yeni şube ataması", notificationText, cancellationToken);
 
         return new AddStaffMemberCommandResult
         {

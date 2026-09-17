@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Notifications;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -10,11 +11,13 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISmsSender _smsSender;
+    private readonly IPushNotificationSender _pushNotificationSender;
 
-    public CreateCompanyCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender)
+    public CreateCompanyCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IPushNotificationSender pushNotificationSender)
     {
         _unitOfWork = unitOfWork;
         _smsSender = smsSender;
+        _pushNotificationSender = pushNotificationSender;
     }
 
     public async Task<CreateCompanyCommandResult> Handle(CreateCompanyCommand request, CancellationToken cancellationToken)
@@ -66,10 +69,10 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-            await _smsSender.SendAsync(
-                request.GymAdminPhone,
-                $"GymApp'te '{request.CompanyName}' firmasının Gym Admin'i olarak atandınız.",
-                cancellationToken);
+            var notificationText = $"GymApp'te '{request.CompanyName}' firmasının Gym Admin'i olarak atandınız.";
+            await _smsSender.SendAsync(request.GymAdminPhone, notificationText, cancellationToken);
+            await NotificationDispatcher.NotifyUserAsync(
+                _unitOfWork, _pushNotificationSender, gymAdminUser.Id, "Yeni firma ataması", notificationText, cancellationToken);
 
             return new CreateCompanyCommandResult
             {
