@@ -114,4 +114,24 @@ public class BranchesAuthorizationTests : IClassFixture<CustomWebApplicationFact
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
+
+    [Fact]
+    public async Task SetActive_AsGymAdminOfOwnCompany_DeactivatesTheBranch()
+    {
+        var (companyA, gymAdminAToken, _, _, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminAToken);
+        var createResponse = await client.PostAsJsonAsync("/api/branches", Body(companyA.Id));
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateBranchResultDto>();
+
+        var response = await client.PatchAsJsonAsync($"/api/branches/{created!.Id}/active", new { isActive = false });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
+        scope.ServiceProvider.GetRequiredService<GymAppApi.Infrastructure.Tenancy.AmbientTenantContext>().IsSuperAdmin = true;
+        Assert.False(db.Branches.Single(b => b.Id == created.Id).IsActive);
+    }
+
+    private record CreateBranchResultDto(int Id, string Name);
 }
