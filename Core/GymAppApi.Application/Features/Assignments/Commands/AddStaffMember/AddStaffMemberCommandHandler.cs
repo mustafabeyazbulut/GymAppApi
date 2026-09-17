@@ -1,6 +1,7 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.Assignments.Exceptions;
+using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -54,44 +55,63 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
             throw new UserAlreadyAssignedException();
         }
 
-        var user = existingUser;
-        if (user is null)
+        // Only relevant on the new-user-creation path: if we're reusing an
+        // existing user found by phone, that user's own email (if any) is
+        // not being changed here, so there's nothing to collide with.
+        if (existingUser is null && !string.IsNullOrWhiteSpace(request.Email)
+            && await userReadRepo.AnyAsync(u => u.Email == request.Email, cancellationToken))
         {
-            user = new User
-            {
-                FullName = request.FullName,
-                Phone = request.Phone,
-                Email = request.Email,
-                PasswordHash = _passwordHasher.Hash(Guid.NewGuid().ToString()),
-                PhoneVerified = false,
-            };
-            await _unitOfWork.GetWriteRepository<User>().AddAsync(user, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken); // need user.Id for the assignment
+            throw new EmailAlreadyRegisteredException();
         }
 
-        var assignment = new Assignment
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
         {
-            UserId = user.Id,
-            CompanyId = branch.CompanyId,
-            BranchId = branch.Id,
-            Role = request.Role,
-            IsActive = true,
-        };
-        await _unitOfWork.GetWriteRepository<Assignment>().AddAsync(assignment, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            var user = existingUser;
+            if (user is null)
+            {
+                user = new User
+                {
+                    FullName = request.FullName,
+                    Phone = request.Phone,
+                    Email = request.Email,
+                    PasswordHash = _passwordHasher.Hash(Guid.NewGuid().ToString()),
+                    PhoneVerified = false,
+                };
+                await _unitOfWork.GetWriteRepository<User>().AddAsync(user, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken); // need user.Id for the assignment
+            }
 
-        await _smsSender.SendAsync(
-            request.Phone,
-            "GymApp hesabınız oluşturuldu. Şifrenizi belirlemek için 'Şifremi Unuttum' akışını kullanın.",
-            cancellationToken);
+            var assignment = new Assignment
+            {
+                UserId = user.Id,
+                CompanyId = branch.CompanyId,
+                BranchId = branch.Id,
+                Role = request.Role,
+                IsActive = true,
+            };
+            await _unitOfWork.GetWriteRepository<Assignment>().AddAsync(assignment, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-        return new AddStaffMemberCommandResult
+            await _smsSender.SendAsync(
+                request.Phone,
+                "GymApp hesabınız oluşturuldu. Şifrenizi belirlemek için 'Şifremi Unuttum' akışını kullanın.",
+                cancellationToken);
+
+            return new AddStaffMemberCommandResult
+            {
+                AssignmentId = assignment.Id,
+                UserId = user.Id,
+                CompanyId = branch.CompanyId,
+                BranchId = branch.Id,
+                Role = assignment.Role.ToString(),
+            };
+        }
+        catch
         {
-            AssignmentId = assignment.Id,
-            UserId = user.Id,
-            CompanyId = branch.CompanyId,
-            BranchId = branch.Id,
-            Role = assignment.Role.ToString(),
-        };
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            throw;
+        }
     }
 }
