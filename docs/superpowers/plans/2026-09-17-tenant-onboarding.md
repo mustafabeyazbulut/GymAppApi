@@ -1219,12 +1219,14 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
 Run: `dotnet test --filter AddStaffMemberCommandHandlerTests`
 Expected: PASS, 4/4.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Core/GymAppApi.Application/Features/Assignments/Commands/AddStaffMember/ Tests/GymAppApi.UnitTests/Features/Assignments/AddStaffMemberCommandHandlerTests.cs
 git commit -m "Add AddStaffMemberCommand - creates a new User when the phone doesn't exist yet"
 ```
+
+**Follow-up (code review, same pattern as CreateCompanyCommand):** wrapped the create in a transaction and added the email-uniqueness check on the new-user path. Commit `5c1b926` "Address code review feedback on AddStaffMemberCommand".
 
 ---
 
@@ -1377,12 +1379,14 @@ Expected: PASS, 2/2.
 Run: `dotnet test`
 Expected: PASS — `AssignmentsAuthorizationTests` (Task-0 existing tests) must still be green; moving the attribute from class to action must not have changed `POST /api/assignments`'s effective authorization.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Presentation/GymAppApi.WebApi/Controllers/AssignmentsController.cs Tests/GymAppApi.IntegrationTests/AddStaffMemberAuthorizationTests.cs
 git commit -m "Add POST /api/assignments/staff for GymAdmin/BranchManager/SuperAdmin"
 ```
+
+**Note (found while writing the test, not in the plan's original scope):** `"role":"Member"` in the JSON body failed model binding (400) because nothing registered a `JsonStringEnumConverter` — `AddStaffMemberCommand.Role` is the first request body to expose an enum to clients. Added `builder.Services.AddControllers().AddJsonOptions(...)` in `Program.cs` in the same commit (`24ef574`). Full suite: 99 unit + 19 integration, all green.
 
 ---
 
