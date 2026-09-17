@@ -29,7 +29,8 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
 
         var branchManager = new User { FullName = "Branch Manager", Phone = "+905550004444", PasswordHash = "x" };
         var member = new User { FullName = "Plain Member", Phone = "+905550005555", PasswordHash = "x" };
-        db.Users.AddRange(branchManager, member);
+        var newStaffCandidate = new User { FullName = "New Member", Phone = "+905550006666", PasswordHash = "x" };
+        db.Users.AddRange(branchManager, member, newStaffCandidate);
         await db.SaveChangesAsync();
         db.Assignments.Add(new Assignment { UserId = branchManager.Id, CompanyId = company.Id, BranchId = branch.Id, Role = AssignmentRole.BranchManager, IsActive = true });
         await db.SaveChangesAsync();
@@ -50,13 +51,29 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
 
         var response = await client.PostAsJsonAsync("/api/assignments/staff", new
         {
-            fullName = "New Member",
             phone = "+905550006666",
             role = "Member",
             branchId,
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddStaff_WhenPhoneIsNotARegisteredUser_Returns404()
+    {
+        var (branchId, branchManagerToken, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", branchManagerToken);
+
+        var response = await client.PostAsJsonAsync("/api/assignments/staff", new
+        {
+            phone = "+905550007777",
+            role = "Member",
+            branchId,
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -68,7 +85,6 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
 
         var response = await client.PostAsJsonAsync("/api/assignments/staff", new
         {
-            fullName = "New Member",
             phone = "+905550006666",
             role = "Member",
             branchId,

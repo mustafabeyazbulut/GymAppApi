@@ -1,7 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.Assignments.Exceptions;
-using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -11,13 +10,11 @@ namespace GymAppApi.Application.Features.Assignments.Commands.AddStaffMember;
 public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberCommand, AddStaffMemberCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IPasswordHasher _passwordHasher;
     private readonly ISmsSender _smsSender;
 
-    public AddStaffMemberCommandHandler(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, ISmsSender smsSender)
+    public AddStaffMemberCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender)
     {
         _unitOfWork = unitOfWork;
-        _passwordHasher = passwordHasher;
         _smsSender = smsSender;
     }
 
@@ -45,73 +42,46 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
             throw new ForbiddenException("Bu şubeye üye/antrenör ekleme yetkiniz yok.");
         }
 
-        var userReadRepo = _unitOfWork.GetReadRepository<User>();
-        var existingUser = await userReadRepo.GetAsync(u => u.Phone == request.Phone, cancellationToken: cancellationToken);
+        // Never creates a new User — staff attach an already-registered
+        // person to a branch, they don't mint accounts by phone. See
+        // .claude/memory/feedback-never-remove-registration-pointer.md.
+        var user = await _unitOfWork.GetReadRepository<User>()
+            .GetAsync(u => u.Phone == request.Phone, cancellationToken: cancellationToken);
+        if (user is null)
+        {
+            throw new NotFoundException($"'{request.Phone}' numaralı kayıtlı bir kullanıcı bulunamadı.");
+        }
 
-        var alreadyAssignedInCompany = existingUser is not null && await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
-            a => a.UserId == existingUser.Id && a.CompanyId == branch.CompanyId && a.IsActive, cancellationToken);
+        var alreadyAssignedInCompany = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
+            a => a.UserId == user.Id && a.CompanyId == branch.CompanyId && a.IsActive, cancellationToken);
         if (alreadyAssignedInCompany)
         {
             throw new UserAlreadyAssignedException();
         }
 
-        // Only relevant on the new-user-creation path: if we're reusing an
-        // existing user found by phone, that user's own email (if any) is
-        // not being changed here, so there's nothing to collide with.
-        if (existingUser is null && !string.IsNullOrWhiteSpace(request.Email)
-            && await userReadRepo.AnyAsync(u => u.Email == request.Email, cancellationToken))
+        var assignment = new Assignment
         {
-            throw new EmailAlreadyRegisteredException();
-        }
+            UserId = user.Id,
+            CompanyId = branch.CompanyId,
+            BranchId = branch.Id,
+            Role = request.Role,
+            IsActive = true,
+        };
+        await _unitOfWork.GetWriteRepository<Assignment>().AddAsync(assignment, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
+        await _smsSender.SendAsync(
+            request.Phone,
+            $"GymApp'te bir şubeye {request.Role} olarak atandınız.",
+            cancellationToken);
+
+        return new AddStaffMemberCommandResult
         {
-            var user = existingUser;
-            if (user is null)
-            {
-                user = new User
-                {
-                    FullName = request.FullName,
-                    Phone = request.Phone,
-                    Email = request.Email,
-                    PasswordHash = _passwordHasher.Hash(Guid.NewGuid().ToString()),
-                    PhoneVerified = false,
-                };
-                await _unitOfWork.GetWriteRepository<User>().AddAsync(user, cancellationToken);
-                await _unitOfWork.SaveChangesAsync(cancellationToken); // need user.Id for the assignment
-            }
-
-            var assignment = new Assignment
-            {
-                UserId = user.Id,
-                CompanyId = branch.CompanyId,
-                BranchId = branch.Id,
-                Role = request.Role,
-                IsActive = true,
-            };
-            await _unitOfWork.GetWriteRepository<Assignment>().AddAsync(assignment, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            await _smsSender.SendAsync(
-                request.Phone,
-                "GymApp hesabınız oluşturuldu. Şifrenizi belirlemek için 'Şifremi Unuttum' akışını kullanın.",
-                cancellationToken);
-
-            return new AddStaffMemberCommandResult
-            {
-                AssignmentId = assignment.Id,
-                UserId = user.Id,
-                CompanyId = branch.CompanyId,
-                BranchId = branch.Id,
-                Role = assignment.Role.ToString(),
-            };
-        }
-        catch
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            throw;
-        }
+            AssignmentId = assignment.Id,
+            UserId = user.Id,
+            CompanyId = branch.CompanyId,
+            BranchId = branch.Id,
+            Role = assignment.Role.ToString(),
+        };
     }
 }

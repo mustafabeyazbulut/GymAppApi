@@ -13,7 +13,9 @@ public class CreateCompanyCommand : IRequest<CreateCompanyCommandResult>
     public string CompanyName { get; set; } = null!;
     public string BranchName { get; set; } = null!;
     public string BranchAddress { get; set; } = null!;
-    public string GymAdminFullName { get; set; } = null!;
+
+    // Looks up an already-registered user by phone and makes them this
+    // company's GymAdmin — this never creates a new User. See
+    // .claude/memory/feedback-never-remove-registration-pointer.md for why.
     public string GymAdminPhone { get; set; } = null!;
-    public string? GymAdminEmail { get; set; }
 }

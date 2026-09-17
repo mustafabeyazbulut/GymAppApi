@@ -5,9 +5,10 @@ namespace GymAppApi.Application.Features.Assignments.Commands.AddStaffMember;
 
 public class AddStaffMemberCommand : IRequest<AddStaffMemberCommandResult>
 {
-    public string FullName { get; set; } = null!;
+    // Looks up an already-registered user by phone and attaches an
+    // Assignment to them — this never creates a new User. See
+    // .claude/memory/feedback-never-remove-registration-pointer.md for why.
     public string Phone { get; set; } = null!;
-    public string? Email { get; set; }
     public AssignmentRole Role { get; set; }
     public int BranchId { get; set; }
 

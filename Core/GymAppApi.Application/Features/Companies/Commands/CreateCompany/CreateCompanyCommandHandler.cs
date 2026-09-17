@@ -1,5 +1,5 @@
+using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
-using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -9,13 +9,11 @@ namespace GymAppApi.Application.Features.Companies.Commands.CreateCompany;
 public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand, CreateCompanyCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IPasswordHasher _passwordHasher;
     private readonly ISmsSender _smsSender;
 
-    public CreateCompanyCommandHandler(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, ISmsSender smsSender)
+    public CreateCompanyCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender)
     {
         _unitOfWork = unitOfWork;
-        _passwordHasher = passwordHasher;
         _smsSender = smsSender;
     }
 
@@ -26,17 +24,15 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
         // has no per-company scope to violate, so the policy's own fresh
         // per-request Assignment re-query (AssignmentRoleAuthorizationHandler)
         // is already the complete check.
-        var userReadRepo = _unitOfWork.GetReadRepository<User>();
-        var existingGymAdmin = await userReadRepo
+        //
+        // Never creates a new User — the Gym Admin must already be a
+        // registered user, picked up by phone. See
+        // .claude/memory/feedback-never-remove-registration-pointer.md.
+        var gymAdminUser = await _unitOfWork.GetReadRepository<User>()
             .GetAsync(u => u.Phone == request.GymAdminPhone, cancellationToken: cancellationToken);
-
-        // Only relevant on the new-user-creation path: if we're reusing an
-        // existing user found by phone, that user's own email (if any) is
-        // not being changed here, so there's nothing to collide with.
-        if (existingGymAdmin is null && !string.IsNullOrWhiteSpace(request.GymAdminEmail)
-            && await userReadRepo.AnyAsync(u => u.Email == request.GymAdminEmail, cancellationToken))
+        if (gymAdminUser is null)
         {
-            throw new EmailAlreadyRegisteredException();
+            throw new NotFoundException($"'{request.GymAdminPhone}' numaralı kayıtlı bir kullanıcı bulunamadı.");
         }
 
         await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -55,21 +51,6 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
             };
             await _unitOfWork.GetWriteRepository<Branch>().AddAsync(branch, cancellationToken);
 
-            var gymAdminUser = existingGymAdmin;
-            if (gymAdminUser is null)
-            {
-                gymAdminUser = new User
-                {
-                    FullName = request.GymAdminFullName,
-                    Phone = request.GymAdminPhone,
-                    Email = request.GymAdminEmail,
-                    PasswordHash = _passwordHasher.Hash(Guid.NewGuid().ToString()),
-                    PhoneVerified = false,
-                };
-                await _unitOfWork.GetWriteRepository<User>().AddAsync(gymAdminUser, cancellationToken);
-                await _unitOfWork.SaveChangesAsync(cancellationToken); // need gymAdminUser.Id for the assignment
-            }
-
             // GymAdmin's BranchId is null by design (Assignment.cs's own
             // comment: a GymAdmin assignment has CompanyId set, BranchId
             // null, meaning "all branches of this company").
@@ -87,7 +68,7 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
 
             await _smsSender.SendAsync(
                 request.GymAdminPhone,
-                "GymApp hesabınız oluşturuldu. Şifrenizi belirlemek için 'Şifremi Unuttum' akışını kullanın.",
+                $"GymApp'te '{request.CompanyName}' firmasının Gym Admin'i olarak atandınız.",
                 cancellationToken);
 
             return new CreateCompanyCommandResult

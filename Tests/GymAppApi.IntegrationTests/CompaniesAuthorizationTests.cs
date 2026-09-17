@@ -15,14 +15,12 @@ public class CompaniesAuthorizationTests : IClassFixture<CustomWebApplicationFac
 
     public CompaniesAuthorizationTests(CustomWebApplicationFactory factory) => _factory = factory;
 
-    private static object ValidBody() => new
+    private static object ValidBody(string gymAdminPhone = "+905559998877") => new
     {
         companyName = "New Gym",
         branchName = "Merkez",
         branchAddress = "Adres 1",
-        gymAdminFullName = "Ada Admin",
-        gymAdminPhone = "+905559998877",
-        gymAdminEmail = (string?)null,
+        gymAdminPhone,
     };
 
     [Fact]
@@ -63,7 +61,8 @@ public class CompaniesAuthorizationTests : IClassFixture<CustomWebApplicationFac
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
         var superAdmin = new User { FullName = "Super Admin", Phone = "+905550002222", PasswordHash = "x" };
-        db.Users.Add(superAdmin);
+        var futureGymAdmin = new User { FullName = "Future Gym Admin", Phone = "+905559998877", PasswordHash = "x" };
+        db.Users.AddRange(superAdmin, futureGymAdmin);
         await db.SaveChangesAsync();
         db.Assignments.Add(new Assignment { UserId = superAdmin.Id, CompanyId = null, Role = AssignmentRole.SuperAdmin, IsActive = true });
         await db.SaveChangesAsync();
@@ -76,6 +75,27 @@ public class CompaniesAuthorizationTests : IClassFixture<CustomWebApplicationFac
         var response = await client.PostAsJsonAsync("/api/companies", ValidBody());
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WhenGymAdminPhoneIsNotARegisteredUser_Returns404()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
+        var superAdmin = new User { FullName = "Super Admin", Phone = "+905550002233", PasswordHash = "x" };
+        db.Users.Add(superAdmin);
+        await db.SaveChangesAsync();
+        db.Assignments.Add(new Assignment { UserId = superAdmin.Id, CompanyId = null, Role = AssignmentRole.SuperAdmin, IsActive = true });
+        await db.SaveChangesAsync();
+
+        var jwtService = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var token = jwtService.GenerateAccessToken(new AccessTokenClaims(superAdmin.Id, superAdmin.FullName, superAdmin.Email, superAdmin.Phone)).Token;
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        var response = await client.PostAsJsonAsync("/api/companies", ValidBody(gymAdminPhone: "+905550009999"));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     private async Task<(Company company, Branch branch, string superAdminToken)> SeedCompanyAndSuperAdminAsync()
