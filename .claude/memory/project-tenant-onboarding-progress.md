@@ -21,8 +21,10 @@ metadata:
 - [x] Task 7 — `POST /api/companies`, SuperAdmin-only (commit 3ee9095)
 - [x] Task 8 — `AddStaffMemberCommand` (commit a0477c2, code review follow-up in 5c1b926: same transaction + email-uniqueness pattern as Task 6 — **this follow-up commit was sitting uncommitted-but-verified when the session's PC froze; resumed 2026-09-17 by rebuilding/retesting the exact same diff, confirming it matched Task 6's already-committed pattern, then committing it**)
 - [x] Task 9 — `POST /api/assignments/staff` (commit 24ef574). **Found during this task, not in the plan's original text:** `AddStaffMemberCommand.Role` is the first request body to expose an enum to clients — `"role":"Member"` failed model binding (400) with no `JsonStringEnumConverter` registered. Fixed by adding `.AddJsonOptions(...)` to `AddControllers()` in `Program.cs`, same commit.
-- [ ] Task 10 — Manual end-to-end verification against real Postgres (not started; needs `docker start postgres` + `dotnet run`, see plan for the exact curl sequence)
-- [ ] Task 11 — Retire self-service registration (`/api/auth/register/*`) — **do this LAST**, only after GymApp's mobile plan has shipped Add Company/Add Staff Member screens and removed its own Register screen. Until then, self-registration is the only way to create a test account on a fresh DB.
+- [x] Task 10 — Manual end-to-end verification against real Postgres — done 2026-09-17. Full flow confirmed live: SuperAdmin login → `POST /api/companies` (+ FAKE SMS log) → Forgot Password OTP → reset → login as staff-created Gym Admin → `POST /api/assignments/staff` → `GET /api/branches` returned only this company's own branch despite other companies' rows already in `gymapp_dev` from earlier sessions. Tenant isolation confirmed real against live Postgres, not just InMemory tests. No code changes, no commit for this task.
+- [ ] Task 11 — Retire self-service registration (`/api/auth/register/*`) — **BLOCKED, do not start.** Only after GymApp's mobile plan has shipped Add Company/Add Staff Member screens and removed its own Register screen. Checked 2026-09-17: GymApp repo has only added its plan file (commit `4805d08`), no screens implemented, no progress memory yet — gate is not satisfied. Until then, self-registration is the only way to create a test account on a fresh DB.
+
+## Plan status: Tasks 1-10 of 11 done (2026-09-17). Only Task 11 remains, and it is intentionally blocked on the sibling mobile repo — not something to push forward from this side. Nothing else pending in this plan.
 
 ## Known permanent local state (not a bug, don't "fix")
 
@@ -32,5 +34,5 @@ metadata:
 
 1. Read this file, then `docs/superpowers/plans/2026-09-17-tenant-onboarding.md` in full (its "Key facts" section has load-bearing context, e.g. why `ITenantResolutionService` needs `.IgnoreQueryFilters()`).
 2. Run `git log --oneline` to confirm which commits actually landed — trust git over this file if they disagree.
-3. Continue subagent-driven-development (or direct implementation) from the first unchecked task above — currently Task 10.
+3. Only Task 11 remains, and it's gated on GymApp's mobile plan shipping first (see that task's own "Status check" note) — check GymApp's memory/git log before starting it, don't just proceed.
 4. `git status`/`git diff` first — if there's an uncommitted change beyond the permanent CORS block described above, treat it as in-progress work to finish/verify, not something to discard.

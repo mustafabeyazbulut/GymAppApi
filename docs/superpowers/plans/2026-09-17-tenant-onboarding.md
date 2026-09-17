@@ -1394,52 +1394,19 @@ git commit -m "Add POST /api/assignments/staff for GymAdmin/BranchManager/SuperA
 
 **Files:** none — this task is manual verification, no code changes.
 
-- [ ] **Step 1: Start the local stack**
+- [x] **Step 1: Start the local stack** — Docker Desktop + the `postgres` container (already had `gymapp_dev` from earlier sessions) + `dotnet run` against `http://localhost:5195`.
 
-Run: `docker start postgres` (if not already running), then from `Presentation/GymAppApi.WebApi/`: `dotnet run`
+- [x] **Step 2: Log in as the seeded Super Admin** — 200, `accessToken` returned (identifier `+900000000000`).
 
-- [ ] **Step 2: Log in as the seeded Super Admin**
+- [x] **Step 3: Create a company** — 201: `{"companyId":4,"branchId":2,"gymAdminUserId":10,"gymAdminPhone":"+905551234567"}`. Console log confirmed `[FAKE SMS] To: +905551234567 | ...`.
 
-```bash
-curl -X POST http://localhost:5195/api/auth/login -H "Content-Type: application/json" -d '{"identifier":"+900000000000","password":"<the placeholder password documented in docs/superpowers/plans/2026-09-15-real-auth.md Task 12>"}'
-```
+- [x] **Step 4: Log in as the new Gym Admin via Forgot Password** — `forgot-password` → 200 → OTP read from console log → `reset-password` → 204 → `login` with the new password → 200 with a fresh token pair. Confirms the "staff-created account, member sets their own password via the existing Forgot Password flow" story end to end.
 
-Expected: 200, an `accessToken`.
+- [x] **Step 5: Add a staff member as this new Gym Admin** — 201: `{"assignmentId":6,"userId":11,"companyId":4,"branchId":2,"role":"Member"}`.
 
-- [ ] **Step 3: Create a company**
+- [x] **Step 6: Confirm tenant isolation with `GET /api/branches`** — as the Gym Admin token, returned exactly `[{"id":2,"companyId":4,"name":"Merkez",...}]` — one branch, this company's own, despite other companies'/branches' rows already existing in `gymapp_dev` from earlier sessions. **Tenant isolation is confirmed real against a live Postgres, not just InMemory tests.**
 
-```bash
-curl -X POST http://localhost:5195/api/companies -H "Content-Type: application/json" -H "Authorization: Bearer <accessToken>" -d '{"companyName":"Demo Gym","branchName":"Merkez","branchAddress":"Test Adres 1","gymAdminFullName":"Demo Admin","gymAdminPhone":"+905551234567","gymAdminEmail":null}'
-```
-
-Expected: 201, a `companyId`/`branchId`/`gymAdminUserId`. Check the running `dotnet run` console for a `[FAKE SMS] To: +905551234567 | ...` log line (confirms the SMS notification fired).
-
-- [ ] **Step 4: Log in as the new Gym Admin via Forgot Password**
-
-```bash
-curl -X POST http://localhost:5195/api/auth/forgot-password -H "Content-Type: application/json" -d '{"identifier":"+905551234567"}'
-```
-
-Read the OTP code from the `[FAKE SMS]` console log line, then:
-
-```bash
-curl -X POST http://localhost:5195/api/auth/reset-password -H "Content-Type: application/json" -d '{"identifier":"+905551234567","code":"<code>","newPassword":"Passw0rd!"}'
-curl -X POST http://localhost:5195/api/auth/login -H "Content-Type: application/json" -d '{"identifier":"+905551234567","password":"Passw0rd!"}'
-```
-
-Expected: the reset succeeds, then login returns 200 with a fresh token pair. This proves the "staff-created account, member sets their own password via the existing Forgot Password flow" story end to end.
-
-- [ ] **Step 5: Add a staff member as this new Gym Admin**
-
-```bash
-curl -X POST http://localhost:5195/api/assignments/staff -H "Content-Type: application/json" -H "Authorization: Bearer <gymAdminAccessToken>" -d '{"fullName":"Demo Member","phone":"+905559876543","role":"Member","branchId":<branchId from step 3>}'
-```
-
-Expected: 201.
-
-- [ ] **Step 6: Confirm tenant isolation with `GET /api/branches`**
-
-As the Gym Admin token, `GET /api/branches` should return only the one branch created in Step 3 — not any other company's branches that may already exist in the local dev database from earlier testing.
+**Verified 2026-09-17.** No code changes from this task. Background `dotnet run` process stopped afterward.
 
 ---
 
@@ -1454,6 +1421,8 @@ As the Gym Admin token, `GET /api/branches` should return only the one branch cr
 - Delete: `Tests/GymAppApi.IntegrationTests/RegisterCompleteAttemptPersistenceTests.cs`, `RegisterCompleteMaxAttemptsPipelineTests.cs`
 
 **Do this task LAST, only after the mobile plan has already shipped its "Add Company"/"Add Staff Member" screens and removed its own Register screen** (mobile plan's own last task) — until then, self-registration is still the only way anyone can create a test account on a fresh database, including for this very plan's own manual verification in Task 10.
+
+**Status check (2026-09-17): still blocked.** `C:\Users\MBEYAZBULUT\Documents\GitHub\GymApp` has only added its plan file (commit `4805d08` "Add Tenant Onboarding (Mobile) implementation plan") — no screens implemented yet, no memory entry tracking its progress. Do not start this task until that repo's own progress memory (once it exists) or its git log shows the Add Company/Add Staff Member screens shipped and Register screen removed.
 
 - [ ] **Step 1: Confirm nothing else references what's about to be deleted**
 
