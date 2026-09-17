@@ -1,9 +1,9 @@
 namespace GymAppApi.Application.Common.Interfaces;
 
-// Populated from JWT claims by WebApi middleware in a later plan (Auth).
-// Until then, GymAppApi.Infrastructure ships an AmbientTenantContext stub
-// that always reports IsSuperAdmin = true (no filtering) so the Branch
-// vertical slice in this plan is testable without auth.
+// Populated once per request by TenantContextMiddleware (Presentation
+// layer), from the caller's own Assignment rows via
+// ITenantResolutionService. See GymAppApi.Infrastructure.Tenancy.
+// AmbientTenantContext for the concrete, settable implementation.
 public interface ITenantContext
 {
     int? CompanyId { get; }

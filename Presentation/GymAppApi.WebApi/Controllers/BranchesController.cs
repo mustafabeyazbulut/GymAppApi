@@ -1,12 +1,14 @@
 using GymAppApi.Application.Features.Branches.Commands.CreateBranch;
 using GymAppApi.Application.Features.Branches.Queries.GetBranches;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GymAppApi.WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class BranchesController : ControllerBase
 {
     private readonly IMediator _mediator;
