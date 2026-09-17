@@ -75,4 +75,20 @@ public class UpdateBranchCommandHandlerTests
             handler.Handle(new UpdateBranchCommand { BranchId = 5, Name = "Yeni Ad", Address = "Yeni Adres", RequestedByUserId = CallerId }, CancellationToken.None));
         branchWriteRepo.Verify(r => r.Update(It.IsAny<Branch>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsBranchManagerNotGymAdmin_ThrowsForbiddenException()
+    {
+        var branch = ExistingBranch();
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, BranchId = 5, Role = AssignmentRole.BranchManager, IsActive = true } };
+        var (uow, branchWriteRepo) = Wire(branch, callerAssignments);
+        var handler = new UpdateBranchCommandHandler(uow.Object);
+
+        // A branch's own manager decides day-to-day operations, not whether
+        // the branch's identity (name/address) changes - renaming/re-addressing
+        // is a GymAdmin/SuperAdmin decision, same principle as SetActive.
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            handler.Handle(new UpdateBranchCommand { BranchId = 5, Name = "Yeni Ad", Address = "Yeni Adres", RequestedByUserId = CallerId }, CancellationToken.None));
+        branchWriteRepo.Verify(r => r.Update(It.IsAny<Branch>()), Times.Never);
+    }
 }

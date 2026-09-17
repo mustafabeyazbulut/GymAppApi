@@ -133,5 +133,33 @@ public class BranchesAuthorizationTests : IClassFixture<CustomWebApplicationFact
         Assert.False(db.Branches.Single(b => b.Id == created.Id).IsActive);
     }
 
+    [Fact]
+    public async Task Update_AsGymAdminOfOwnCompany_RenamesTheBranch()
+    {
+        var (companyA, gymAdminAToken, _, _, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminAToken);
+        var createResponse = await client.PostAsJsonAsync("/api/branches", Body(companyA.Id));
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateBranchResultDto>();
+
+        var response = await client.PatchAsJsonAsync($"/api/branches/{created!.Id}", new { name = "Yeni Ad", address = "Yeni Adres" });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
+        scope.ServiceProvider.GetRequiredService<GymAppApi.Infrastructure.Tenancy.AmbientTenantContext>().IsSuperAdmin = true;
+        var updated = db.Branches.Single(b => b.Id == created.Id);
+        Assert.Equal("Yeni Ad", updated.Name);
+        Assert.Equal("Yeni Adres", updated.Address);
+    }
+
+    [Fact]
+    public async Task Update_WithoutToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.PatchAsJsonAsync("/api/branches/1", new { name = "Yeni Ad", address = "Yeni Adres" });
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     private record CreateBranchResultDto(int Id, string Name);
 }
