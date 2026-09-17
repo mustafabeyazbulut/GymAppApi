@@ -9,7 +9,11 @@ public class AddStaffMemberCommandValidator : AbstractValidator<AddStaffMemberCo
     {
         RuleFor(x => x.Phone).NotEmpty().Matches(@"^\+[1-9]\d{7,14}$");
         RuleFor(x => x.BranchId).GreaterThan(0);
-        RuleFor(x => x.Role).Must(r => r is AssignmentRole.Member or AssignmentRole.Trainer)
-            .WithMessage("Role must be Member or Trainer.");
+        // Member is deliberately NOT allowed here yet - the product model
+        // requires a Package/PackageAssignment to back a real membership,
+        // and that module doesn't exist yet. Member-adding returns once it
+        // does; don't add it back ad hoc.
+        RuleFor(x => x.Role).Must(r => r is AssignmentRole.Trainer or AssignmentRole.BranchManager)
+            .WithMessage("Role must be Trainer or BranchManager.");
     }
 }

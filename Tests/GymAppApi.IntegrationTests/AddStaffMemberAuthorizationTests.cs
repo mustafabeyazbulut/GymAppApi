@@ -65,11 +65,23 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
         var response = await client.PostAsJsonAsync("/api/assignments/staff", new
         {
             phone = candidatePhone,
-            role = "Member",
+            role = "Trainer",
             branchId,
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddStaff_WithRoleMember_Returns422()
+    {
+        var (branchId, _, candidatePhone, branchManagerToken, _, _, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", branchManagerToken);
+
+        var response = await client.PostAsJsonAsync("/api/assignments/staff", new { phone = candidatePhone, role = "Member", branchId });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]
@@ -87,7 +99,7 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", branchManagerToken);
-        var addResponse = await client.PostAsJsonAsync("/api/assignments/staff", new { phone = candidatePhone, role = "Member", branchId });
+        var addResponse = await client.PostAsJsonAsync("/api/assignments/staff", new { phone = candidatePhone, role = "Trainer", branchId });
         Assert.Equal(HttpStatusCode.Created, addResponse.StatusCode);
         Assert.False(db.Assignments.Any(a => a.UserId == candidateId));
 
@@ -99,7 +111,7 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
         Assert.Equal(HttpStatusCode.Created, confirmResponse.StatusCode);
         var assignment = db.Assignments.Single(a => a.UserId == candidateId);
         Assert.Equal(branchId, assignment.BranchId);
-        Assert.Equal(AssignmentRole.Member, assignment.Role);
+        Assert.Equal(AssignmentRole.Trainer, assignment.Role);
     }
 
     [Fact]
@@ -146,7 +158,7 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
         var (branchId, candidateId, candidatePhone, branchManagerToken, _, newStaffCandidateToken, _) = await SeedAsync();
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", branchManagerToken);
-        await client.PostAsJsonAsync("/api/assignments/staff", new { phone = candidatePhone, role = "Member", branchId });
+        await client.PostAsJsonAsync("/api/assignments/staff", new { phone = candidatePhone, role = "Trainer", branchId });
 
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", newStaffCandidateToken);
         var response = await client.PostAsJsonAsync("/api/assignments/confirm", new { code = "000000" });
@@ -168,7 +180,7 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
         var response = await client.PostAsJsonAsync("/api/assignments/staff", new
         {
             phone = "+905550007777",
-            role = "Member",
+            role = "Trainer",
             branchId,
         });
 
@@ -185,7 +197,7 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
         var response = await client.PostAsJsonAsync("/api/assignments/staff", new
         {
             phone = candidatePhone,
-            role = "Member",
+            role = "Trainer",
             branchId,
         });
 
