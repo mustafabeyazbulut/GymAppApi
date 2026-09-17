@@ -56,9 +56,15 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
             throw new NotFoundException($"'{request.Phone}' numaralı kayıtlı bir kullanıcı bulunamadı.");
         }
 
-        var alreadyAssignedInCompany = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
-            a => a.UserId == user.Id && a.CompanyId == branch.CompanyId && a.IsActive, cancellationToken);
-        if (alreadyAssignedInCompany)
+        // Scoped to (CompanyId, BranchId, Role), not just CompanyId - a
+        // Trainer/BranchManager can hold assignments at more than one branch
+        // of the same company (and, separately, at any number of other
+        // companies - that was never blocked). Only an exact duplicate
+        // (same person, same branch, same role) is rejected.
+        var alreadyHoldsThisExactAssignment = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
+            a => a.UserId == user.Id && a.CompanyId == branch.CompanyId && a.BranchId == branch.Id &&
+                 a.Role == request.Role && a.IsActive, cancellationToken);
+        if (alreadyHoldsThisExactAssignment)
         {
             throw new UserAlreadyAssignedException();
         }

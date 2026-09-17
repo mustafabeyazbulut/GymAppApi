@@ -46,7 +46,8 @@ public class ConfirmAssignmentInvitationCommandHandler : IRequestHandler<Confirm
         // meantime. The invitation is still consumed either way - it must
         // never be redeemable twice.
         var alreadyAssigned = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
-            a => a.UserId == matching.TargetUserId && a.CompanyId == matching.CompanyId && a.IsActive, cancellationToken);
+            a => a.UserId == matching.TargetUserId && a.CompanyId == matching.CompanyId &&
+                 a.BranchId == matching.BranchId && a.Role == matching.Role && a.IsActive, cancellationToken);
         if (alreadyAssigned)
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
