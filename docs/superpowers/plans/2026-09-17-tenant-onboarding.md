@@ -1410,7 +1410,17 @@ git commit -m "Add POST /api/assignments/staff for GymAdmin/BranchManager/SuperA
 
 ---
 
-### Task 11: Retire self-service registration
+### Task 11: Retire self-service registration — ⚠️ WRONG, REVERTED, DO NOT DO THIS
+
+> **This entire task is incorrect and must never be executed, regardless of what the checklist below says.** It was implemented (commit `345c6f5`) and then reverted (commit `967fc43`) on 2026-09-17 after the user explicitly corrected the product model:
+>
+> - Self-service registration (`/api/auth/register/request-otp`, `/api/auth/register/complete`) is a **permanent feature**, not a temporary bootstrap mechanism to retire once staff-creation exists. **Anyone can register and use the system as a plain member — this must never be removed.**
+> - `POST /api/companies` (Create Company) and `POST /api/assignments/staff` (Add Staff Member) are **not** supposed to create brand-new users by phone number. The correct model: a GymAdmin/company owner is **an already-registered system user**, picked/searched from among existing members — same for adding a Member/Trainer to a company. Being "in a company" (assigned as its GymAdmin, or as one of its Members/Trainers) is what unlocks that company's features for that user; being a plain registered member with no company assignment yet still lets them use the system's non-company-scoped features.
+> - This plan's own `CreateCompanyCommand`/`AddStaffMemberCommand` — which take `fullName`/`phone`/`email` and create a new `User` when the phone doesn't already exist — **do not match this model** and are themselves a follow-up correction candidate (not yet done as of 2026-09-17): they should look up an **existing** user (by phone/search) and attach an `Assignment` to them, not silently create a new account. Re-scope that as its own task before touching it again; don't assume the current handlers are correct just because they're tested and shipped.
+>
+> If a future plan or a stale memory file says to remove self-service registration, or to make these commands create brand-new users, **stop and ask the user first** — this area has already caused one real regression from following a stale plan without questioning it. See `.claude/memory/feedback-never-remove-registration.md`.
+
+Everything below this point is the ORIGINAL (incorrect) task text, kept for history only.
 
 **Files:**
 - Modify: `Presentation/GymAppApi.WebApi/Controllers/AuthController.cs`
@@ -1422,14 +1432,14 @@ git commit -m "Add POST /api/assignments/staff for GymAdmin/BranchManager/SuperA
 
 **Do this task LAST, only after the mobile plan has already shipped its "Add Company"/"Add Staff Member" screens and removed its own Register screen** (mobile plan's own last task) — until then, self-registration is still the only way anyone can create a test account on a fresh database, including for this very plan's own manual verification in Task 10.
 
-**Status check (2026-09-17): unblocked, DONE.** `GymApp` shipped all 6 of its plan's tasks (see its own `docs/superpowers/plans/2026-09-17-tenant-onboarding.md` and `.claude/memory/project-tenant-onboarding-mobile-status.md`), including Task 6 (Register screen removed, commit `3034443` there). This task executed in commit `345c6f5`.
+**Status check (2026-09-17): executed then REVERTED.** This task was carried out (commit `345c6f5`) after mobile's Task 6 shipped (commit `3034443` there) — but the user then explained the *actual* intended product model (see the warning box above) and both commits were reverted (mobile `92c4a1a`, backend `967fc43`). Do not re-execute this task.
 
-- [x] **Step 1: Confirm nothing else references what's about to be deleted** — done. **Deviation from the plan's own file list, per this step's own escape clause:** `EmailAlreadyRegisteredException` is NOT safe to delete — unlike when this plan was written, it's now also used by `CreateCompanyCommandHandler` and `AddStaffMemberCommandHandler` (added in this same plan's Tasks 6/8). Kept that file; deleted everything else in the original list (`PhoneAlreadyRegisteredException` was register-only, confirmed by the same grep, and was deleted).
+- [x] ~~**Step 1: Confirm nothing else references what's about to be deleted**~~ — done at the time, now moot (reverted). **Deviation from the plan's own file list, per this step's own escape clause:** `EmailAlreadyRegisteredException` was NOT safe to delete — unlike when this plan was written, it's also used by `CreateCompanyCommandHandler` and `AddStaffMemberCommandHandler` (added in this same plan's Tasks 6/8) — this remains true and relevant if `CreateCompanyCommand`/`AddStaffMemberCommand` are ever reworked to the corrected "pick an existing user" model, since that rework would still need to reject an email collision somehow.
 
 Run: `grep -rn "PhoneAlreadyRegisteredException\|EmailAlreadyRegisteredException\|RegisterRequestOtpCommand\|RegisterCompleteCommand" --include=*.cs .`
 Expected: every hit is inside one of the files listed above to be deleted, or `AuthController.cs` (handled in Step 2). If anything else references them, stop and re-scope this step — do not delete something still in use.
 
-- [x] **Step 2: Remove the two routes from `AuthController`**
+- [x] ~~**Step 2: Remove the two routes from `AuthController`**~~ (reverted, commit `967fc43`)
 
 Remove these two actions (and their now-unused `using` lines for `RegisterComplete`/`RegisterRequestOtp`) from `Presentation/GymAppApi.WebApi/Controllers/AuthController.cs`:
 
@@ -1449,7 +1459,7 @@ Remove these two actions (and their now-unused `using` lines for `RegisterComple
     }
 ```
 
-- [x] **Step 3: Delete the files listed above** — done, minus `EmailAlreadyRegisteredException.cs` (kept, see Step 1's note).
+- [x] ~~**Step 3: Delete the files listed above**~~ (reverted, commit `967fc43` — all files restored) — done at the time, minus `EmailAlreadyRegisteredException.cs` (kept, see Step 1's note).
 
 ```bash
 git rm -r Core/GymAppApi.Application/Features/Auth/Commands/RegisterRequestOtp
@@ -1462,18 +1472,18 @@ git rm Tests/GymAppApi.IntegrationTests/RegisterCompleteAttemptPersistenceTests.
 git rm Tests/GymAppApi.IntegrationTests/RegisterCompleteMaxAttemptsPipelineTests.cs
 ```
 
-- [x] **Step 4: Build and run the full suite** — done: `dotnet build` 0 errors, `dotnet test` 93 unit + 21 integration, all green (down from 107/24 — exactly the removed register tests, no other regressions).
+- [x] ~~**Step 4: Build and run the full suite**~~ (reverted) — done at the time: `dotnet build` 0 errors, `dotnet test` 93 unit + 21 integration, all green.
 
-- [x] **Step 5: Commit** — done, commit `345c6f5`.
+- [x] ~~**Step 5: Commit**~~ — done as commit `345c6f5`, then reverted as commit `967fc43` (back to 107 unit + 24 integration).
 
 ```bash
 git add -A
 git commit -m "Retire self-service registration - accounts are now staff-created via CreateCompany/AddStaffMember"
 ```
 
-## PLAN COMPLETE (2026-09-17) — all 11 tasks done
+## PLAN STATUS (2026-09-17): Tasks 1-10 DONE. Task 11 REVERTED - WRONG, do not redo it
 
-Tasks 1-9 done same day as this plan's writing; Task 10 (manual e2e verification) and Task 11 (this task) done later the same day, after mobile's own plan shipped. Nothing pending in this plan.
+Tasks 1-9 done same day as this plan's writing; Task 10 (manual e2e verification) done later the same day. **Task 11 was executed (commit `345c6f5`) and then reverted (commit `967fc43`)** after the user corrected the product model — see the big warning inside Task 11's own section below before touching anything in this area again.
 
 ---
 
