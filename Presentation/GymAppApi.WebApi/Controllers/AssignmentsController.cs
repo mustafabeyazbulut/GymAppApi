@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Assignments.Commands.AddStaffMember;
 using GymAppApi.Application.Features.Assignments.Commands.ConfirmAssignmentInvitation;
 using GymAppApi.Application.Features.Assignments.Commands.CreateAssignment;
+using GymAppApi.Application.Features.Assignments.Commands.InviteGymAdmin;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +22,15 @@ public class AssignmentsController : ControllerBase
     [Authorize(Policy = "GymAdminOrSuperAdmin")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateAssignmentCommand command, CancellationToken cancellationToken)
+    {
+        command.RequestedByUserId = CurrentUserId;
+        var result = await _mediator.Send(command, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [Authorize(Policy = "GymAdminOrSuperAdmin")]
+    [HttpPost("gym-admin")]
+    public async Task<IActionResult> InviteGymAdmin(InviteGymAdminCommand command, CancellationToken cancellationToken)
     {
         command.RequestedByUserId = CurrentUserId;
         var result = await _mediator.Send(command, cancellationToken);
