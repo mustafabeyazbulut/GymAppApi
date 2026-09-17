@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Branches.Commands.CreateBranch;
 using GymAppApi.Application.Features.Branches.Commands.SetBranchActive;
 using GymAppApi.Application.Features.Branches.Commands.UpdateBranch;
+using GymAppApi.Application.Features.Branches.Queries.GetBranchDetail;
 using GymAppApi.Application.Features.Branches.Queries.GetBranches;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -23,6 +24,10 @@ public class BranchesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetBranchesQuery(), cancellationToken));
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetBranchDetailQuery(id), cancellationToken));
 
     [Authorize(Policy = "GymAdminOrSuperAdmin")]
     [HttpPost]

@@ -161,5 +161,61 @@ public class BranchesAuthorizationTests : IClassFixture<CustomWebApplicationFact
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task GetById_AsGymAdminOfOwnCompany_ReturnsTheBranch()
+    {
+        var (companyA, gymAdminAToken, _, _, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminAToken);
+        var createResponse = await client.PostAsJsonAsync("/api/branches", Body(companyA.Id));
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateBranchResultDto>();
+
+        var response = await client.GetAsync($"/api/branches/{created!.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateBranchResultDto>();
+        Assert.Equal(created.Id, body!.Id);
+        Assert.Equal("Merkez Şube", body.Name);
+    }
+
+    [Fact]
+    public async Task GetById_ForNonExistentId_Returns404()
+    {
+        var (_, gymAdminAToken, _, _, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminAToken);
+
+        var response = await client.GetAsync("/api/branches/999999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetById_AsGymAdminOfADifferentCompany_Returns404()
+    {
+        // Same tenant-scoping story as GetAll: the global query filter on
+        // Branch hides companyA's branch from gymAdminB entirely, so the
+        // handler's GetAsync finds nothing and this surfaces as 404, not 403.
+        var (companyA, gymAdminAToken, gymAdminBToken, _, _) = await SeedAsync();
+        var ownerClient = _factory.CreateClient();
+        ownerClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminAToken);
+        var createResponse = await ownerClient.PostAsJsonAsync("/api/branches", Body(companyA.Id));
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateBranchResultDto>();
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminBToken);
+        var response = await client.GetAsync($"/api/branches/{created!.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetById_WithoutToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/branches/1");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     private record CreateBranchResultDto(int Id, string Name);
 }
