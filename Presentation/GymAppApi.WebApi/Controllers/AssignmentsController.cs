@@ -3,6 +3,7 @@ using GymAppApi.Application.Features.Assignments.Commands.AddStaffMember;
 using GymAppApi.Application.Features.Assignments.Commands.ConfirmAssignmentInvitation;
 using GymAppApi.Application.Features.Assignments.Commands.CreateAssignment;
 using GymAppApi.Application.Features.Assignments.Commands.InviteGymAdmin;
+using GymAppApi.Application.Features.Assignments.Commands.RemoveAssignment;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -56,5 +57,16 @@ public class AssignmentsController : ControllerBase
         command.UserId = CurrentUserId;
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    // Any authenticated user can call this - authorization is fully
+    // role-dependent (see RemoveAssignmentCommandHandler) and can't be
+    // expressed as one static policy the way Create/AddStaffMember can.
+    [Authorize]
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Remove(int id, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new RemoveAssignmentCommand { AssignmentId = id, RequestedByUserId = CurrentUserId }, cancellationToken);
+        return NoContent();
     }
 }
