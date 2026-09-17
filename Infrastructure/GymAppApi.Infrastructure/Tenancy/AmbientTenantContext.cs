@@ -2,14 +2,16 @@ using GymAppApi.Application.Common.Interfaces;
 
 namespace GymAppApi.Infrastructure.Tenancy;
 
-// Placeholder until the Auth plan adds JWT + a middleware that reads
-// CompanyId/BranchId/Role claims into a request-scoped implementation of
-// this interface. Reporting IsSuperAdmin = true means every global query
-// filter in Task 7 is a no-op for now — safe default for an
-// unauthenticated foundation, NOT safe once real users exist.
+// Populated once per request by TenantContextMiddleware (Presentation layer)
+// right after authentication, from the caller's own Assignment rows (via
+// ITenantResolutionService). A brand-new request that hasn't gone through
+// that middleware yet (or an unauthenticated one) keeps these fail-closed
+// defaults - IsSuperAdmin=false, CompanyId=null - which the existing global
+// query filters already treat as "see nothing" for every tenant-scoped
+// entity except a null-CompanyId row.
 public class AmbientTenantContext : ITenantContext
 {
-    public int? CompanyId => null;
-    public int? BranchId => null;
-    public bool IsSuperAdmin => true;
+    public int? CompanyId { get; set; }
+    public int? BranchId { get; set; }
+    public bool IsSuperAdmin { get; set; }
 }

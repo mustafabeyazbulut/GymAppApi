@@ -13,7 +13,8 @@ public static class Registration
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<ITenantContext, AmbientTenantContext>();
+        services.AddScoped<AmbientTenantContext>();
+        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<AmbientTenantContext>());
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection("Jwt"))
