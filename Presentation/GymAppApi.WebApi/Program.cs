@@ -48,6 +48,14 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("GymAdminOrSuperAdmin", policy => policy.Requirements.Add(
         new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
             GymAppApi.Domain.Enums.AssignmentRole.GymAdmin, GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
+    options.AddPolicy("SuperAdminOnly", policy => policy.Requirements.Add(
+        new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
+            GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
+    options.AddPolicy("StaffManagement", policy => policy.Requirements.Add(
+        new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
+            GymAppApi.Domain.Enums.AssignmentRole.BranchManager,
+            GymAppApi.Domain.Enums.AssignmentRole.GymAdmin,
+            GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
 });
 
 builder.Services.AddRateLimiter(options =>
