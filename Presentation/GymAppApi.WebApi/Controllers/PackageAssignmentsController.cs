@@ -8,6 +8,7 @@ using GymAppApi.Application.Features.Packages.Commands.RecordPackageAssignmentPa
 using GymAppApi.Application.Features.Packages.Commands.RecordProgressNote;
 using GymAppApi.Application.Features.Packages.Commands.UnfreezePackageAssignment;
 using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentCheckIns;
+using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignments;
 using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentPayments;
 using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentProgressNotes;
 using GymAppApi.Application.Features.Reservations.Queries.GetPackageAssignmentReservations;
@@ -41,6 +42,13 @@ public class PackageAssignmentsController : ControllerBase
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }
+
+    // Personelin (ödeme kaydetmek için hedef atamayı bulabilmesi amacıyla)
+    // kendi şirketindeki paket atamalarını listelemesi/araması.
+    [Authorize(Policy = "StaffManagement")]
+    [HttpGet]
+    public async Task<IActionResult> GetAll([FromQuery] string? memberPhone, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetPackageAssignmentsQuery(memberPhone), cancellationToken));
 
     // Any authenticated user can call this - it's how the MEMBER (not the
     // inviter) confirms a pending package invitation sent to their own phone.
