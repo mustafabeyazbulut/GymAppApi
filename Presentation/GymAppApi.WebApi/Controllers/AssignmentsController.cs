@@ -4,6 +4,7 @@ using GymAppApi.Application.Features.Assignments.Commands.ConfirmAssignmentInvit
 using GymAppApi.Application.Features.Assignments.Commands.CreateAssignment;
 using GymAppApi.Application.Features.Assignments.Commands.InviteGymAdmin;
 using GymAppApi.Application.Features.Assignments.Commands.RemoveAssignment;
+using GymAppApi.Application.Features.Assignments.Queries.GetStaffMembers;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,13 @@ public class AssignmentsController : ControllerBase
         var result = await _mediator.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }
+
+    // Personelin (ekleme/kaldırma zaten vardı) kendi şirketinin personelini
+    // görebilmesi için - kim çalışıyor sorusunun tek cevabı Swagger'dı.
+    [Authorize(Policy = "StaffManagement")]
+    [HttpGet]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetStaffMembersQuery(), cancellationToken));
 
     [Authorize(Policy = "GymAdminOrSuperAdmin")]
     [HttpPost("gym-admin")]
