@@ -53,7 +53,11 @@ public class PackageAssignmentsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    [Authorize(Policy = "StaffManagement")]
+    // [Authorize(Policy = "StaffManagement")] DEĞİL - handler'ın kendisi
+    // atamanın sahibi Member'ın kendi üyeliğini dondurmasına/açmasına izin
+    // veriyor, StaffManagement policy'si bunu tamamen engellerdi (bir
+    // Member'ın hiç Assignment'ı yoktur).
+    [Authorize]
     [HttpPost("{id}/freeze")]
     public async Task<IActionResult> Freeze(int id, CancellationToken cancellationToken)
     {
@@ -61,7 +65,7 @@ public class PackageAssignmentsController : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Policy = "StaffManagement")]
+    [Authorize]
     [HttpPost("{id}/unfreeze")]
     public async Task<IActionResult> Unfreeze(int id, CancellationToken cancellationToken)
     {

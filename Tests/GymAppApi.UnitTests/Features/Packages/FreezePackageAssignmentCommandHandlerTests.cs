@@ -14,7 +14,9 @@ public class FreezePackageAssignmentCommandHandlerTests
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<PackageAssignment>> writeRepo) Wire(PackageAssignment? assignment, IReadOnlyList<Assignment> callerAssignments)
     {
         var assignmentReadRepo = new Mock<IReadRepository<PackageAssignment>>();
-        assignmentReadRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<PackageAssignment, bool>>>(), null, false, default))
+        assignmentReadRepo.Setup(r => r.GetAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<PackageAssignment, bool>>>(),
+                It.IsAny<Func<IQueryable<PackageAssignment>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<PackageAssignment, object>>?>(), false, default))
             .ReturnsAsync(assignment);
         var writeRepo = new Mock<IWriteRepository<PackageAssignment>>();
 
@@ -66,5 +68,19 @@ public class FreezePackageAssignmentCommandHandlerTests
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new FreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = CallerId }, CancellationToken.None));
         writeRepo.Verify(r => r.Update(It.IsAny<PackageAssignment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsTheAssignmentsOwnMember_SetsStatusFrozen()
+    {
+        const int memberId = 7;
+        var assignment = new PackageAssignment { Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, MemberUserId = memberId, Status = PackageAssignmentStatus.Active };
+        var (uow, writeRepo) = Wire(assignment, callerAssignments: new List<Assignment>());
+        var handler = new FreezePackageAssignmentCommandHandler(uow.Object);
+
+        await handler.Handle(new FreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None);
+
+        Assert.Equal(PackageAssignmentStatus.Frozen, assignment.Status);
+        writeRepo.Verify(r => r.Update(assignment), Times.Once);
     }
 }

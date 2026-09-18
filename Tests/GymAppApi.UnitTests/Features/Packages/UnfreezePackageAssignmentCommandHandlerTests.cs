@@ -13,7 +13,9 @@ public class UnfreezePackageAssignmentCommandHandlerTests
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<PackageAssignment>> writeRepo) Wire(PackageAssignment assignment, IReadOnlyList<Assignment> callerAssignments)
     {
         var assignmentReadRepo = new Mock<IReadRepository<PackageAssignment>>();
-        assignmentReadRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<PackageAssignment, bool>>>(), null, false, default))
+        assignmentReadRepo.Setup(r => r.GetAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<PackageAssignment, bool>>>(),
+                It.IsAny<Func<IQueryable<PackageAssignment>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<PackageAssignment, object>>?>(), false, default))
             .ReturnsAsync(assignment);
         var writeRepo = new Mock<IWriteRepository<PackageAssignment>>();
 
@@ -68,5 +70,23 @@ public class UnfreezePackageAssignmentCommandHandlerTests
 
         Assert.Equal(PackageAssignmentStatus.Active, assignment.Status);
         Assert.Null(assignment.EndDate);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsTheAssignmentsOwnMember_SetsStatusActive()
+    {
+        const int memberId = 7;
+        var assignment = new PackageAssignment
+        {
+            Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, MemberUserId = memberId,
+            Status = PackageAssignmentStatus.Frozen, FrozenAt = DateTime.UtcNow.AddDays(-5), EndDate = null,
+        };
+        var (uow, writeRepo) = Wire(assignment, callerAssignments: new List<Assignment>());
+        var handler = new UnfreezePackageAssignmentCommandHandler(uow.Object);
+
+        await handler.Handle(new UnfreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None);
+
+        Assert.Equal(PackageAssignmentStatus.Active, assignment.Status);
+        writeRepo.Verify(r => r.Update(assignment), Times.Once);
     }
 }
