@@ -11,7 +11,7 @@ public class TenantResolutionService : ITenantResolutionService
 
     public TenantResolutionService(GymAppApiDbContext dbContext) => _dbContext = dbContext;
 
-    public async Task<ResolvedTenant> ResolveForUserAsync(int userId, CancellationToken cancellationToken = default)
+    public async Task<ResolvedTenant> ResolveForUserAsync(int userId, int? preferredCompanyId = null, CancellationToken cancellationToken = default)
     {
         // One of the few places allowed to bypass the tenant query filter (see
         // also GetMeQueryHandler, same rationale) — resolving a user's OWN
@@ -30,13 +30,21 @@ public class TenantResolutionService : ITenantResolutionService
             return new ResolvedTenant(true, null, null);
         }
 
-        // A user with more than one non-SuperAdmin Assignment (multi-company
-        // staff/members) picks their FIRST one deterministically for now - a
-        // proper "şirket/şube seç" context switcher (see the product design
-        // doc's "Çoklu Şirkete Bağlılık ve Giriş Akışı") is future work, out
-        // of scope here. Practically rare today since Tenant Onboarding is
-        // what starts letting a user hold more than one Assignment at all.
-        var primary = assignments.OrderBy(a => a.Id).First();
+        // Birden fazla SuperAdmin-olmayan Assignment'ı olan bir çağıran
+        // (çok-şirketli personel/üye), istek verildiğinde ve gerçekten
+        // eşleştiğinde isteğin kendi X-Active-Company-Id header'ıyla (bkz.
+        // TenantContextMiddleware) eşleşen Assignment'a çözülür - bu sadece
+        // bir İPUCU, çağıranın KENDİ mevcut satırları arasından seçim
+        // yapmanın ötesinde asla güvenilmez, bu yüzden Assignment'ı olmadığı
+        // bir şirkete erişim veremez. Header gönderilmediğinde veya hiçbir
+        // şeyle eşleşmediğinde çağıranın kronolojik olarak ilk Assignment'ına
+        // (önceki davranış) geri döner, bu yüzden tek-şirketli bir çağıran
+        // (yaygın durum) ve header'ı henüz göndermeyen herhangi bir istemci
+        // tamamen etkilenmez.
+        var preferred = preferredCompanyId is null
+            ? null
+            : assignments.Where(a => a.CompanyId == preferredCompanyId).MinBy(a => a.Id);
+        var primary = preferred ?? assignments.OrderBy(a => a.Id).First();
         return new ResolvedTenant(false, primary.CompanyId, primary.BranchId);
     }
 }

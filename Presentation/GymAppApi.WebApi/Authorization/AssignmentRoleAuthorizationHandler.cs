@@ -2,14 +2,16 @@ using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.WebApi.Authorization;
 
-// Deliberately re-queries Assignment on every request rather than trusting a
-// JWT claim — see the backend spec's "Auth/Yetkilendirme Altyapısı" section:
-// a user's Assignments can change (role granted/revoked) after a token is
-// issued, and the access token's short lifetime isn't short enough to make a
-// stale claim acceptable for a destructive/administrative action like this.
+// Her istekte Assignment'ı bir JWT claim'ine güvenmek yerine bilinçli olarak
+// yeniden sorguluyor — bkz. backend spec'inin "Auth/Yetkilendirme Altyapısı"
+// bölümü: bir kullanıcının Assignment'ları (rol verilme/iptal) token
+// çıkarıldıktan SONRA değişebilir, ve access token'ın kısa ömrü bu kadar
+// yıkıcı/idari bir işlem için bayat bir claim'i kabul edilebilir kılacak
+// kadar kısa değil.
 public class AssignmentRoleAuthorizationHandler : AuthorizationHandler<AssignmentRoleRequirement>
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -25,11 +27,26 @@ public class AssignmentRoleAuthorizationHandler : AuthorizationHandler<Assignmen
             return;
         }
 
-        var hasAllowedRole = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
+        // AnyAsync yerine IgnoreQueryFilters + GetAllAsync: bu kontrol
+        // çalıştığında çağıranın ambient tenant context'i henüz gerçek
+        // anlamda kullanışlı değil - TenantResolutionService, CompanyId'yi
+        // çağıranın İLK (Id'ye göre) Assignment'ından çözüyor, bu yüzden ilk
+        // oluşturulan Assignment'ı bu requirement'ın gerçekten önemsediği
+        // şirketten FARKLI bir şirkette olan çok-şirketli bir personel,
+        // gerçek GymAdmin/BranchManager/SuperAdmin satırının Assignment'ın
+        // kendi CompanyId sorgu filtresi tarafından sessizce gizlenmesiyle
+        // karşılaşırdı - o ikinci şirket için policy ile korunan HER işlemi
+        // yanlışlıkla reddeder. AnyAsync'in hiçbir IgnoreQueryFilters kaçış
+        // yolu yok (bkz. .claude/memory/project-member-package-linkage-
+        // design.md'deki standing rule), bu yüzden bunun yerine GetAllAsync+
+        // Count kullanılmalı - bu kod tabanındaki Member/çok-şirketli
+        // erişilebilir her kontrolde zaten kullanılan aynı düzeltme deseni.
+        var assignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == userId && a.IsActive && requirement.AllowedRoles.Contains(a.Role),
-            CancellationToken.None);
+            include: q => q.IgnoreQueryFilters().Include(a => a.User),
+            cancellationToken: CancellationToken.None);
 
-        if (hasAllowedRole)
+        if (assignments.Count > 0)
         {
             context.Succeed(requirement);
         }

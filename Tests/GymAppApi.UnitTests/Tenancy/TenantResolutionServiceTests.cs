@@ -116,6 +116,56 @@ public class TenantResolutionServiceTests
     }
 
     [Fact]
+    public async Task ResolveForUserAsync_WithPreferredCompanyId_ReturnsThatCompanyEvenWhenItIsNotTheFirstAssignment()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        int userId;
+        await using (var seedContext = CreateSeedContext(dbName))
+        {
+            var user = new User { FullName = "Multi Company Staff", Phone = "+905550000014", PasswordHash = "x" };
+            seedContext.Users.Add(user);
+            await seedContext.SaveChangesAsync();
+            userId = user.Id;
+            seedContext.Assignments.Add(new Assignment { UserId = user.Id, CompanyId = 1, Role = AssignmentRole.Trainer, IsActive = true });
+            await seedContext.SaveChangesAsync();
+            seedContext.Assignments.Add(new Assignment { UserId = user.Id, CompanyId = 2, BranchId = 5, Role = AssignmentRole.GymAdmin, IsActive = true });
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var context = CreateUnresolvedContext(dbName);
+        var service = new TenantResolutionService(context);
+        var resolved = await service.ResolveForUserAsync(userId, preferredCompanyId: 2);
+
+        Assert.Equal(2, resolved.CompanyId);
+        Assert.Equal(5, resolved.BranchId);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_WithPreferredCompanyIdTheCallerDoesNotHold_FallsBackToTheFirstAssignment()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        int userId;
+        await using (var seedContext = CreateSeedContext(dbName))
+        {
+            var user = new User { FullName = "Single Company Staff", Phone = "+905550000015", PasswordHash = "x" };
+            seedContext.Users.Add(user);
+            await seedContext.SaveChangesAsync();
+            userId = user.Id;
+            seedContext.Assignments.Add(new Assignment { UserId = user.Id, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true });
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var context = CreateUnresolvedContext(dbName);
+        var service = new TenantResolutionService(context);
+        // Sahte/bayat bir header, çağıranın hiç Assignment'ı olmadığı bir
+        // şirketi işaret ediyorsa o şirketin kapsamını asla vermemeli -
+        // sadece gerçek, tek Assignment'ına geri döner.
+        var resolved = await service.ResolveForUserAsync(userId, preferredCompanyId: 999);
+
+        Assert.Equal(1, resolved.CompanyId);
+    }
+
+    [Fact]
     public async Task ResolveForUserAsync_IgnoresInactiveAssignments()
     {
         var dbName = Guid.NewGuid().ToString();

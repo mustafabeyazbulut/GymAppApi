@@ -18,12 +18,26 @@ public class TenantContextMiddleware
 
     public TenantContextMiddleware(RequestDelegate next) => _next = next;
 
+    // JWT claim değil header: çok-şirketli bir personelin şu an hangi şirket
+    // olarak hareket ettiği bir access token'ın ömründen çok daha sık
+    // değişir, ve bir claim'in aksine bu her zaman sadece bir İPUCU -
+    // ITenantResolutionService yine de çağıranın orada gerçekten canlı bir
+    // Assignment'ı olmasını şart koşuyor, bu yüzden sahte/bayat bir header
+    // değeri çağıranın kendi Assignment'larının zaten izin verdiğinden fazla
+    // erişim asla veremez.
+    public const string ActiveCompanyHeaderName = "X-Active-Company-Id";
+
     public async Task InvokeAsync(HttpContext context, AmbientTenantContext tenantContext, ITenantResolutionService resolutionService)
     {
         var subClaim = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         if (subClaim is not null && int.TryParse(subClaim, out var userId))
         {
-            var resolved = await resolutionService.ResolveForUserAsync(userId, context.RequestAborted);
+            int? preferredCompanyId = context.Request.Headers.TryGetValue(ActiveCompanyHeaderName, out var headerValue)
+                && int.TryParse(headerValue, out var parsedCompanyId)
+                    ? parsedCompanyId
+                    : null;
+
+            var resolved = await resolutionService.ResolveForUserAsync(userId, preferredCompanyId, context.RequestAborted);
             tenantContext.IsSuperAdmin = resolved.IsSuperAdmin;
             tenantContext.CompanyId = resolved.CompanyId;
             tenantContext.BranchId = resolved.BranchId;
