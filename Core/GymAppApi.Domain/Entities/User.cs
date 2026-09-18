@@ -28,4 +28,5 @@ public class User : EntityBase
     public bool IsAccountFrozen { get; set; }
 
     public ICollection<Assignment> Assignments { get; set; } = new List<Assignment>();
+    public ICollection<PackageAssignment> PackageAssignments { get; set; } = new List<PackageAssignment>();
 }

@@ -39,6 +39,7 @@ public class GymAppApiDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<PendingAssignmentInvitation> PendingAssignmentInvitations => Set<PendingAssignmentInvitation>();
     public DbSet<Package> Packages => Set<Package>();
+    public DbSet<PackageAssignment> PackageAssignments => Set<PackageAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
