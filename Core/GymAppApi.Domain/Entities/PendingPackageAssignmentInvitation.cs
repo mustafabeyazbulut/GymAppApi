@@ -13,8 +13,13 @@ public class PendingPackageAssignmentInvitation : EntityBase
     public int TargetUserId { get; set; }
     public User? TargetUser { get; set; }
 
+    // Deliberately no navigation property to Package - Package carries a
+    // company-scoped query filter and this row is intentionally unscoped
+    // (the target member may not have any assignment to that company yet),
+    // so a required FK navigation between them would filter out the Package
+    // for exactly the caller this row exists to serve. Same reasoning as
+    // PendingAssignmentInvitation's plain CompanyId/BranchId ints below.
     public int PackageId { get; set; }
-    public Package? Package { get; set; }
 
     // Snapshot of Package.CompanyId/BranchId at issue time.
     public int CompanyId { get; set; }

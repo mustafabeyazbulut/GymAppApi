@@ -15,11 +15,6 @@ public class PendingPackageAssignmentInvitationConfiguration : IEntityTypeConfig
             .HasForeignKey(x => x.TargetUserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(x => x.Package)
-            .WithMany()
-            .HasForeignKey(x => x.PackageId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasIndex(x => new { x.TargetUserId, x.CompanyId });
     }
 }
