@@ -3,9 +3,12 @@ using GymAppApi.Application.Features.Packages.Commands.CancelPackageAssignment;
 using GymAppApi.Application.Features.Packages.Commands.ConfirmPackageAssignment;
 using GymAppApi.Application.Features.Packages.Commands.CreatePackageAssignment;
 using GymAppApi.Application.Features.Packages.Commands.FreezePackageAssignment;
+using GymAppApi.Application.Features.Packages.Commands.RecordGeneralCheckIn;
 using GymAppApi.Application.Features.Packages.Commands.RecordPackageAssignmentPayment;
 using GymAppApi.Application.Features.Packages.Commands.UnfreezePackageAssignment;
+using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentCheckIns;
 using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentPayments;
+using GymAppApi.Application.Features.Reservations.Queries.GetPackageAssignmentReservations;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -88,4 +91,27 @@ public class PackageAssignmentsController : ControllerBase
     [HttpGet("{id}/payments")]
     public async Task<IActionResult> GetPayments(int id, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetPackageAssignmentPaymentsQuery(id, CurrentUserId), cancellationToken));
+
+    // [Authorize] not StaffManagement-only - the handler allows the
+    // assignment's own Member to see their own reservations too.
+    [Authorize]
+    [HttpGet("{id}/reservations")]
+    public async Task<IActionResult> GetReservations(int id, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetPackageAssignmentReservationsQuery(id, CurrentUserId), cancellationToken));
+
+    // Walk-in/no-reservation check-in - front desk only, unlike the
+    // reservation-based check-in endpoints on ReservationsController which a
+    // Trainer may also call.
+    [Authorize(Policy = "StaffManagement")]
+    [HttpPost("{id}/check-in")]
+    public async Task<IActionResult> CheckIn(int id, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new RecordGeneralCheckInCommand { PackageAssignmentId = id, RequestedByUserId = CurrentUserId }, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpGet("{id}/check-ins")]
+    public async Task<IActionResult> GetCheckIns(int id, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetPackageAssignmentCheckInsQuery(id, CurrentUserId), cancellationToken));
 }
