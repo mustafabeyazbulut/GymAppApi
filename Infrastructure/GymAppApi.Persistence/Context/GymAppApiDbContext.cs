@@ -17,6 +17,7 @@ public class GymAppApiDbContext : DbContext
         typeof(PendingContactVerification),
         typeof(Notification),
         typeof(PendingAssignmentInvitation),
+        typeof(PendingPackageAssignmentInvitation),
     };
 
     private readonly ITenantContext _tenantContext;
@@ -38,6 +39,7 @@ public class GymAppApiDbContext : DbContext
     public DbSet<PendingContactVerification> PendingContactVerifications => Set<PendingContactVerification>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<PendingAssignmentInvitation> PendingAssignmentInvitations => Set<PendingAssignmentInvitation>();
+    public DbSet<PendingPackageAssignmentInvitation> PendingPackageAssignmentInvitations => Set<PendingPackageAssignmentInvitation>();
     public DbSet<Package> Packages => Set<Package>();
     public DbSet<PackageAssignment> PackageAssignments => Set<PackageAssignment>();
 
