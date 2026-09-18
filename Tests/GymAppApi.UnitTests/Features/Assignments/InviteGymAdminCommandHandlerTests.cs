@@ -13,7 +13,7 @@ public class InviteGymAdminCommandHandlerTests
     private const int CallerId = 42;
 
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<PendingAssignmentInvitation>> invitationWriteRepo) Wire(
-        bool companyExists, IReadOnlyList<Assignment> callerAssignments, User? existingUser, bool alreadyGymAdmin)
+        bool companyExists, IReadOnlyList<Assignment> callerAssignments, User? existingUser, bool alreadyGymAdmin, bool hasConflictingRole = false)
     {
         var companyReadRepo = new Mock<IReadRepository<Company>>();
         companyReadRepo.Setup(r => r.GetAsync(
@@ -24,8 +24,11 @@ public class InviteGymAdminCommandHandlerTests
         assignmentReadRepo.Setup(r => r.GetAllAsync(
                 It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), null, null, false, default))
             .ReturnsAsync(callerAssignments);
-        assignmentReadRepo.Setup(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
-            .ReturnsAsync(alreadyGymAdmin);
+        // Called up to twice: first the exact-duplicate GymAdmin check, then (only if that's
+        // false) the cross-role BranchManager conflict check - matches the handler's call order.
+        assignmentReadRepo.SetupSequence(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
+            .ReturnsAsync(alreadyGymAdmin)
+            .ReturnsAsync(hasConflictingRole);
 
         var userReadRepo = new Mock<IReadRepository<User>>();
         userReadRepo.Setup(r => r.GetAsync(
@@ -123,6 +126,18 @@ public class InviteGymAdminCommandHandlerTests
         var handler = new InviteGymAdminCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
 
         await Assert.ThrowsAsync<UserAlreadyAssignedException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
+        invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenInviteeIsAlreadyBranchManagerOfThisCompany_ThrowsConflictingAssignmentRoleException()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var existingUser = new User { Id = 7, FullName = "Existing", Phone = "+905550003333", PasswordHash = "x" };
+        var (uow, invitationWriteRepo) = Wire(companyExists: true, callerAssignments, existingUser, alreadyGymAdmin: false, hasConflictingRole: true);
+        var handler = new InviteGymAdminCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+
+        await Assert.ThrowsAsync<ConflictingAssignmentRoleException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
     }
 }

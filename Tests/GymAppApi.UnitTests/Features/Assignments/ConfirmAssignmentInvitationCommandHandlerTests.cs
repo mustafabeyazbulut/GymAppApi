@@ -12,7 +12,7 @@ public class ConfirmAssignmentInvitationCommandHandlerTests
     private const int TargetUserId = 7;
 
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<PendingAssignmentInvitation>> invitationWriteRepo, Mock<IWriteRepository<Assignment>> assignmentWriteRepo) Wire(
-        IReadOnlyList<PendingAssignmentInvitation> liveInvitations, bool alreadyAssigned = false)
+        IReadOnlyList<PendingAssignmentInvitation> liveInvitations, bool alreadyAssigned = false, bool hasConflictingRole = false)
     {
         var invitationReadRepo = new Mock<IReadRepository<PendingAssignmentInvitation>>();
         invitationReadRepo.Setup(r => r.GetAllAsync(
@@ -21,8 +21,11 @@ public class ConfirmAssignmentInvitationCommandHandlerTests
         var invitationWriteRepo = new Mock<IWriteRepository<PendingAssignmentInvitation>>();
 
         var assignmentReadRepo = new Mock<IReadRepository<Assignment>>();
-        assignmentReadRepo.Setup(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
-            .ReturnsAsync(alreadyAssigned);
+        // Called up to twice: first the exact-duplicate defense-in-depth check, then (only if
+        // that's false, and only for GymAdmin/BranchManager) the cross-role conflict check.
+        assignmentReadRepo.SetupSequence(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
+            .ReturnsAsync(alreadyAssigned)
+            .ReturnsAsync(hasConflictingRole);
         var assignmentWriteRepo = new Mock<IWriteRepository<Assignment>>();
 
         var uow = new Mock<IUnitOfWork>();
@@ -118,6 +121,22 @@ public class ConfirmAssignmentInvitationCommandHandlerTests
             handler.Handle(new ConfirmAssignmentInvitationCommand { Code = "123456", UserId = TargetUserId }, CancellationToken.None));
 
         Assert.True(invitation.IsUsed);
+        assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenConfirmingGymAdminAndTargetIsAlreadyBranchManagerOfThatCompany_MarksInvitationUsedAndThrowsConflictingAssignmentRoleException()
+    {
+        var invitation = LiveInvitation();
+        invitation.Role = AssignmentRole.GymAdmin;
+        var (uow, invitationWriteRepo, assignmentWriteRepo) = Wire(new List<PendingAssignmentInvitation> { invitation }, hasConflictingRole: true);
+        var handler = new ConfirmAssignmentInvitationCommandHandler(uow.Object);
+
+        await Assert.ThrowsAsync<ConflictingAssignmentRoleException>(() =>
+            handler.Handle(new ConfirmAssignmentInvitationCommand { Code = "123456", UserId = TargetUserId }, CancellationToken.None));
+
+        Assert.True(invitation.IsUsed);
+        invitationWriteRepo.Verify(r => r.Update(invitation), Times.Once);
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
     }
 }

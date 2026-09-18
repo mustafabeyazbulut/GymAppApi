@@ -2,6 +2,7 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.Invitations;
 using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
+using GymAppApi.Domain.Enums;
 using MediatR;
 
 namespace GymAppApi.Application.Features.Assignments.Commands.ConfirmAssignmentInvitation;
@@ -52,6 +53,24 @@ public class ConfirmAssignmentInvitationCommandHandler : IRequestHandler<Confirm
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             throw new UserAlreadyAssignedException();
+        }
+
+        // Closes the race window between the two issue-time checks in
+        // AddStaffMemberCommandHandler/InviteGymAdminCommandHandler: a second,
+        // conflicting invitation (GymAdmin vs BranchManager, same company) could
+        // have been issued and confirmed first. GymAdmin already covers every
+        // branch, so the two roles can never coexist for the same user+company.
+        if (matching.Role == AssignmentRole.GymAdmin || matching.Role == AssignmentRole.BranchManager)
+        {
+            var conflictingRole = matching.Role == AssignmentRole.GymAdmin ? AssignmentRole.BranchManager : AssignmentRole.GymAdmin;
+            var hasConflictingRole = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
+                a => a.UserId == matching.TargetUserId && a.CompanyId == matching.CompanyId &&
+                     a.Role == conflictingRole && a.IsActive, cancellationToken);
+            if (hasConflictingRole)
+            {
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                throw new ConflictingAssignmentRoleException();
+            }
         }
 
         var assignment = new Assignment

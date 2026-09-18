@@ -76,6 +76,20 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
             throw new UserAlreadyAssignedException();
         }
 
+        // GymAdmin already covers every branch of the company; a BranchManager
+        // assignment on top of that is redundant/conflicting and is blocked -
+        // same rule enforced the other way in InviteGymAdminCommandHandler.
+        if (request.Role == AssignmentRole.BranchManager)
+        {
+            var targetIsAlreadyGymAdminOfThisCompany = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
+                a => a.UserId == user.Id && a.CompanyId == branch.CompanyId &&
+                     a.Role == AssignmentRole.GymAdmin && a.IsActive, cancellationToken);
+            if (targetIsAlreadyGymAdminOfThisCompany)
+            {
+                throw new ConflictingAssignmentRoleException();
+            }
+        }
+
         // Security requirement: the caller knowing this phone number is
         // never enough by itself to attach the person - the Assignment only
         // comes into existence once the invitee confirms this code

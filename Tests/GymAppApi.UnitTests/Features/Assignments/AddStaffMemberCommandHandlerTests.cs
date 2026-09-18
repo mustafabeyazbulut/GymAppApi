@@ -14,7 +14,7 @@ public class AddStaffMemberCommandHandlerTests
     private const int BranchIdInCompany1 = 10;
 
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<Assignment>> assignmentWriteRepo, Mock<IWriteRepository<PendingAssignmentInvitation>> invitationWriteRepo) Wire(
-        IReadOnlyList<Assignment> callerAssignments, Branch? branch, User? existingUser, bool alreadyAssigned)
+        IReadOnlyList<Assignment> callerAssignments, Branch? branch, User? existingUser, bool alreadyAssigned, bool hasConflictingRole = false)
     {
         var uow = new Mock<IUnitOfWork>();
 
@@ -22,8 +22,11 @@ public class AddStaffMemberCommandHandlerTests
         assignmentReadRepo.Setup(r => r.GetAllAsync(
                 It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), null, null, false, default))
             .ReturnsAsync(callerAssignments);
-        assignmentReadRepo.Setup(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
-            .ReturnsAsync(alreadyAssigned);
+        // Called up to twice per Handle: first the exact-duplicate check, then (only if that's false) the
+        // cross-role GymAdmin<->BranchManager conflict check - order matches the handler's own call order.
+        assignmentReadRepo.SetupSequence(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
+            .ReturnsAsync(alreadyAssigned)
+            .ReturnsAsync(hasConflictingRole);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(assignmentReadRepo.Object);
         var assignmentWriteRepo = new Mock<IWriteRepository<Assignment>>();
         uow.Setup(u => u.GetWriteRepository<Assignment>()).Returns(assignmentWriteRepo.Object);
@@ -155,6 +158,21 @@ public class AddStaffMemberCommandHandlerTests
         await handler.Handle(command, CancellationToken.None);
 
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenAssigningBranchManagerToAnExistingGymAdminOfTheSameCompany_ThrowsConflictingAssignmentRoleException()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var existingUser = new User { Id = 7, FullName = "Existing", Phone = "+905550003333", PasswordHash = "x" };
+        var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false, hasConflictingRole: true);
+        var command = ValidCommand();
+        command.Role = AssignmentRole.BranchManager;
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+
+        await Assert.ThrowsAsync<ConflictingAssignmentRoleException>(() => handler.Handle(command, CancellationToken.None));
+
+        invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
     }
 
     [Fact]
