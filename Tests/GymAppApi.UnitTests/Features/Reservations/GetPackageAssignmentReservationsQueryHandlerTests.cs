@@ -72,4 +72,34 @@ public class GetPackageAssignmentReservationsQueryHandlerTests
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new GetPackageAssignmentReservationsQuery(1, CallerId), CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsTheBranchsOwnTrainer_ReturnsReservations()
+    {
+        var reservations = new List<Reservation> { new() { Id = 1, PackageAssignmentId = 1, TrainerId = 99, ScheduledAt = DateTime.UtcNow, Status = ReservationStatus.Booked, QrCode = "111111" } };
+        var callerAssignments = new List<Assignment>
+        {
+            new() { Id = 5, UserId = CallerId, CompanyId = 1, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true },
+        };
+        var uow = Wire(Assignment(), callerAssignments, reservations);
+        var handler = new GetPackageAssignmentReservationsQueryHandler(uow.Object);
+
+        var result = await handler.Handle(new GetPackageAssignmentReservationsQuery(1, CallerId), CancellationToken.None);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsATrainerOfADifferentBranch_ThrowsForbiddenException()
+    {
+        var callerAssignments = new List<Assignment>
+        {
+            new() { Id = 5, UserId = CallerId, CompanyId = 1, BranchId = 99, Role = AssignmentRole.Trainer, IsActive = true },
+        };
+        var uow = Wire(Assignment(), callerAssignments);
+        var handler = new GetPackageAssignmentReservationsQueryHandler(uow.Object);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            handler.Handle(new GetPackageAssignmentReservationsQuery(1, CallerId), CancellationToken.None));
+    }
 }

@@ -30,10 +30,16 @@ public class GetPackageAssignmentReservationsQueryHandler : IRequestHandler<GetP
         {
             var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
                 a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
+            // Trainer da dahil - CreateReservationCommandHandler'ın kendi
+            // yetkilendirmesiyle aynı: bu şubedeki herhangi bir antrenör bir
+            // rezervasyon oluşturabiliyorsa, aynı şekilde listeyi de
+            // görebilmeli - aksi halde bir antrenör kendi oluşturduğu bir
+            // rezervasyonu bile geriye dönük listeleyip göremez.
             var callerIsAuthorized = callerAssignments.Any(a =>
                 a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == assignment.CompanyId) ||
-                (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId));
+                (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId) ||
+                (a.Role == AssignmentRole.Trainer && a.BranchId == assignment.BranchId));
             if (!callerIsAuthorized)
             {
                 throw new ForbiddenException("Bu paket atamasının rezervasyonlarını görme yetkiniz yok.");

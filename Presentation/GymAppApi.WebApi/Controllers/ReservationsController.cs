@@ -4,6 +4,7 @@ using GymAppApi.Application.Features.Reservations.Commands.CheckInReservation;
 using GymAppApi.Application.Features.Reservations.Commands.CheckInReservationByCode;
 using GymAppApi.Application.Features.Reservations.Commands.CreateReservation;
 using GymAppApi.Application.Features.Reservations.Commands.MarkReservationNoShow;
+using GymAppApi.Application.Features.Reservations.Queries.GetMyReservations;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -62,4 +63,11 @@ public class ReservationsController : ControllerBase
         await _mediator.Send(command, cancellationToken);
         return NoContent();
     }
+
+    // Bir antrenörün kendi programı - TrainerId == çağıran filtresi dışında
+    // ayrı bir yetki kontrolü yok, tıpkı bir Member'ın kendi
+    // PackageAssignment'ını görmesi gibi kendiliğinden kapsanıyor.
+    [HttpGet("mine")]
+    public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetMyReservationsQuery(CurrentUserId), cancellationToken));
 }
