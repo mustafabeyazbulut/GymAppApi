@@ -87,4 +87,36 @@ public class GetMeQueryHandlerTests
         Assert.Equal("MAT & MOVE Kadıköy", assignment.CompanyName);
         Assert.Equal("Member", assignment.Role);
     }
+
+    [Fact]
+    public async Task Handle_MapsPackageAssignmentsExcludingCancelledOnes()
+    {
+        var company = new Company { Id = 3, Name = "MAT & MOVE Kadıköy", IsActive = true };
+        var package = new Package { Id = 5, CompanyId = 3, Name = "10 Seans", IsActive = true };
+        var user = new User
+        {
+            Id = 1, FullName = "Ayşe", Phone = "+905551112233", PasswordHash = "x",
+            Assignments = new List<Assignment>(),
+            PackageAssignments = new List<PackageAssignment>
+            {
+                new() { Id = 20, MemberUserId = 1, PackageId = 5, Package = package, CompanyId = 3, Company = company, BranchId = null, Status = PackageAssignmentStatus.Active, EndDate = null },
+                new() { Id = 21, MemberUserId = 1, PackageId = 5, Package = package, CompanyId = 3, Company = company, Status = PackageAssignmentStatus.Cancelled },
+            },
+        };
+        var userReadRepo = new Mock<IReadRepository<User>>();
+        userReadRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<User, bool>>>(), It.IsAny<Func<IQueryable<User>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<User, object>>?>(), false, default))
+            .ReturnsAsync(user);
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
+
+        var handler = new GetMeQueryHandler(uow.Object);
+        var result = await handler.Handle(new GetMeQuery { UserId = 1 }, CancellationToken.None);
+
+        var pa = Assert.Single(result.PackageAssignments);
+        Assert.Equal(3, pa.CompanyId);
+        Assert.Equal("MAT & MOVE Kadıköy", pa.CompanyName);
+        Assert.Equal(5, pa.PackageId);
+        Assert.Equal("10 Seans", pa.PackageName);
+        Assert.Equal("Active", pa.Status);
+    }
 }

@@ -9,6 +9,7 @@ public class MeResultDto
     public string PreferredLanguage { get; set; } = null!;
     public bool IsAccountFrozen { get; set; }
     public IReadOnlyList<MeAssignmentDto> Assignments { get; set; } = new List<MeAssignmentDto>();
+    public IReadOnlyList<MePackageAssignmentDto> PackageAssignments { get; set; } = new List<MePackageAssignmentDto>();
 }
 
 public class MeAssignmentDto
@@ -20,4 +21,15 @@ public class MeAssignmentDto
     public string? CompanyName { get; set; }
     public int? BranchId { get; set; } // no BranchName — mobile only needs to know a branch id exists, not its label, for the "do I have an active membership" check this DTO exists for
     public string Role { get; set; } = null!;
+}
+
+public class MePackageAssignmentDto
+{
+    public int CompanyId { get; set; }
+    public string? CompanyName { get; set; }
+    public int? BranchId { get; set; }
+    public int PackageId { get; set; }
+    public string? PackageName { get; set; }
+    public string Status { get; set; } = null!;
+    public DateTime? EndDate { get; set; }
 }
