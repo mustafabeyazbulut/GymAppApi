@@ -43,6 +43,8 @@ public class GymAppApiDbContext : DbContext
     public DbSet<Package> Packages => Set<Package>();
     public DbSet<PackageAssignment> PackageAssignments => Set<PackageAssignment>();
     public DbSet<PackageAssignmentPayment> PackageAssignmentPayments => Set<PackageAssignmentPayment>();
+    public DbSet<Reservation> Reservations => Set<Reservation>();
+    public DbSet<CheckIn> CheckIns => Set<CheckIn>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
