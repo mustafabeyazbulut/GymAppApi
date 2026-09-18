@@ -29,8 +29,10 @@ public class CreateReservationCommandHandlerTests
             .ReturnsAsync(callerAssignments);
 
         var reservationReadRepo = new Mock<IReadRepository<Reservation>>();
-        reservationReadRepo.Setup(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Reservation, bool>>>(), default))
-            .ReturnsAsync(hasConflict);
+        reservationReadRepo.Setup(r => r.GetAllAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<Reservation, bool>>>(),
+                It.IsAny<Func<IQueryable<Reservation>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<Reservation, object>>?>(), null, false, default))
+            .ReturnsAsync(hasConflict ? new List<Reservation> { new() } : new List<Reservation>());
         var reservationWriteRepo = new Mock<IWriteRepository<Reservation>>();
 
         var uow = new Mock<IUnitOfWork>();

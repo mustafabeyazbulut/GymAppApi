@@ -4,6 +4,7 @@ using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Packages.Commands.ConfirmPackageAssignment;
 
@@ -39,17 +40,31 @@ public class ConfirmPackageAssignmentCommandHandler : IRequestHandler<ConfirmPac
         // Defense in depth, same rationale as ConfirmAssignmentInvitationCommandHandler:
         // something else could have assigned this package to the member in the
         // meantime. The invitation is consumed either way.
-        var alreadyAssigned = await _unitOfWork.GetReadRepository<PackageAssignment>().AnyAsync(
+        // IgnoreQueryFilters (here and on the Package fetch below): the
+        // confirming caller is the MEMBER, who typically has no Assignment
+        // row at all, so their ambient CompanyId is always null (see the
+        // standing rule in .claude/memory/project-member-package-linkage-design.md)
+        // - without this, PackageAssignment/Package are invisible to them via
+        // the ICompanyScoped filter, silently defeating the duplicate check
+        // above and leaving RemainingSessions/EndDate null below (a package
+        // fetch that "succeeds" with null). Safe because AnyAsync/the
+        // downstream write are scoped by matching.PackageId/TargetUserId, not
+        // by tenant.
+        var existingAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
             pa => pa.MemberUserId == matching.TargetUserId && pa.PackageId == matching.PackageId &&
-                  pa.Status != PackageAssignmentStatus.Cancelled, cancellationToken);
-        if (alreadyAssigned)
+                  pa.Status != PackageAssignmentStatus.Cancelled,
+            include: q => q.IgnoreQueryFilters().Include(pa => pa.Package),
+            cancellationToken: cancellationToken);
+        if (existingAssignments.Count > 0)
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             throw new MemberAlreadyHasThisPackageException();
         }
 
-        var package = await _unitOfWork.GetReadRepository<Package>()
-            .GetAsync(p => p.Id == matching.PackageId, cancellationToken: cancellationToken);
+        var package = await _unitOfWork.GetReadRepository<Package>().GetAsync(
+            p => p.Id == matching.PackageId,
+            include: q => q.IgnoreQueryFilters().Include(p => p.Company),
+            cancellationToken: cancellationToken);
 
         var assignment = new PackageAssignment
         {

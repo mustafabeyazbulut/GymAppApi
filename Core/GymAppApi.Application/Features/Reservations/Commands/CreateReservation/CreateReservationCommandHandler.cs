@@ -58,10 +58,17 @@ public class CreateReservationCommandHandler : IRequestHandler<CreateReservation
             throw new PackageAssignmentNotEligibleForReservationException();
         }
 
-        var hasConflict = await _unitOfWork.GetReadRepository<Reservation>().AnyAsync(
+        // GetAllAsync+IgnoreQueryFilters rather than AnyAsync: AnyAsync has no
+        // way to bypass the tenant filter, and this check has the exact same
+        // Member-caller-has-no-Assignment problem as the PackageAssignment
+        // fetch above - without this, a conflicting Booked reservation from
+        // another company's ambient-context mismatch would be invisible here,
+        // silently allowing a double-booking.
+        var conflicting = await _unitOfWork.GetReadRepository<Reservation>().GetAllAsync(
             r => r.TrainerId == request.TrainerId && r.ScheduledAt == request.ScheduledAt && r.Status == ReservationStatus.Booked,
-            cancellationToken);
-        if (hasConflict)
+            include: q => q.IgnoreQueryFilters().Include(r => r.PackageAssignment),
+            cancellationToken: cancellationToken);
+        if (conflicting.Count > 0)
         {
             throw new ReservationConflictException();
         }

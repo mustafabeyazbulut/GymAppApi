@@ -12,7 +12,7 @@ public class ConfirmPackageAssignmentCommandHandlerTests
     private const int TargetUserId = 7;
 
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<PendingPackageAssignmentInvitation>> invitationWriteRepo, Mock<IWriteRepository<PackageAssignment>> assignmentWriteRepo) Wire(
-        IReadOnlyList<PendingPackageAssignmentInvitation> liveInvitations, Package? package, bool alreadyAssigned = false)
+        IReadOnlyList<PendingPackageAssignmentInvitation> liveInvitations, Package? package, IReadOnlyList<PackageAssignment>? existingAssignments = null)
     {
         var invitationReadRepo = new Mock<IReadRepository<PendingPackageAssignmentInvitation>>();
         invitationReadRepo.Setup(r => r.GetAllAsync(
@@ -21,12 +21,16 @@ public class ConfirmPackageAssignmentCommandHandlerTests
         var invitationWriteRepo = new Mock<IWriteRepository<PendingPackageAssignmentInvitation>>();
 
         var packageReadRepo = new Mock<IReadRepository<Package>>();
-        packageReadRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Package, bool>>>(), null, false, default))
+        packageReadRepo.Setup(r => r.GetAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<Package, bool>>>(),
+                It.IsAny<Func<IQueryable<Package>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<Package, object>>?>(), false, default))
             .ReturnsAsync(package);
 
         var assignmentReadRepo = new Mock<IReadRepository<PackageAssignment>>();
-        assignmentReadRepo.Setup(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<PackageAssignment, bool>>>(), default))
-            .ReturnsAsync(alreadyAssigned);
+        assignmentReadRepo.Setup(r => r.GetAllAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<PackageAssignment, bool>>>(),
+                It.IsAny<Func<IQueryable<PackageAssignment>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<PackageAssignment, object>>?>(), null, false, default))
+            .ReturnsAsync(existingAssignments ?? new List<PackageAssignment>());
         var assignmentWriteRepo = new Mock<IWriteRepository<PackageAssignment>>();
 
         var uow = new Mock<IUnitOfWork>();
@@ -55,6 +59,7 @@ public class ConfirmPackageAssignmentCommandHandlerTests
     };
 
     private static Package DurationPackage() => new() { Id = 5, CompanyId = 1, BranchId = 10, Name = "Aylık Üyelik", Type = PackageType.Duration, DurationDays = 30, IsActive = true };
+    private static Package SessionBasedPackage() => new() { Id = 5, CompanyId = 1, BranchId = 10, Name = "10 Seans", Type = PackageType.SessionBased, SessionCount = 10, IsActive = true };
 
     [Fact]
     public async Task Handle_WhenCodeMatchesALiveInvitation_CreatesThePackageAssignmentWithComputedEndDate()
@@ -71,6 +76,18 @@ public class ConfirmPackageAssignmentCommandHandlerTests
         assignmentWriteRepo.Verify(r => r.AddAsync(It.Is<PackageAssignment>(a =>
             a.MemberUserId == TargetUserId && a.PackageId == 5 && a.CompanyId == 1 && a.BranchId == 10 &&
             a.Status == PackageAssignmentStatus.Active && a.EndDate != null), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPackageIsSessionBased_SetsRemainingSessionsFromPackageSessionCount()
+    {
+        var invitation = LiveInvitation();
+        var (uow, _, assignmentWriteRepo) = Wire(new List<PendingPackageAssignmentInvitation> { invitation }, SessionBasedPackage());
+        var handler = new ConfirmPackageAssignmentCommandHandler(uow.Object);
+
+        await handler.Handle(new ConfirmPackageAssignmentCommand { Code = "123456", UserId = TargetUserId }, CancellationToken.None);
+
+        assignmentWriteRepo.Verify(r => r.AddAsync(It.Is<PackageAssignment>(a => a.RemainingSessions == 10 && a.EndDate == null), default), Times.Once);
     }
 
     [Fact]
@@ -91,7 +108,8 @@ public class ConfirmPackageAssignmentCommandHandlerTests
     public async Task Handle_WhenAlreadyAssignedToThatPackage_MarksInvitationUsedAndThrowsMemberAlreadyHasThisPackageException()
     {
         var invitation = LiveInvitation();
-        var (uow, invitationWriteRepo, assignmentWriteRepo) = Wire(new List<PendingPackageAssignmentInvitation> { invitation }, DurationPackage(), alreadyAssigned: true);
+        var existingAssignment = new PackageAssignment { Id = 1, MemberUserId = TargetUserId, PackageId = 5, CompanyId = 1, Status = PackageAssignmentStatus.Active };
+        var (uow, invitationWriteRepo, assignmentWriteRepo) = Wire(new List<PendingPackageAssignmentInvitation> { invitation }, DurationPackage(), new List<PackageAssignment> { existingAssignment });
         var handler = new ConfirmPackageAssignmentCommandHandler(uow.Object);
 
         await Assert.ThrowsAsync<MemberAlreadyHasThisPackageException>(() =>
