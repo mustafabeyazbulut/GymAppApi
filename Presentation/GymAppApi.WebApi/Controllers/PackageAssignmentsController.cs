@@ -3,7 +3,9 @@ using GymAppApi.Application.Features.Packages.Commands.CancelPackageAssignment;
 using GymAppApi.Application.Features.Packages.Commands.ConfirmPackageAssignment;
 using GymAppApi.Application.Features.Packages.Commands.CreatePackageAssignment;
 using GymAppApi.Application.Features.Packages.Commands.FreezePackageAssignment;
+using GymAppApi.Application.Features.Packages.Commands.RecordPackageAssignmentPayment;
 using GymAppApi.Application.Features.Packages.Commands.UnfreezePackageAssignment;
+using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentPayments;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -68,4 +70,22 @@ public class PackageAssignmentsController : ControllerBase
         await _mediator.Send(new CancelPackageAssignmentCommand { PackageAssignmentId = id, RequestedByUserId = CurrentUserId }, cancellationToken);
         return NoContent();
     }
+
+    [Authorize(Policy = "StaffManagement")]
+    [HttpPost("{id}/payments")]
+    public async Task<IActionResult> RecordPayment(int id, RecordPackageAssignmentPaymentCommand command, CancellationToken cancellationToken)
+    {
+        command.PackageAssignmentId = id;
+        command.RequestedByUserId = CurrentUserId;
+        var result = await _mediator.Send(command, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    // [Authorize] not StaffManagement-only - the handler itself allows the
+    // assignment's own Member to see their own payment history, in addition
+    // to staff.
+    [Authorize]
+    [HttpGet("{id}/payments")]
+    public async Task<IActionResult> GetPayments(int id, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetPackageAssignmentPaymentsQuery(id, CurrentUserId), cancellationToken));
 }
