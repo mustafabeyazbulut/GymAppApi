@@ -13,9 +13,9 @@ public class TenantResolutionService : ITenantResolutionService
 
     public async Task<ResolvedTenant> ResolveForUserAsync(int userId, CancellationToken cancellationToken = default)
     {
-        // The only place in the codebase allowed to bypass the tenant query
-        // filter — see this plan's "Key facts" for why (resolving a user's
-        // OWN assignments must not itself already be tenant-filtered).
+        // One of the few places allowed to bypass the tenant query filter (see
+        // also GetMeQueryHandler, same rationale) — resolving a user's OWN
+        // assignments must not itself already be tenant-filtered.
         var assignments = await _dbContext.Assignments
             .IgnoreQueryFilters()
             .Where(a => a.UserId == userId && a.IsActive)

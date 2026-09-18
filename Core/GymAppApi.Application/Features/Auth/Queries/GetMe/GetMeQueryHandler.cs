@@ -15,9 +15,19 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
 
     public async Task<MeResultDto> Handle(GetMeQuery request, CancellationToken cancellationToken)
     {
+        // IgnoreQueryFilters: this query is already pinned to one specific user
+        // (u.Id == request.UserId), so bypassing the tenant filter here can't
+        // leak another tenant's data - but it's necessary, because Assignment/
+        // PackageAssignment/Company/Package are all company-scoped, and THIS
+        // caller's own ambient tenant context is resolved FROM their own
+        // Assignments (TenantResolutionService) - a plain Member has none, so
+        // their ambient CompanyId is always null, which would otherwise hide
+        // their own PackageAssignment rows from themselves. Same rationale as
+        // TenantResolutionService's own IgnoreQueryFilters usage.
         var user = await _unitOfWork.GetReadRepository<User>().GetAsync(
             u => u.Id == request.UserId,
-            include: q => q.Include(u => u.Assignments).ThenInclude(a => a.Company)
+            include: q => q.IgnoreQueryFilters()
+                .Include(u => u.Assignments).ThenInclude(a => a.Company)
                 .Include(u => u.PackageAssignments).ThenInclude(pa => pa.Company)
                 .Include(u => u.PackageAssignments).ThenInclude(pa => pa.Package),
             cancellationToken: cancellationToken);
