@@ -25,11 +25,20 @@ public class MeAssignmentDto
 
 public class MePackageAssignmentDto
 {
+    // The mobile client needs the assignment's own id (not just the
+    // Package's) to call /api/package-assignments/{id}/... (payments,
+    // reservations, check-ins) for the right row when a Member holds more
+    // than one PackageAssignment.
+    public int Id { get; set; }
     public int CompanyId { get; set; }
     public string? CompanyName { get; set; }
     public int? BranchId { get; set; }
     public int PackageId { get; set; }
     public string? PackageName { get; set; }
+    public decimal Price { get; set; }
     public string Status { get; set; } = null!;
+    public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
+    public int? SessionCount { get; set; }
+    public int? RemainingSessions { get; set; }
 }

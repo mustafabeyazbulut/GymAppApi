@@ -92,14 +92,15 @@ public class GetMeQueryHandlerTests
     public async Task Handle_MapsPackageAssignmentsExcludingCancelledOnes()
     {
         var company = new Company { Id = 3, Name = "MAT & MOVE Kadıköy", IsActive = true };
-        var package = new Package { Id = 5, CompanyId = 3, Name = "10 Seans", IsActive = true };
+        var package = new Package { Id = 5, CompanyId = 3, Name = "10 Seans", IsActive = true, Price = 1500m, SessionCount = 10 };
+        var startDate = new DateTime(2026, 1, 1);
         var user = new User
         {
             Id = 1, FullName = "Ayşe", Phone = "+905551112233", PasswordHash = "x",
             Assignments = new List<Assignment>(),
             PackageAssignments = new List<PackageAssignment>
             {
-                new() { Id = 20, MemberUserId = 1, PackageId = 5, Package = package, CompanyId = 3, Company = company, BranchId = null, Status = PackageAssignmentStatus.Active, EndDate = null },
+                new() { Id = 20, MemberUserId = 1, PackageId = 5, Package = package, CompanyId = 3, Company = company, BranchId = null, Status = PackageAssignmentStatus.Active, StartDate = startDate, EndDate = null, RemainingSessions = 7 },
                 new() { Id = 21, MemberUserId = 1, PackageId = 5, Package = package, CompanyId = 3, Company = company, Status = PackageAssignmentStatus.Cancelled },
             },
         };
@@ -113,10 +114,15 @@ public class GetMeQueryHandlerTests
         var result = await handler.Handle(new GetMeQuery { UserId = 1 }, CancellationToken.None);
 
         var pa = Assert.Single(result.PackageAssignments);
+        Assert.Equal(20, pa.Id);
         Assert.Equal(3, pa.CompanyId);
         Assert.Equal("MAT & MOVE Kadıköy", pa.CompanyName);
         Assert.Equal(5, pa.PackageId);
         Assert.Equal("10 Seans", pa.PackageName);
+        Assert.Equal(1500m, pa.Price);
         Assert.Equal("Active", pa.Status);
+        Assert.Equal(startDate, pa.StartDate);
+        Assert.Equal(10, pa.SessionCount);
+        Assert.Equal(7, pa.RemainingSessions);
     }
 }

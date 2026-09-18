@@ -59,13 +59,18 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
                 .Where(pa => pa.Status != PackageAssignmentStatus.Cancelled)
                 .Select(pa => new MePackageAssignmentDto
                 {
+                    Id = pa.Id,
                     CompanyId = pa.CompanyId,
                     CompanyName = pa.Company?.Name,
                     BranchId = pa.BranchId,
                     PackageId = pa.PackageId,
                     PackageName = pa.Package?.Name,
+                    Price = pa.Package?.Price ?? 0,
                     Status = pa.Status.ToString(),
+                    StartDate = pa.StartDate,
                     EndDate = pa.EndDate,
+                    SessionCount = pa.Package?.SessionCount,
+                    RemainingSessions = pa.RemainingSessions,
                 })
                 .ToList(),
         };
