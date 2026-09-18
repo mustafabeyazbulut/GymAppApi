@@ -38,6 +38,7 @@ public class GymAppApiDbContext : DbContext
     public DbSet<PendingContactVerification> PendingContactVerifications => Set<PendingContactVerification>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<PendingAssignmentInvitation> PendingAssignmentInvitations => Set<PendingAssignmentInvitation>();
+    public DbSet<Package> Packages => Set<Package>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
