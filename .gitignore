@@ -208,6 +208,12 @@ PublishScripts/
 **/[Pp]ackages/*
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
+# except our own "Packages" (membership package) feature source/test folders -
+# not NuGet package caches, just an unlucky name collision with the rule above.
+!Core/GymAppApi.Application/Features/Packages/
+!Core/GymAppApi.Application/Features/Packages/**
+!Tests/GymAppApi.UnitTests/Features/Packages/
+!Tests/GymAppApi.UnitTests/Features/Packages/**
 # Uncomment if necessary however generally it will be regenerated when needed
 #!**/[Pp]ackages/repositories.config
 # NuGet v3's project.json files produces more ignorable files
