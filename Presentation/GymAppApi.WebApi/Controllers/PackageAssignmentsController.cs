@@ -9,6 +9,7 @@ using GymAppApi.Application.Features.Packages.Commands.UnfreezePackageAssignment
 using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentCheckIns;
 using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentPayments;
 using GymAppApi.Application.Features.Reservations.Queries.GetPackageAssignmentReservations;
+using GymAppApi.Application.Features.Reservations.Queries.GetPackageAssignmentTrainers;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -98,6 +99,15 @@ public class PackageAssignmentsController : ControllerBase
     [HttpGet("{id}/reservations")]
     public async Task<IActionResult> GetReservations(int id, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetPackageAssignmentReservationsQuery(id, CurrentUserId), cancellationToken));
+
+    // Which Trainer ids a caller may pass into POST /api/reservations for
+    // this assignment - see GetPackageAssignmentTrainersQueryHandler's own
+    // comment for why this is scoped per-assignment rather than a general
+    // trainer directory.
+    [Authorize]
+    [HttpGet("{id}/trainers")]
+    public async Task<IActionResult> GetTrainers(int id, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetPackageAssignmentTrainersQuery(id, CurrentUserId), cancellationToken));
 
     // Walk-in/no-reservation check-in - front desk only, unlike the
     // reservation-based check-in endpoints on ReservationsController which a
