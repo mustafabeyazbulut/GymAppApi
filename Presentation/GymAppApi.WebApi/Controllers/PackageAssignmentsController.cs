@@ -5,9 +5,11 @@ using GymAppApi.Application.Features.Packages.Commands.CreatePackageAssignment;
 using GymAppApi.Application.Features.Packages.Commands.FreezePackageAssignment;
 using GymAppApi.Application.Features.Packages.Commands.RecordGeneralCheckIn;
 using GymAppApi.Application.Features.Packages.Commands.RecordPackageAssignmentPayment;
+using GymAppApi.Application.Features.Packages.Commands.RecordProgressNote;
 using GymAppApi.Application.Features.Packages.Commands.UnfreezePackageAssignment;
 using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentCheckIns;
 using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentPayments;
+using GymAppApi.Application.Features.Packages.Queries.GetPackageAssignmentProgressNotes;
 using GymAppApi.Application.Features.Reservations.Queries.GetPackageAssignmentReservations;
 using GymAppApi.Application.Features.Reservations.Queries.GetPackageAssignmentTrainers;
 using MediatR;
@@ -124,4 +126,24 @@ public class PackageAssignmentsController : ControllerBase
     [HttpGet("{id}/check-ins")]
     public async Task<IActionResult> GetCheckIns(int id, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetPackageAssignmentCheckInsQuery(id, CurrentUserId), cancellationToken));
+
+    // [Authorize(Policy = "StaffManagement")] DEĞİL - handler'ın kendisi bir
+    // Trainer'ın da (bu şubede çalışıyorsa) not bırakabilmesine izin veriyor,
+    // StaffManagement policy'si Trainer rolünü hiç kapsamıyor.
+    [Authorize]
+    [HttpPost("{id}/progress-notes")]
+    public async Task<IActionResult> RecordProgressNote(int id, RecordProgressNoteCommand command, CancellationToken cancellationToken)
+    {
+        command.PackageAssignmentId = id;
+        command.RequestedByUserId = CurrentUserId;
+        var result = await _mediator.Send(command, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    // [Authorize] - handler'ın kendisi hem atamanın sahibi Member'a hem de
+    // ilgili şubedeki staff/Trainer'a izin veriyor.
+    [Authorize]
+    [HttpGet("{id}/progress-notes")]
+    public async Task<IActionResult> GetProgressNotes(int id, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetPackageAssignmentProgressNotesQuery(id, CurrentUserId), cancellationToken));
 }
