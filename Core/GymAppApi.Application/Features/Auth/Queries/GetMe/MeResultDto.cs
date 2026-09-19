@@ -35,6 +35,11 @@ public class MePackageAssignmentDto
     public int? BranchId { get; set; }
     public int PackageId { get; set; }
     public string? PackageName { get; set; }
+    // null = bu paket hiçbir grup dersine uygun değil (ör. 1:1 PT paketi) -
+    // mobil taraf "Katıl" butonunu bu ders kategorisiyle eşleşen bir paket
+    // yoksa devre dışı bırakmak için kullanır (bkz. Package.Category,
+    // ClassScheduling modülü).
+    public string? Category { get; set; }
     public decimal Price { get; set; }
     public string Status { get; set; } = null!;
     public DateTime StartDate { get; set; }

@@ -65,6 +65,7 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
                     BranchId = pa.BranchId,
                     PackageId = pa.PackageId,
                     PackageName = pa.Package?.Name,
+                    Category = pa.Package?.Category?.ToString(),
                     Price = pa.Package?.Price ?? 0,
                     Status = pa.Status.ToString(),
                     StartDate = pa.StartDate,
