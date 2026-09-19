@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -27,7 +28,7 @@ public class FreezePackageAssignmentCommandHandler : IRequestHandler<FreezePacka
             cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         bool callerIsAuthorized;
@@ -46,7 +47,26 @@ public class FreezePackageAssignmentCommandHandler : IRequestHandler<FreezePacka
         }
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu paket atamasını dondurma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenFreezePackageAssignment");
+        }
+
+        // Sadece Active bir atama dondurulabilir - Cancelled bir atamanın
+        // dondurulması anlamsız, zaten Frozen olanın tekrar dondurulması ise
+        // FrozenAt'i sıfırdan başlatıp o ana kadar geçen süreyi kaybettirir.
+        if (assignment.Status != PackageAssignmentStatus.Active)
+        {
+            throw new PackageAssignmentNotActiveException();
+        }
+
+        // Paket bir dondurma sınırı tanımlamışsa (Package.MaxFreezeDays) ve
+        // üye/personel bu sınırı önceki dondurma döngülerinde zaten
+        // tüketmişse, yeni bir dondurmaya izin verme - bir GymAdmin'in
+        // paketi "kendi kafasına göre" sınırsız dondurulabilir şekilde
+        // tanımlamasını engelleyen asıl kontrol burası.
+        var maxFreezeDays = assignment.Package?.MaxFreezeDays;
+        if (maxFreezeDays is not null && assignment.TotalFrozenDays >= maxFreezeDays.Value)
+        {
+            throw new FreezeLimitExceededException(maxFreezeDays.Value);
         }
 
         assignment.Status = PackageAssignmentStatus.Frozen;

@@ -6,5 +6,5 @@ public class ForbiddenException : BaseException
 {
     public override HttpStatusCode StatusCode => HttpStatusCode.Forbidden;
 
-    public ForbiddenException(string message) : base(message) { }
+    public ForbiddenException(string code, params object[] args) : base(code, args) { }
 }

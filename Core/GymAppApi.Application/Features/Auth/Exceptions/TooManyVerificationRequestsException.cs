@@ -7,5 +7,5 @@ public class TooManyVerificationRequestsException : BaseException
 {
     public override HttpStatusCode StatusCode => HttpStatusCode.TooManyRequests;
 
-    public TooManyVerificationRequestsException() : base("Çok fazla kod isteği gönderildi. Lütfen daha sonra tekrar deneyin.") { }
+    public TooManyVerificationRequestsException() : base("TooManyVerificationRequests") { }
 }

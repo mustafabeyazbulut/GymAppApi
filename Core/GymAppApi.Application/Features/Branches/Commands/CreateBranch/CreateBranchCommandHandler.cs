@@ -35,7 +35,7 @@ public class CreateBranchCommandHandler : IRequestHandler<CreateBranchCommand, C
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu firma için şube oluşturma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCreateBranch");
         }
 
         var branch = new Branch

@@ -24,7 +24,7 @@ public class GetPackageAssignmentProgressNotesQueryHandler : IRequestHandler<Get
             cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         if (assignment.MemberUserId != request.RequestedByUserId)
@@ -38,7 +38,7 @@ public class GetPackageAssignmentProgressNotesQueryHandler : IRequestHandler<Get
                 (a.Role == AssignmentRole.Trainer && a.BranchId == assignment.BranchId));
             if (!callerIsAuthorized)
             {
-                throw new ForbiddenException("Bu paket atamasının ilerleme notlarını görme yetkiniz yok.");
+                throw new ForbiddenException("ForbiddenViewProgressNotes");
             }
         }
 

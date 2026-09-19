@@ -58,6 +58,8 @@ public class GetPackageAssignmentsQueryHandler : IRequestHandler<GetPackageAssig
                 Status = a.Status.ToString(),
                 TotalPaid = totalPaid,
                 RemainingBalance = price - totalPaid,
+                MaxFreezeDays = a.Package?.MaxFreezeDays,
+                TotalFrozenDays = a.TotalFrozenDays,
             };
         }).ToList();
     }

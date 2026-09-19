@@ -13,4 +13,6 @@ public class PackageDto
     public decimal Price { get; set; }
     public string AccessTier { get; set; } = null!;
     public bool IsActive { get; set; }
+    // null = dondurma süresi sınırsız.
+    public int? MaxFreezeDays { get; set; }
 }

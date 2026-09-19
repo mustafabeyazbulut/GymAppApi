@@ -16,6 +16,8 @@ public class CreatePackageCommand : IRequest<CreatePackageCommandResult>
     public int? DurationDays { get; set; }
     public int? SessionCount { get; set; }
     public decimal Price { get; set; }
+    // null = dondurma süresi sınırsız.
+    public int? MaxFreezeDays { get; set; }
 
     // Set by the controller from the caller's own JWT sub claim.
     public int RequestedByUserId { get; set; }

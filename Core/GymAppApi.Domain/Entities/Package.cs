@@ -26,4 +26,11 @@ public class Package : EntityBase, ICompanyScoped, IDeactivatable
     public decimal Price { get; set; }
     public PackageAccessTier AccessTier { get; set; } = PackageAccessTier.Standard;
     public bool IsActive { get; set; } = true;
+
+    // null = dondurma süresi sınırsız. Set edilmişse, bu paketten atanan bir
+    // PackageAssignment toplamda bu kadar günden fazla dondurulamaz (bkz.
+    // PackageAssignment.TotalFrozenDays ve Freeze/UnfreezePackageAssignment
+    // handler'ları) - bir GymAdmin'in paketi kendi kafasına göre, sınırsız
+    // dondurulabilir şekilde tanımlamasını engeller.
+    public int? MaxFreezeDays { get; set; }
 }

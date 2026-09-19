@@ -24,7 +24,7 @@ public class CancelReservationCommandHandler : IRequestHandler<CancelReservation
             cancellationToken: cancellationToken);
         if (reservation is null)
         {
-            throw new NotFoundException($"Rezervasyon {request.ReservationId} bulunamadı.");
+            throw new NotFoundException("ReservationNotFound", request.ReservationId);
         }
 
         bool callerIsAuthorized;
@@ -43,7 +43,7 @@ public class CancelReservationCommandHandler : IRequestHandler<CancelReservation
         }
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu rezervasyonu iptal etme yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCancelReservation");
         }
 
         if (reservation.Status != ReservationStatus.Booked)

@@ -18,7 +18,7 @@ public class CancelPackageAssignmentCommandHandler : IRequestHandler<CancelPacka
             .GetAsync(a => a.Id == request.PackageAssignmentId, cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
@@ -29,7 +29,7 @@ public class CancelPackageAssignmentCommandHandler : IRequestHandler<CancelPacka
             (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu paket atamasını iptal etme yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCancelPackageAssignment");
         }
 
         assignment.Status = PackageAssignmentStatus.Cancelled;

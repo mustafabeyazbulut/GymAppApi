@@ -17,7 +17,7 @@ public class UpdateCompanyNameCommandHandler : IRequestHandler<UpdateCompanyName
             .GetAsync(c => c.Id == request.CompanyId, cancellationToken: cancellationToken);
         if (company is null)
         {
-            throw new NotFoundException($"Firma {request.CompanyId} bulunamadı.");
+            throw new NotFoundException("CompanyNotFound", request.CompanyId);
         }
 
         company.Name = request.Name;

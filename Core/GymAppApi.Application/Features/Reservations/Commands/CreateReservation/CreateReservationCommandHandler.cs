@@ -28,7 +28,7 @@ public class CreateReservationCommandHandler : IRequestHandler<CreateReservation
             cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         bool callerIsAuthorized;
@@ -48,7 +48,7 @@ public class CreateReservationCommandHandler : IRequestHandler<CreateReservation
         }
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu paket ataması için rezervasyon oluşturma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCreateReservation");
         }
 
         // Eligible only for an active, session-based assignment with sessions

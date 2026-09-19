@@ -28,7 +28,7 @@ public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminComman
             .GetAsync(c => c.Id == request.CompanyId, cancellationToken: cancellationToken);
         if (company is null)
         {
-            throw new NotFoundException($"Firma {request.CompanyId} bulunamadı.");
+            throw new NotFoundException("CompanyNotFound", request.CompanyId);
         }
 
         // Same pattern as every other mutation here: the [Authorize] policy
@@ -41,7 +41,7 @@ public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminComman
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu firma için Gym Admin daveti gönderme yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenInviteGymAdmin");
         }
 
         // Never creates a new User - same rule as CreateCompanyCommand. See
@@ -50,7 +50,7 @@ public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminComman
             .GetAsync(u => u.Phone == request.Phone, cancellationToken: cancellationToken);
         if (invitedUser is null)
         {
-            throw new NotFoundException($"'{request.Phone}' numaralı kayıtlı bir kullanıcı bulunamadı.");
+            throw new NotFoundException("PhoneNotRegistered", request.Phone);
         }
 
         var alreadyGymAdminOfThisCompany = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(

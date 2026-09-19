@@ -15,7 +15,14 @@ public class User : EntityBase
     public string PasswordHash { get; set; } = null!;
     public string FullName { get; set; } = null!;
     public Gender Gender { get; set; } = Gender.Unspecified;
-    public string PreferredLanguage { get; set; } = "tr";
+    // Uygulamanın standart dili İngilizce - kayıt sırasında istemci bir dil
+    // göndermiyor, bu yüzden varsayılan burası. Mobil taraf zaten cihazın
+    // sistem dilini (tr ise tr, değilse en) otomatik seçiyordu; buradaki
+    // eski "tr" varsayılanı her yeni kullanıcının telefonunun kendi dilini
+    // görmezden gelip zorla Türkçeye geçirmesine sebep oluyordu (bkz.
+    // GymApp'in AppLocale.seedFromAccount'ı - hesabın PreferredLanguage'ı
+    // login sonrası uygulamanın diline uygulanıyor).
+    public string PreferredLanguage { get; set; } = "en";
     public bool PhoneVerified { get; set; }
     public bool EmailVerified { get; set; }
 

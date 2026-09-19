@@ -4,5 +4,5 @@ namespace GymAppApi.Application.Features.Reservations.Exceptions;
 
 public class NoRemainingSessionsException : ConflictException
 {
-    public NoRemainingSessionsException() : base("Bu paket atamasının kalan seans hakkı yok.") { }
+    public NoRemainingSessionsException() : base("NoRemainingSessions") { }
 }

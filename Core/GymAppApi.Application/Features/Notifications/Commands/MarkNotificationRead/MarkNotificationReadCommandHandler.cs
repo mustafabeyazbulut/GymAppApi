@@ -17,7 +17,7 @@ public class MarkNotificationReadCommandHandler : IRequestHandler<MarkNotificati
             n => n.Id == request.NotificationId && n.UserId == request.UserId, cancellationToken: cancellationToken);
         if (notification is null)
         {
-            throw new NotFoundException($"Bildirim {request.NotificationId} bulunamadı.");
+            throw new NotFoundException("NotificationNotFound", request.NotificationId);
         }
 
         if (!notification.IsRead)

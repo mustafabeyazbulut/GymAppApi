@@ -4,5 +4,5 @@ namespace GymAppApi.Application.Features.Auth.Exceptions;
 
 public class EmailAlreadyRegisteredException : ConflictException
 {
-    public EmailAlreadyRegisteredException() : base("Bu e-posta adresiyle zaten bir hesap var.") { }
+    public EmailAlreadyRegisteredException() : base("EmailAlreadyRegistered") { }
 }

@@ -21,7 +21,7 @@ public class CheckInReservationCommandHandler : IRequestHandler<CheckInReservati
             .GetAsync(r => r.Id == request.ReservationId, cancellationToken: cancellationToken);
         if (reservation is null)
         {
-            throw new NotFoundException($"Rezervasyon {request.ReservationId} bulunamadı.");
+            throw new NotFoundException("ReservationNotFound", request.ReservationId);
         }
 
         bool callerIsAuthorized;
@@ -40,7 +40,7 @@ public class CheckInReservationCommandHandler : IRequestHandler<CheckInReservati
         }
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu rezervasyonu check-in yapma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCheckIn");
         }
 
         if (reservation.Status != ReservationStatus.Booked)

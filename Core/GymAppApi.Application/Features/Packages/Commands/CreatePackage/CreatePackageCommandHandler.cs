@@ -18,7 +18,7 @@ public class CreatePackageCommandHandler : IRequestHandler<CreatePackageCommand,
             .GetAsync(c => c.Id == request.CompanyId, cancellationToken: cancellationToken);
         if (company is null)
         {
-            throw new NotFoundException($"Firma {request.CompanyId} bulunamadı.");
+            throw new NotFoundException("CompanyNotFound", request.CompanyId);
         }
 
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
@@ -37,7 +37,7 @@ public class CreatePackageCommandHandler : IRequestHandler<CreatePackageCommand,
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == request.BranchId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu firma/şube için paket oluşturma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCreatePackage");
         }
 
         var package = new Package
@@ -50,6 +50,7 @@ public class CreatePackageCommandHandler : IRequestHandler<CreatePackageCommand,
             DurationDays = request.DurationDays,
             SessionCount = request.SessionCount,
             Price = request.Price,
+            MaxFreezeDays = request.MaxFreezeDays,
         };
 
         await _unitOfWork.GetWriteRepository<Package>().AddAsync(package, cancellationToken);

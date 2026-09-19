@@ -18,7 +18,7 @@ public class RecordProgressNoteCommandHandler : IRequestHandler<RecordProgressNo
             .GetAsync(a => a.Id == request.PackageAssignmentId, cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         // Trainer da dahil - GetPackageAssignmentReservations/CheckIns'le aynı
@@ -33,7 +33,7 @@ public class RecordProgressNoteCommandHandler : IRequestHandler<RecordProgressNo
             (a.Role == AssignmentRole.Trainer && a.BranchId == assignment.BranchId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu paket ataması için ilerleme notu bırakma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenRecordProgressNote");
         }
 
         var note = new ProgressNote

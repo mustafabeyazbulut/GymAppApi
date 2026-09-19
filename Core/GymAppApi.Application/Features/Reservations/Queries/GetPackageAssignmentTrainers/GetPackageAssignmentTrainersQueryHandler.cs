@@ -28,7 +28,7 @@ public class GetPackageAssignmentTrainersQueryHandler : IRequestHandler<GetPacka
             cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         if (assignment.MemberUserId != request.RequestedByUserId)
@@ -42,7 +42,7 @@ public class GetPackageAssignmentTrainersQueryHandler : IRequestHandler<GetPacka
                 (a.Role == AssignmentRole.Trainer && a.BranchId == assignment.BranchId));
             if (!callerIsAuthorized)
             {
-                throw new ForbiddenException("Bu paket ataması için antrenör listesini görme yetkiniz yok.");
+                throw new ForbiddenException("ForbiddenViewTrainers");
             }
         }
 

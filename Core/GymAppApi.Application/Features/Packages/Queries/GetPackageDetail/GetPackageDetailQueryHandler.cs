@@ -18,7 +18,7 @@ public class GetPackageDetailQueryHandler : IRequestHandler<GetPackageDetailQuer
             .GetAsync(p => p.Id == request.PackageId, cancellationToken: cancellationToken);
         if (package is null)
         {
-            throw new NotFoundException($"Paket {request.PackageId} bulunamadı.");
+            throw new NotFoundException("PackageNotFound", request.PackageId);
         }
 
         return GetPackagesQueryHandler.ToDto(package);

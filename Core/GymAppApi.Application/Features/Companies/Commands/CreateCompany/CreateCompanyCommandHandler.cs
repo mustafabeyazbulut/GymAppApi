@@ -36,7 +36,7 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
             .GetAsync(u => u.Phone == request.GymAdminPhone, cancellationToken: cancellationToken);
         if (gymAdminUser is null)
         {
-            throw new NotFoundException($"'{request.GymAdminPhone}' numaralı kayıtlı bir kullanıcı bulunamadı.");
+            throw new NotFoundException("PhoneNotRegistered", request.GymAdminPhone);
         }
 
         await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);

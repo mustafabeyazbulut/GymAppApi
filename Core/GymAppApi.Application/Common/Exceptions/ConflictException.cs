@@ -6,5 +6,5 @@ public class ConflictException : BaseException
 {
     public override HttpStatusCode StatusCode => HttpStatusCode.Conflict;
 
-    public ConflictException(string message) : base(message) { }
+    public ConflictException(string code, params object[] args) : base(code, args) { }
 }

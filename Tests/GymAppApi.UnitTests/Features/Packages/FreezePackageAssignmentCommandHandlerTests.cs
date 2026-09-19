@@ -83,4 +83,73 @@ public class FreezePackageAssignmentCommandHandlerTests
         Assert.Equal(PackageAssignmentStatus.Frozen, assignment.Status);
         writeRepo.Verify(r => r.Update(assignment), Times.Once);
     }
+
+    [Theory]
+    [InlineData(PackageAssignmentStatus.Frozen)]
+    [InlineData(PackageAssignmentStatus.Cancelled)]
+    public async Task Handle_WhenAssignmentIsNotActive_ThrowsPackageAssignmentNotActiveException(PackageAssignmentStatus status)
+    {
+        const int memberId = 7;
+        var assignment = new PackageAssignment { Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, MemberUserId = memberId, Status = status };
+        var (uow, writeRepo) = Wire(assignment, callerAssignments: new List<Assignment>());
+        var handler = new FreezePackageAssignmentCommandHandler(uow.Object);
+
+        await Assert.ThrowsAsync<GymAppApi.Application.Features.Packages.Exceptions.PackageAssignmentNotActiveException>(() =>
+            handler.Handle(new FreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None));
+        writeRepo.Verify(r => r.Update(It.IsAny<PackageAssignment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPackageHasNoFreezeLimit_AllowsFreezeRegardlessOfPreviousUsage()
+    {
+        const int memberId = 7;
+        var package = new Package { Id = 5, MaxFreezeDays = null };
+        var assignment = new PackageAssignment
+        {
+            Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, Package = package, MemberUserId = memberId,
+            Status = PackageAssignmentStatus.Active, TotalFrozenDays = 90,
+        };
+        var (uow, writeRepo) = Wire(assignment, callerAssignments: new List<Assignment>());
+        var handler = new FreezePackageAssignmentCommandHandler(uow.Object);
+
+        await handler.Handle(new FreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None);
+
+        Assert.Equal(PackageAssignmentStatus.Frozen, assignment.Status);
+    }
+
+    [Fact]
+    public async Task Handle_WhenTotalFrozenDaysAlreadyReachedTheLimit_ThrowsFreezeLimitExceededException()
+    {
+        const int memberId = 7;
+        var package = new Package { Id = 5, MaxFreezeDays = 30 };
+        var assignment = new PackageAssignment
+        {
+            Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, Package = package, MemberUserId = memberId,
+            Status = PackageAssignmentStatus.Active, TotalFrozenDays = 30,
+        };
+        var (uow, writeRepo) = Wire(assignment, callerAssignments: new List<Assignment>());
+        var handler = new FreezePackageAssignmentCommandHandler(uow.Object);
+
+        await Assert.ThrowsAsync<GymAppApi.Application.Features.Packages.Exceptions.FreezeLimitExceededException>(() =>
+            handler.Handle(new FreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None));
+        writeRepo.Verify(r => r.Update(It.IsAny<PackageAssignment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenTotalFrozenDaysBelowTheLimit_AllowsFreeze()
+    {
+        const int memberId = 7;
+        var package = new Package { Id = 5, MaxFreezeDays = 30 };
+        var assignment = new PackageAssignment
+        {
+            Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, Package = package, MemberUserId = memberId,
+            Status = PackageAssignmentStatus.Active, TotalFrozenDays = 29,
+        };
+        var (uow, writeRepo) = Wire(assignment, callerAssignments: new List<Assignment>());
+        var handler = new FreezePackageAssignmentCommandHandler(uow.Object);
+
+        await handler.Handle(new FreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None);
+
+        Assert.Equal(PackageAssignmentStatus.Frozen, assignment.Status);
+    }
 }

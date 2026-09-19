@@ -41,4 +41,8 @@ public class MePackageAssignmentDto
     public DateTime? EndDate { get; set; }
     public int? SessionCount { get; set; }
     public int? RemainingSessions { get; set; }
+    // null = dondurma süresi sınırsız - üyenin kendi paketini dondururken
+    // ne kadar hakkı kaldığını görebilmesi için (bkz. Package.MaxFreezeDays).
+    public int? MaxFreezeDays { get; set; }
+    public int TotalFrozenDays { get; set; }
 }

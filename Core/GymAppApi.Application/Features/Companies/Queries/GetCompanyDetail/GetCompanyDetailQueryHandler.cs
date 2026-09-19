@@ -22,7 +22,7 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
 
         if (company is null)
         {
-            throw new NotFoundException($"Firma {request.CompanyId} bulunamadı.");
+            throw new NotFoundException("CompanyNotFound", request.CompanyId);
         }
 
         return new CompanyDetailDto

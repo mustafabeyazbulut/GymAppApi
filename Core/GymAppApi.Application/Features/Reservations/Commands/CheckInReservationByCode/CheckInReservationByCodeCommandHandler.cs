@@ -42,7 +42,7 @@ public class CheckInReservationByCodeCommandHandler : IRequestHandler<CheckInRes
         }
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu rezervasyonu check-in yapma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCheckIn");
         }
 
         var assignment = await _unitOfWork.GetReadRepository<PackageAssignment>()

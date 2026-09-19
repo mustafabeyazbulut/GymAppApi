@@ -4,5 +4,5 @@ namespace GymAppApi.Application.Features.Assignments.Exceptions;
 
 public class UserAlreadyAssignedException : ConflictException
 {
-    public UserAlreadyAssignedException() : base("Bu kullanıcı zaten bu firmaya bağlı.") { }
+    public UserAlreadyAssignedException() : base("UserAlreadyAssigned") { }
 }

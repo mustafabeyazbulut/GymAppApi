@@ -1,4 +1,6 @@
+using System.Globalization;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Localization;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -7,7 +9,13 @@ namespace GymAppApi.Application.Features.Auth.Commands.ForgotPassword;
 
 public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordCommand, ForgotPasswordCommandResult>
 {
-    private const string GenericMessage = "Hesabınız varsa, şifre sıfırlama kodu gönderildi.";
+    // CurrentUICulture: Handle() bu handler'ı çağıran isteğin pipeline'ı
+    // İÇİNDE çalışıyor (RequestLocalizationMiddleware'in nested'ı), bu
+    // yüzden ExceptionMiddleware'in aksine ambient kültürü doğrudan
+    // okuyabiliyor - bkz. ExceptionMiddleware'in kendi yorumundaki
+    // ExecutionContext açıklaması.
+    private static string GenericMessage =>
+        AppMessages.Resolve("PasswordResetCodeSentIfAccountExists", CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISmsSender _smsSender;

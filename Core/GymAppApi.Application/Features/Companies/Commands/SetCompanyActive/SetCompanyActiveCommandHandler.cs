@@ -17,7 +17,7 @@ public class SetCompanyActiveCommandHandler : IRequestHandler<SetCompanyActiveCo
             .GetAsync(c => c.Id == request.CompanyId, cancellationToken: cancellationToken);
         if (company is null)
         {
-            throw new NotFoundException($"Firma {request.CompanyId} bulunamadı.");
+            throw new NotFoundException("CompanyNotFound", request.CompanyId);
         }
 
         company.IsActive = request.IsActive;

@@ -72,7 +72,7 @@ public class RegisterCompleteCommandHandlerTests
 
         var exception = await Assert.ThrowsAsync<InvalidContactVerificationCodeException>(() => handler.Handle(command, CancellationToken.None));
 
-        Assert.Equal("Telefon kodu hatalı, süresi dolmuş veya çok fazla deneme yapıldı.", exception.Message);
+        Assert.Equal("PhoneCodeInvalid", exception.Code);
         Assert.Equal(1, phonePending.AttemptCount);
         pendingWriteRepo.Verify(r => r.Update(It.Is<PendingContactVerification>(p => p.AttemptCount == 1)), Times.Once);
         uow.Verify(u => u.SaveChangesAsync(default), Times.Once);
@@ -164,7 +164,7 @@ public class RegisterCompleteCommandHandlerTests
 
         var exception = await Assert.ThrowsAsync<InvalidContactVerificationCodeException>(() => handler.Handle(command, CancellationToken.None));
 
-        Assert.Equal("E-posta kodu hatalı, süresi dolmuş veya çok fazla deneme yapıldı.", exception.Message);
+        Assert.Equal("EmailCodeInvalid", exception.Code);
         Assert.Equal(0, phonePending.AttemptCount);
         Assert.Equal(1, emailPending.AttemptCount);
         userWriteRepo.Verify(r => r.AddAsync(It.IsAny<User>(), default), Times.Never);

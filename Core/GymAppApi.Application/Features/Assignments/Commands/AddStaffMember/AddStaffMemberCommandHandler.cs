@@ -28,7 +28,7 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
             .GetAsync(b => b.Id == request.BranchId, cancellationToken: cancellationToken);
         if (branch is null)
         {
-            throw new NotFoundException($"Şube {request.BranchId} bulunamadı.");
+            throw new NotFoundException("BranchNotFound", request.BranchId);
         }
 
         // Same pattern as CreateAssignmentCommandHandler: the [Authorize]
@@ -50,7 +50,7 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == branch.Id));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu şubeye personel ekleme yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenAddStaffToBranch");
         }
 
         // Never creates a new User — staff attach an already-registered
@@ -60,7 +60,7 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
             .GetAsync(u => u.Phone == request.Phone, cancellationToken: cancellationToken);
         if (user is null)
         {
-            throw new NotFoundException($"'{request.Phone}' numaralı kayıtlı bir kullanıcı bulunamadı.");
+            throw new NotFoundException("PhoneNotRegistered", request.Phone);
         }
 
         // Scoped to (CompanyId, BranchId, Role), not just CompanyId - a

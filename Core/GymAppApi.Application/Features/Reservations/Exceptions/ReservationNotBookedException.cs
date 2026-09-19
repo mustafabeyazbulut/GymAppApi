@@ -7,5 +7,5 @@ namespace GymAppApi.Application.Features.Reservations.Exceptions;
 // Cancelled or NoShow.
 public class ReservationNotBookedException : ConflictException
 {
-    public ReservationNotBookedException() : base("Bu rezervasyon artık 'Booked' durumunda değil.") { }
+    public ReservationNotBookedException() : base("ReservationNotBooked") { }
 }

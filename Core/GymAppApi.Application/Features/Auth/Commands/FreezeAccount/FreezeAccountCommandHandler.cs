@@ -20,7 +20,7 @@ public class FreezeAccountCommandHandler : IRequestHandler<FreezeAccountCommand>
             .GetAsync(u => u.Id == request.UserId, cancellationToken: cancellationToken);
         if (user is null)
         {
-            throw new NotFoundException($"Kullanıcı {request.UserId} bulunamadı.");
+            throw new NotFoundException("UserNotFound", request.UserId);
         }
 
         var pendingReadRepo = _unitOfWork.GetReadRepository<PendingContactVerification>();

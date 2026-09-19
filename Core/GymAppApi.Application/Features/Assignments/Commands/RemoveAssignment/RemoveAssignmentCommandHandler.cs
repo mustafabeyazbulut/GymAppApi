@@ -26,7 +26,7 @@ public class RemoveAssignmentCommandHandler : IRequestHandler<RemoveAssignmentCo
             a => a.Id == request.AssignmentId && a.IsActive, cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Atama {request.AssignmentId} bulunamadı.");
+            throw new NotFoundException("AssignmentNotFound", request.AssignmentId);
         }
 
         var callerAssignments = await assignmentReadRepo.GetAllAsync(
@@ -49,7 +49,7 @@ public class RemoveAssignmentCommandHandler : IRequestHandler<RemoveAssignmentCo
         };
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu atamayı kaldırma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenRemoveAssignment");
         }
 
         // Self-removal (a GymAdmin/BranchManager removing their own assignment)

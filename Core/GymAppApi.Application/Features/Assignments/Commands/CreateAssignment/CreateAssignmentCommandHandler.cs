@@ -36,7 +36,7 @@ public class CreateAssignmentCommandHandler : IRequestHandler<CreateAssignmentCo
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId));
         if (!callerIsAuthorizedForThisCompany)
         {
-            throw new ForbiddenException("Bu firma için atama yapma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCreateAssignment");
         }
 
         var user = await _unitOfWork.GetReadRepository<User>().GetAsync(u => u.Id == request.UserId, cancellationToken: cancellationToken);

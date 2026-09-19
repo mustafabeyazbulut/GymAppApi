@@ -3,8 +3,10 @@ using MediatR;
 
 namespace GymAppApi.Application.Common.Behaviors;
 
+// Aynı "notnull" kısıt düzeltmesi ValidationBehavior'da da var - buraya
+// bakış gerekçesi için o dosyanın başındaki yorum.
 public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
+    where TRequest : notnull
 {
     private readonly IUnitOfWork _unitOfWork;
 

@@ -23,7 +23,7 @@ public class GetPackageAssignmentReservationsQueryHandler : IRequestHandler<GetP
             cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         if (assignment.MemberUserId != request.RequestedByUserId)
@@ -42,7 +42,7 @@ public class GetPackageAssignmentReservationsQueryHandler : IRequestHandler<GetP
                 (a.Role == AssignmentRole.Trainer && a.BranchId == assignment.BranchId));
             if (!callerIsAuthorized)
             {
-                throw new ForbiddenException("Bu paket atamasının rezervasyonlarını görme yetkiniz yok.");
+                throw new ForbiddenException("ForbiddenViewReservations");
             }
         }
 

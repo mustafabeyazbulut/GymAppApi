@@ -24,7 +24,7 @@ public class SetBranchActiveCommandHandler : IRequestHandler<SetBranchActiveComm
             .GetAsync(b => b.Id == request.BranchId, cancellationToken: cancellationToken);
         if (branch is null)
         {
-            throw new NotFoundException($"Şube {request.BranchId} bulunamadı.");
+            throw new NotFoundException("BranchNotFound", request.BranchId);
         }
 
         // Same re-check pattern as CreateBranchCommandHandler - opening or
@@ -37,7 +37,7 @@ public class SetBranchActiveCommandHandler : IRequestHandler<SetBranchActiveComm
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu şubeyi aktif/pasif yapma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenSetBranchActive");
         }
 
         branch.IsActive = request.IsActive;

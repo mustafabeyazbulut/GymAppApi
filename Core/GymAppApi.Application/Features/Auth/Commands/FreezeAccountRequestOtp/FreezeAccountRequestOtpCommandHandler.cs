@@ -24,7 +24,7 @@ public class FreezeAccountRequestOtpCommandHandler : IRequestHandler<FreezeAccou
             .GetAsync(u => u.Id == request.UserId, cancellationToken: cancellationToken);
         if (user is null)
         {
-            throw new NotFoundException($"Kullanıcı {request.UserId} bulunamadı.");
+            throw new NotFoundException("UserNotFound", request.UserId);
         }
 
         var code = await PendingVerificationCodeService.IssueAsync(_unitOfWork, ContactChannel.Phone, user.Phone, cancellationToken);

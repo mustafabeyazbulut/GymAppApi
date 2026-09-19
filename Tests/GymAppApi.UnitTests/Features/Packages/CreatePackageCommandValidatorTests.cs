@@ -1,0 +1,73 @@
+using GymAppApi.Application.Features.Packages.Commands.CreatePackage;
+using GymAppApi.Domain.Enums;
+
+namespace GymAppApi.UnitTests.Features.Packages;
+
+public class CreatePackageCommandValidatorTests
+{
+    private readonly CreatePackageCommandValidator _validator = new();
+
+    private static CreatePackageCommand ValidDurationCommand() => new()
+    {
+        CompanyId = 1,
+        Name = "Aylık Üyelik",
+        Type = PackageType.Duration,
+        DurationDays = 30,
+        Price = 1000m,
+    };
+
+    [Fact]
+    public void Validate_WhenDurationDaysIsZero_HasError()
+    {
+        var command = ValidDurationCommand();
+        command.DurationDays = 0;
+
+        var result = _validator.Validate(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_WhenDurationDaysIsNegative_HasError()
+    {
+        var command = ValidDurationCommand();
+        command.DurationDays = -5;
+
+        var result = _validator.Validate(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_WhenMaxFreezeDaysIsZero_HasError()
+    {
+        var command = ValidDurationCommand();
+        command.MaxFreezeDays = 0;
+
+        var result = _validator.Validate(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_WhenMaxFreezeDaysIsNull_HasNoError()
+    {
+        var command = ValidDurationCommand();
+        command.MaxFreezeDays = null;
+
+        var result = _validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_WhenMaxFreezeDaysIsPositive_HasNoError()
+    {
+        var command = ValidDurationCommand();
+        command.MaxFreezeDays = 30;
+
+        var result = _validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
+}

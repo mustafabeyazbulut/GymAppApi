@@ -133,4 +133,18 @@ public class CreatePackageCommandHandlerTests
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         writeRepo.Verify(r => r.AddAsync(It.IsAny<Package>(), default), Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_CarriesMaxFreezeDaysOverToTheNewPackage()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var (uow, writeRepo) = Wire(callerAssignments);
+        var command = ValidCommand();
+        command.MaxFreezeDays = 30;
+        var handler = new CreatePackageCommandHandler(uow.Object);
+
+        await handler.Handle(command, CancellationToken.None);
+
+        writeRepo.Verify(r => r.AddAsync(It.Is<Package>(p => p.MaxFreezeDays == 30), default), Times.Once);
+    }
 }

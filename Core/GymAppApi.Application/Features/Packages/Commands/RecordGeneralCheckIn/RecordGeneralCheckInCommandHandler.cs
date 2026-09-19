@@ -22,7 +22,7 @@ public class RecordGeneralCheckInCommandHandler : IRequestHandler<RecordGeneralC
             .GetAsync(a => a.Id == request.PackageAssignmentId, cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
@@ -33,7 +33,7 @@ public class RecordGeneralCheckInCommandHandler : IRequestHandler<RecordGeneralC
             (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu paket ataması için check-in yapma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenCheckIn");
         }
 
         // RemainingSessions is null for a Duration-type assignment - no

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using FluentValidation;
 using GymAppApi.Application.Common.Exceptions;
+using GymAppApi.Application.Common.Localization;
 
 namespace GymAppApi.WebApi.Middleware;
 
@@ -30,15 +31,31 @@ public class ExceptionMiddleware
 
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var (statusCode, errors) = exception switch
+        // Code: istemcinin ihtiyaç duyarsa kendi başına da kullanabileceği,
+        // dilden bağımsız kararlı bir tanımlayıcı.
+        // CultureInfo.CurrentUICulture DEĞİL: bu middleware, RequestLocalizationMiddleware'i
+        // SARMALIYOR (pipeline'da ondan önce geliyor), bu yüzden içerideki
+        // middleware'in ambient kültürü değiştirmesi buradaki catch bloğuna
+        // (ayrı bir ExecutionContext dalı) yansımıyor - .NET'in normal async/
+        // ExecutionContext davranışı. HttpContext.Features üzerinden okumak
+        // middleware sırasından bağımsız, güvenilir tek yol.
+        var language = context.Features.Get<Microsoft.AspNetCore.Localization.IRequestCultureFeature>()
+            ?.RequestCulture.UICulture.TwoLetterISOLanguageName ?? "en";
+
+        var (statusCode, errors, code) = exception switch
         {
             ValidationException validationException => (
                 (int)HttpStatusCode.UnprocessableEntity,
-                validationException.Errors.Select(e => e.ErrorMessage)),
+                validationException.Errors.Select(e => e.ErrorMessage),
+                "ValidationError"),
             BaseException baseException => (
                 (int)baseException.StatusCode,
-                new[] { baseException.Message }.AsEnumerable()),
-            _ => ((int)HttpStatusCode.InternalServerError, new[] { "Beklenmeyen bir hata oluştu." }.AsEnumerable())
+                new[] { AppMessages.Resolve(baseException.Code, language, baseException.Args) }.AsEnumerable(),
+                baseException.Code),
+            _ => (
+                (int)HttpStatusCode.InternalServerError,
+                new[] { AppMessages.Resolve("UnexpectedError", language) }.AsEnumerable(),
+                "InternalError")
         };
 
         if (statusCode == (int)HttpStatusCode.InternalServerError)
@@ -52,7 +69,8 @@ public class ExceptionMiddleware
         await context.Response.WriteAsync(JsonSerializer.Serialize(new
         {
             Status = statusCode,
-            Errors = errors
+            Errors = errors,
+            Code = code
         }));
     }
 }

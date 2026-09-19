@@ -21,7 +21,7 @@ public class MarkReservationNoShowCommandHandler : IRequestHandler<MarkReservati
             .GetAsync(r => r.Id == request.ReservationId, cancellationToken: cancellationToken);
         if (reservation is null)
         {
-            throw new NotFoundException($"Rezervasyon {request.ReservationId} bulunamadı.");
+            throw new NotFoundException("ReservationNotFound", request.ReservationId);
         }
 
         bool callerIsAuthorized;
@@ -40,7 +40,7 @@ public class MarkReservationNoShowCommandHandler : IRequestHandler<MarkReservati
         }
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu rezervasyonu 'gelmedi' olarak işaretleme yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenMarkNoShow");
         }
 
         if (reservation.Status != ReservationStatus.Booked)

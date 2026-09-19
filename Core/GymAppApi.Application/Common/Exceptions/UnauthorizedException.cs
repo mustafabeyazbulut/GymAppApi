@@ -6,5 +6,5 @@ public class UnauthorizedException : BaseException
 {
     public override HttpStatusCode StatusCode => HttpStatusCode.Unauthorized;
 
-    public UnauthorizedException(string message) : base(message) { }
+    public UnauthorizedException(string code, params object[] args) : base(code, args) { }
 }

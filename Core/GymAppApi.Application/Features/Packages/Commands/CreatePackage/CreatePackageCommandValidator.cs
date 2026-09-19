@@ -1,4 +1,6 @@
+using System.Globalization;
 using FluentValidation;
+using GymAppApi.Application.Common.Localization;
 using GymAppApi.Domain.Enums;
 
 namespace GymAppApi.Application.Features.Packages.Commands.CreatePackage;
@@ -11,12 +13,21 @@ public class CreatePackageCommandValidator : AbstractValidator<CreatePackageComm
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
 
-        RuleFor(x => x.DurationDays).NotNull().When(x => x.Type == PackageType.Duration)
-            .WithMessage("DurationDays is required for a Duration package.");
+        // NotNull tek başına 0 veya negatif bir değeri kabul ederdi - bir
+        // GymAdmin'in "0 gün süreli" gibi anlamsız bir paket tanımlamasını
+        // engeller.
+        RuleFor(x => x.DurationDays).NotNull().GreaterThan(0).When(x => x.Type == PackageType.Duration)
+            .WithMessage(_ => Localized("DurationDaysRequiredForDurationPackage"));
         RuleFor(x => x.SessionCount).Null().When(x => x.Type == PackageType.Duration)
-            .WithMessage("SessionCount must not be set for a Duration package.");
+            .WithMessage(_ => Localized("SessionCountMustBeNullForDurationPackage"));
 
         RuleFor(x => x.SessionCount).NotNull().GreaterThan(0).When(x => x.Type == PackageType.SessionBased)
-            .WithMessage("SessionCount is required and must be greater than 0 for a SessionBased package.");
+            .WithMessage(_ => Localized("SessionCountRequiredForSessionBasedPackage"));
+
+        RuleFor(x => x.MaxFreezeDays).GreaterThan(0).When(x => x.MaxFreezeDays != null)
+            .WithMessage(_ => Localized("MaxFreezeDaysMustBeGreaterThanZero"));
     }
+
+    private static string Localized(string code) =>
+        AppMessages.Resolve(code, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
 }

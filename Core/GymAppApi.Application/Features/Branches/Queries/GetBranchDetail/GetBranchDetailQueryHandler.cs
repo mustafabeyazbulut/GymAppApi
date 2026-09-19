@@ -18,7 +18,7 @@ public class GetBranchDetailQueryHandler : IRequestHandler<GetBranchDetailQuery,
             .GetAsync(b => b.Id == request.BranchId, cancellationToken: cancellationToken);
         if (branch is null)
         {
-            throw new NotFoundException($"Şube {request.BranchId} bulunamadı.");
+            throw new NotFoundException("BranchNotFound", request.BranchId);
         }
 
         return new BranchListItemDto

@@ -30,5 +30,6 @@ public class GetPackagesQueryHandler : IRequestHandler<GetPackagesQuery, IReadOn
         Price = p.Price,
         AccessTier = p.AccessTier.ToString(),
         IsActive = p.IsActive,
+        MaxFreezeDays = p.MaxFreezeDays,
     };
 }

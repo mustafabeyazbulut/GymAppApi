@@ -33,7 +33,7 @@ public class GetPackageAssignmentPaymentsQueryHandler : IRequestHandler<GetPacka
             cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         // Same staff authorization pattern as Freeze/Unfreeze/Cancel, plus the
@@ -48,7 +48,7 @@ public class GetPackageAssignmentPaymentsQueryHandler : IRequestHandler<GetPacka
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId));
             if (!callerIsAuthorized)
             {
-                throw new ForbiddenException("Bu paket atamasının ödemelerini görme yetkiniz yok.");
+                throw new ForbiddenException("ForbiddenPackageAssignmentPayments");
             }
         }
 

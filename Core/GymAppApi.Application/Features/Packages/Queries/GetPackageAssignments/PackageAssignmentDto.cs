@@ -17,4 +17,7 @@ public class PackageAssignmentDto
     public string Status { get; set; } = null!;
     public decimal TotalPaid { get; set; }
     public decimal RemainingBalance { get; set; }
+    // null = dondurma süresi sınırsız.
+    public int? MaxFreezeDays { get; set; }
+    public int TotalFrozenDays { get; set; }
 }

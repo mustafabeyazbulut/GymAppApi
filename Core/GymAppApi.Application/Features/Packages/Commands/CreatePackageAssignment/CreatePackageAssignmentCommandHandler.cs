@@ -28,7 +28,7 @@ public class CreatePackageAssignmentCommandHandler : IRequestHandler<CreatePacka
             .GetAsync(p => p.Id == request.PackageId, cancellationToken: cancellationToken);
         if (package is null)
         {
-            throw new NotFoundException($"Paket {request.PackageId} bulunamadı.");
+            throw new NotFoundException("PackageNotFound", request.PackageId);
         }
 
         // A company-wide package (BranchId == null) may only be assigned by a
@@ -46,14 +46,14 @@ public class CreatePackageAssignmentCommandHandler : IRequestHandler<CreatePacka
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == package.BranchId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu paketi atama yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenAssignPackage");
         }
 
         var member = await _unitOfWork.GetReadRepository<User>()
             .GetAsync(u => u.Phone == request.MemberPhone, cancellationToken: cancellationToken);
         if (member is null)
         {
-            throw new NotFoundException($"'{request.MemberPhone}' numaralı kayıtlı bir kullanıcı bulunamadı.");
+            throw new NotFoundException("PhoneNotRegistered", request.MemberPhone);
         }
 
         var alreadyHasThisPackage = await _unitOfWork.GetReadRepository<PackageAssignment>().AnyAsync(

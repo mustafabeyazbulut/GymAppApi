@@ -18,7 +18,7 @@ public class SetPackageActiveCommandHandler : IRequestHandler<SetPackageActiveCo
             .GetAsync(p => p.Id == request.PackageId, cancellationToken: cancellationToken);
         if (package is null)
         {
-            throw new NotFoundException($"Paket {request.PackageId} bulunamadı.");
+            throw new NotFoundException("PackageNotFound", request.PackageId);
         }
 
         // Same GymAdmin(of company)/SuperAdmin-only rule as SetBranchActiveCommandHandler -
@@ -30,7 +30,7 @@ public class SetPackageActiveCommandHandler : IRequestHandler<SetPackageActiveCo
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == package.CompanyId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu paketi aktif/pasif yapma yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenManagePackage");
         }
 
         package.IsActive = request.IsActive;

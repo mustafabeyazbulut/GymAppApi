@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Localization;
 using GymAppApi.Application;
 using GymAppApi.Infrastructure;
 using GymAppApi.Persistence;
@@ -86,6 +88,22 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ExceptionMiddleware>();
+
+// Mobil, uygulama icinde secili olan dili (tr/en) her istekte standart
+// Accept-Language header'i ile gonderiyor - CurrentUICulture bu middleware
+// tarafindan ayarlaniyor; hem ExceptionMiddleware'in (yukarida, bu yuzden
+// onu SARMALIYOR - middleware sirasinda ExceptionMiddleware'in try/catch'i
+// bunu da kapsamali) hem FluentValidation'in varsayilan mesajlarinin
+// (kendisi de CurrentUICulture'a bakar) otomatik olarak dogru dili
+// kullanmasini sagliyor. Desteklenmeyen/eksik bir dil -> varsayilan
+// Ingilizce (uygulamanin standart dili).
+var supportedCultures = new[] { new CultureInfo("en"), new CultureInfo("tr") };
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture("en"),
+    SupportedCultures = supportedCultures,
+    SupportedUICultures = supportedCultures,
+});
 
 app.UseHttpsRedirection();
 

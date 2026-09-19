@@ -4,5 +4,5 @@ namespace GymAppApi.Application.Features.Auth.Exceptions;
 
 public class InvalidRefreshTokenException : UnauthorizedException
 {
-    public InvalidRefreshTokenException() : base("Oturum süresi doldu, lütfen tekrar giriş yapın.") { }
+    public InvalidRefreshTokenException() : base("InvalidRefreshToken") { }
 }

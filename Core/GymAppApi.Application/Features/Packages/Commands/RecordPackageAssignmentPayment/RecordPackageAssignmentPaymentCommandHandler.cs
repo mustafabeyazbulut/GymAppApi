@@ -19,7 +19,7 @@ public class RecordPackageAssignmentPaymentCommandHandler : IRequestHandler<Reco
             .GetAsync(a => a.Id == request.PackageAssignmentId, cancellationToken: cancellationToken);
         if (assignment is null)
         {
-            throw new NotFoundException($"Paket ataması {request.PackageAssignmentId} bulunamadı.");
+            throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
         }
 
         // Same authorization pattern as Freeze/Unfreeze/CancelPackageAssignmentCommandHandler.
@@ -31,7 +31,7 @@ public class RecordPackageAssignmentPaymentCommandHandler : IRequestHandler<Reco
             (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu paket ataması için ödeme kaydetme yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenRecordPayment");
         }
 
         var package = await _unitOfWork.GetReadRepository<Package>()

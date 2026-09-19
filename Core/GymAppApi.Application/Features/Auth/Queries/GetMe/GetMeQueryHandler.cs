@@ -34,7 +34,7 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
 
         if (user is null)
         {
-            throw new NotFoundException($"Kullanıcı {request.UserId} bulunamadı.");
+            throw new NotFoundException("UserNotFound", request.UserId);
         }
 
         return new MeResultDto
@@ -71,6 +71,8 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
                     EndDate = pa.EndDate,
                     SessionCount = pa.Package?.SessionCount,
                     RemainingSessions = pa.RemainingSessions,
+                    MaxFreezeDays = pa.Package?.MaxFreezeDays,
+                    TotalFrozenDays = pa.TotalFrozenDays,
                 })
                 .ToList(),
         };

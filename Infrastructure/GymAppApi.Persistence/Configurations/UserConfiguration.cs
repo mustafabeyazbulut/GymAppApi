@@ -12,7 +12,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.Email).HasMaxLength(200);
         builder.Property(x => x.PasswordHash).IsRequired();
         builder.Property(x => x.FullName).IsRequired().HasMaxLength(200);
-        builder.Property(x => x.PreferredLanguage).IsRequired().HasMaxLength(10).HasDefaultValue("tr");
+        builder.Property(x => x.PreferredLanguage).IsRequired().HasMaxLength(10).HasDefaultValue("en");
 
         builder.HasIndex(x => x.Phone).IsUnique();
         builder.HasIndex(x => x.Email).IsUnique().HasFilter("\"Email\" IS NOT NULL");

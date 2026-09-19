@@ -9,6 +9,7 @@ public class PackageAssignmentConfiguration : IEntityTypeConfiguration<PackageAs
     public void Configure(EntityTypeBuilder<PackageAssignment> builder)
     {
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+        builder.Property(x => x.TotalFrozenDays).HasDefaultValue(0);
 
         builder.HasOne(x => x.Package)
             .WithMany()

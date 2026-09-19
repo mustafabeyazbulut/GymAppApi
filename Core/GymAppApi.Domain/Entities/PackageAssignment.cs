@@ -28,7 +28,13 @@ public class PackageAssignment : EntityBase, ICompanyScoped
     public int? RemainingSessions { get; set; }
 
     public PackageAssignmentStatus Status { get; set; } = PackageAssignmentStatus.Active;
-    // Only set while Status == Frozen. On unfreeze, EndDate is pushed forward
-    // by (now - FrozenAt) and this is cleared back to null.
+    // Sadece Status == Frozen iken set edilir. Unfreeze'de EndDate
+    // (now - FrozenAt) kadar ileri itilir ve bu tekrar null'a döner.
     public DateTime? FrozenAt { get; set; }
+
+    // Bugüne kadar bu atamada birden fazla dondurma döngüsünde kullanılmış
+    // toplam gün sayısı - Package.MaxFreezeDays karşısında biriktirilir,
+    // her yeni freeze/unfreeze döngüsünde sıfırlanmaz (aksi hâlde üye
+    // sürekli dondurup açarak sınırı aşabilirdi).
+    public int TotalFrozenDays { get; set; }
 }

@@ -18,7 +18,7 @@ public class UpdateBranchCommandHandler : IRequestHandler<UpdateBranchCommand>
             .GetAsync(b => b.Id == request.BranchId, cancellationToken: cancellationToken);
         if (branch is null)
         {
-            throw new NotFoundException($"Şube {request.BranchId} bulunamadı.");
+            throw new NotFoundException("BranchNotFound", request.BranchId);
         }
 
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
@@ -28,7 +28,7 @@ public class UpdateBranchCommandHandler : IRequestHandler<UpdateBranchCommand>
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId));
         if (!callerIsAuthorized)
         {
-            throw new ForbiddenException("Bu şubeyi güncelleme yetkiniz yok.");
+            throw new ForbiddenException("ForbiddenUpdateBranch");
         }
 
         branch.Name = request.Name;
