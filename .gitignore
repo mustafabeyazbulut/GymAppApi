@@ -486,3 +486,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# PowerShell profilinin ürettiği transcript log klasörleri (tarih adlı, ör. 20260918/)
+[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]/
