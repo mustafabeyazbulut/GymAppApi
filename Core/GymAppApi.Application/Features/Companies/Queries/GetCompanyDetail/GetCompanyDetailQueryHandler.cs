@@ -61,6 +61,7 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
                 .Where(a => a.Role == AssignmentRole.GymAdmin)
                 .Select(a => new CompanyGymAdminDto
                 {
+                    AssignmentId = a.Id,
                     UserId = a.UserId,
                     FullName = a.User?.FullName ?? string.Empty,
                     Phone = a.User?.Phone ?? string.Empty,

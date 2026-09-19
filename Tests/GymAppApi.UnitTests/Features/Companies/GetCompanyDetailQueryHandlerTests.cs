@@ -70,6 +70,7 @@ public class GetCompanyDetailQueryHandlerTests
         Assert.Equal("Kadıköy", branch.Name);
         Assert.Equal("Ayşe Yılmaz", branch.ManagerName);
         var gymAdmin = Assert.Single(result.GymAdmins);
+        Assert.Equal(1, gymAdmin.AssignmentId);
         Assert.Equal("Mehmet Kaya", gymAdmin.FullName);
         Assert.Equal("+905550001122", gymAdmin.Phone);
         Assert.Equal(1, result.GymAdminCount);
