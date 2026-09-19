@@ -29,6 +29,13 @@ public class TransactionBehaviorTests
         var transaction = new Mock<IAsyncDisposable>();
         var unitOfWork = new Mock<IUnitOfWork>();
         unitOfWork.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transaction.Object);
+        // ExecuteWithRetryAsync gercek Npgsql execution strategy'sinin
+        // yerini tutuyor - burada sadece verilen delegate'i CAGIRIYOR, aksi
+        // halde asagidaki BeginTransactionAsync/CommitTransactionAsync
+        // cagrilari hic gerceklesmez (Moq, ayarlanmamis bir Task<T> donen
+        // metodu delegate'i hic calistirmadan varsayilan degerle donuyor).
+        unitOfWork.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<string>>>()))
+            .Returns<Func<Task<string>>>(operation => operation());
 
         var behavior = new TransactionBehavior<TransactionalPing, string>(unitOfWork.Object);
 
@@ -45,6 +52,8 @@ public class TransactionBehaviorTests
         var transaction = new Mock<IAsyncDisposable>();
         var unitOfWork = new Mock<IUnitOfWork>();
         unitOfWork.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).ReturnsAsync(transaction.Object);
+        unitOfWork.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<string>>>()))
+            .Returns<Func<Task<string>>>(operation => operation());
 
         var behavior = new TransactionBehavior<TransactionalPing, string>(unitOfWork.Object);
 

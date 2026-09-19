@@ -2,6 +2,7 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Common;
 using GymAppApi.Persistence.Context;
 using GymAppApi.Persistence.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Persistence.UnitOfWork;
 
@@ -26,4 +27,7 @@ public class UnitOfWork : IUnitOfWork
 
     public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
         => await _context.Database.RollbackTransactionAsync(cancellationToken);
+
+    public Task<TResult> ExecuteWithRetryAsync<TResult>(Func<Task<TResult>> operation)
+        => _context.Database.CreateExecutionStrategy().ExecuteAsync(operation);
 }

@@ -22,17 +22,26 @@ public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TReque
             return await next();
         }
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
+        // Transaction'i dogrudan degil ExecuteWithRetryAsync icinden aciyoruz:
+        // DbContext'in EnableRetryOnFailure execution strategy'si, kullanici
+        // tarafindan baslatilan bir transaction'i ancak begin/commit/rollback'in
+        // TAMAMI kendi ExecuteAsync delegate'inin icindeyse yeniden deneyebiliyor
+        // - aksi halde EF Core calisma zamaninda "does not support
+        // user-initiated transactions" firlatiyor.
+        return await _unitOfWork.ExecuteWithRetryAsync(async () =>
         {
-            var response = await next();
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-            return response;
-        }
-        catch
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            throw;
-        }
+            await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var response = await next();
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+                return response;
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 }
