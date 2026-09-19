@@ -41,11 +41,16 @@ public class GetCompanyDetailQueryHandlerTests
             .ReturnsAsync(company);
         var assignmentReadRepo = new Mock<IReadRepository<Assignment>>();
         assignmentReadRepo.Setup(r => r.GetAllAsync(
-                It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>?>(), null, null, false, default))
+                It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>?>(),
+                It.IsAny<Func<IQueryable<Assignment>, IIncludableQueryable<Assignment, object>>?>(), null, false, default))
             .ReturnsAsync(new List<Assignment>
             {
                 new() { Id = 1, UserId = 1, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true },
-                new() { Id = 2, UserId = 2, CompanyId = 1, BranchId = 5, Role = AssignmentRole.BranchManager, IsActive = true },
+                new()
+                {
+                    Id = 2, UserId = 2, CompanyId = 1, BranchId = 5, Role = AssignmentRole.BranchManager, IsActive = true,
+                    User = new User { Id = 2, FullName = "Ayşe Yılmaz", Phone = "+905551112233", PasswordHash = "x" },
+                },
                 new() { Id = 3, UserId = 3, CompanyId = 1, BranchId = 5, Role = AssignmentRole.Trainer, IsActive = true },
                 new() { Id = 4, UserId = 4, CompanyId = 1, BranchId = 5, Role = AssignmentRole.Member, IsActive = true },
             });
@@ -59,6 +64,7 @@ public class GetCompanyDetailQueryHandlerTests
         Assert.Equal("MAT & MOVE", result.Name);
         var branch = Assert.Single(result.Branches);
         Assert.Equal("Kadıköy", branch.Name);
+        Assert.Equal("Ayşe Yılmaz", branch.ManagerName);
         Assert.Equal(1, result.GymAdminCount);
         Assert.Equal(1, result.BranchManagerCount);
         Assert.Equal(1, result.TrainerCount);

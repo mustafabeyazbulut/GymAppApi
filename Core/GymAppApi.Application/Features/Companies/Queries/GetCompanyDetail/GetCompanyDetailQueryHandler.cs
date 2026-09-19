@@ -32,7 +32,16 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
         // ve bu sirkete ait tum atamalar guvenle cekilebiliyor.
         var assignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             predicate: a => a.CompanyId == request.CompanyId && a.IsActive,
+            include: q => q.Include(a => a.User!),
             cancellationToken: cancellationToken);
+
+        // Bir subenin BranchManager'i - ayni subeye birden fazla BranchManager
+        // atanmasi teoride mumkun olsa da (AddStaffMember bunu engellemiyor),
+        // pratikte her zaman tek kisi olduğundan ilkini gostermek yeterli.
+        var branchManagerNameByBranchId = assignments
+            .Where(a => a.Role == AssignmentRole.BranchManager && a.BranchId != null)
+            .GroupBy(a => a.BranchId!.Value)
+            .ToDictionary(g => g.Key, g => g.First().User?.FullName);
 
         return new CompanyDetailDto
         {
@@ -46,6 +55,7 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
                 Name = b.Name,
                 Address = b.Address,
                 IsActive = b.IsActive,
+                ManagerName = branchManagerNameByBranchId.GetValueOrDefault(b.Id),
             }).ToList(),
             GymAdminCount = assignments.Count(a => a.Role == AssignmentRole.GymAdmin),
             BranchManagerCount = assignments.Count(a => a.Role == AssignmentRole.BranchManager),
