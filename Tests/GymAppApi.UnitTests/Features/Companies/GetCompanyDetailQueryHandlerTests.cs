@@ -2,6 +2,7 @@ using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.Companies.Queries.GetCompanyDetail;
 using GymAppApi.Domain.Entities;
+using GymAppApi.Domain.Enums;
 using Microsoft.EntityFrameworkCore.Query;
 using Moq;
 
@@ -38,8 +39,19 @@ public class GetCompanyDetailQueryHandlerTests
                 It.IsAny<System.Linq.Expressions.Expression<Func<Company, bool>>>(),
                 It.IsAny<Func<IQueryable<Company>, IIncludableQueryable<Company, object>>?>(), false, default))
             .ReturnsAsync(company);
+        var assignmentReadRepo = new Mock<IReadRepository<Assignment>>();
+        assignmentReadRepo.Setup(r => r.GetAllAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>?>(), null, null, false, default))
+            .ReturnsAsync(new List<Assignment>
+            {
+                new() { Id = 1, UserId = 1, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true },
+                new() { Id = 2, UserId = 2, CompanyId = 1, BranchId = 5, Role = AssignmentRole.BranchManager, IsActive = true },
+                new() { Id = 3, UserId = 3, CompanyId = 1, BranchId = 5, Role = AssignmentRole.Trainer, IsActive = true },
+                new() { Id = 4, UserId = 4, CompanyId = 1, BranchId = 5, Role = AssignmentRole.Member, IsActive = true },
+            });
         var uow = new Mock<IUnitOfWork>();
         uow.Setup(u => u.GetReadRepository<Company>()).Returns(companyReadRepo.Object);
+        uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(assignmentReadRepo.Object);
 
         var handler = new GetCompanyDetailQueryHandler(uow.Object);
         var result = await handler.Handle(new GetCompanyDetailQuery(1), CancellationToken.None);
@@ -47,5 +59,9 @@ public class GetCompanyDetailQueryHandlerTests
         Assert.Equal("MAT & MOVE", result.Name);
         var branch = Assert.Single(result.Branches);
         Assert.Equal("Kadıköy", branch.Name);
+        Assert.Equal(1, result.GymAdminCount);
+        Assert.Equal(1, result.BranchManagerCount);
+        Assert.Equal(1, result.TrainerCount);
+        Assert.Equal(1, result.MemberCount);
     }
 }

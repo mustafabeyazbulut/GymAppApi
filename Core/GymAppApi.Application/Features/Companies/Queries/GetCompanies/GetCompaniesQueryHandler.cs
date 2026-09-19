@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Entities;
+using GymAppApi.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,12 +18,29 @@ public class GetCompaniesQueryHandler : IRequestHandler<GetCompaniesQuery, IRead
             include: q => q.Include(c => c.Branches),
             cancellationToken: cancellationToken);
 
-        return companies.Select(c => new CompanyListItemDto
+        // Bu uc noktaya sadece SuperAdmin erisebiliyor (CompaniesController'daki
+        // SuperAdminOnly policy'si), bu yuzden Assignment'in tenant-scoping
+        // global filtresi (_tenantContext.IsSuperAdmin) burada devre disi kaliyor
+        // ve tum sirketlerin atamalari tek sorguda guvenle cekilebiliyor.
+        var assignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
+            predicate: a => a.CompanyId != null && a.IsActive && a.Role != AssignmentRole.SuperAdmin,
+            cancellationToken: cancellationToken);
+        var assignmentsByCompany = assignments.ToLookup(a => a.CompanyId!.Value);
+
+        return companies.Select(c =>
         {
-            Id = c.Id,
-            Name = c.Name,
-            IsActive = c.IsActive,
-            BranchCount = c.Branches.Count,
+            var companyAssignments = assignmentsByCompany[c.Id];
+            return new CompanyListItemDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                IsActive = c.IsActive,
+                BranchCount = c.Branches.Count,
+                GymAdminCount = companyAssignments.Count(a => a.Role == AssignmentRole.GymAdmin),
+                BranchManagerCount = companyAssignments.Count(a => a.Role == AssignmentRole.BranchManager),
+                TrainerCount = companyAssignments.Count(a => a.Role == AssignmentRole.Trainer),
+                MemberCount = companyAssignments.Count(a => a.Role == AssignmentRole.Member),
+            };
         }).ToList();
     }
 }

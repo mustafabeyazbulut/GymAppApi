@@ -2,6 +2,7 @@ using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.Branches.Queries.GetBranches;
 using GymAppApi.Domain.Entities;
+using GymAppApi.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +26,14 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
             throw new NotFoundException("CompanyNotFound", request.CompanyId);
         }
 
+        // Bu uc noktaya sadece SuperAdmin erisebiliyor (CompaniesController'daki
+        // SuperAdminOnly policy'si), bu yuzden Assignment'in tenant-scoping
+        // global filtresi (_tenantContext.IsSuperAdmin) burada devre disi kaliyor
+        // ve bu sirkete ait tum atamalar guvenle cekilebiliyor.
+        var assignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
+            predicate: a => a.CompanyId == request.CompanyId && a.IsActive,
+            cancellationToken: cancellationToken);
+
         return new CompanyDetailDto
         {
             Id = company.Id,
@@ -38,6 +47,10 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
                 Address = b.Address,
                 IsActive = b.IsActive,
             }).ToList(),
+            GymAdminCount = assignments.Count(a => a.Role == AssignmentRole.GymAdmin),
+            BranchManagerCount = assignments.Count(a => a.Role == AssignmentRole.BranchManager),
+            TrainerCount = assignments.Count(a => a.Role == AssignmentRole.Trainer),
+            MemberCount = assignments.Count(a => a.Role == AssignmentRole.Member),
         };
     }
 }

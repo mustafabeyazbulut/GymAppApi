@@ -14,3 +14,4 @@
 - [Turkish comments and commits](feedback-turkish-comments-and-commits.md) — ALL code comments, commit messages, AND chat replies to the user go in Turkish only, no exceptions. Read before writing anything.
 - [Backend localization mimarisi](project-backend-localization.md) — AppMessages/BaseException.Code/UseRequestLocalization ile hata mesajları mobilin seçtiği dile göre çevriliyor. Yeni bir mesaj eklemeden önce oku.
 - [MediatR void komut doğrulama hatası](project-mediatr-void-command-validation-bug.md) — KRİTİK, düzeltilmiş: ValidationBehavior/TransactionBehavior'ın eski kısıtı void komutlarda FluentValidation'ı hiç çalıştırmıyordu. Yeni bir pipeline behavior eklemeden önce oku.
+- [Her metin dil paketi uyumlu olacak](feedback-always-localize-user-facing-text.md) — kullanıcıya giden hiçbir metin (backend/mobil) hardcode tek dilde yazılmayacak, her zaman AppMessages/AppLocalizations üzerinden. Yeni bir mesaj/hata eklemeden önce oku.
