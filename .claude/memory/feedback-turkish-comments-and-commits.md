@@ -1,18 +1,21 @@
 ---
 name: feedback-turkish-comments-and-commits
-description: User wants ALL code comments, ALL git commit messages, AND all chat replies to the user written in Turkish only, in every repo. Read this before writing any comment, commit message, or chat response.
+description: Kullanıcı tüm kod açıklamalarının, tüm git commit mesajlarının VE kullanıcıya yazılan tüm sohbet yanıtlarının sadece Türkçe olmasını istiyor, her repoda. Herhangi bir açıklama, commit mesajı veya sohbet yanıtı yazmadan önce bunu oku.
 metadata:
   type: feedback
 ---
 
-# Write code comments, commit messages, AND chat replies in Turkish only (2026-09-19, reinforced same day)
+# Kod açıklamaları, commit mesajları VE sohbet yanıtları sadece Türkçe olacak (2026-09-19, aynı gün pekiştirildi)
 
-User's original instruction, mid-session: "kod açıklamalarını türkçeye çevir her zaman türkçe yazsın commit satırları" (translate code comments to Turkish, commit lines should always be written in Turkish).
+Kullanıcının ilk talimatı, oturum ortasında: "kod açıklamalarını türkçeye çevir her zaman türkçe yazsın commit satırları".
 
-**Reinforced later the same day, sharply, after Claude kept replying to the user in English in chat:** "bir daha uyarmayacağım seni bana sadece türkçe açıklama yaz. kod stırına da sadece türkçe açıklama yaz" (I won't warn you again - write explanations to me only in Turkish. Also write only Turkish comments in code lines). This is a correction to an earlier, WRONG assumption recorded in this same memory file - that chat replies could stay in whatever language fit the conversation. That assumption was false and caused a real, repeated annoyance. Corrected below.
+**Aynı gün, daha sert şekilde pekiştirildi, Claude sohbette İngilizce yanıt vermeye devam edince:** "bir daha uyarmayacağım seni bana sadece türkçe açıklama yaz. kod stırına da sadece türkçe açıklama yaz". Bu, bu hafıza dosyasının kendisinde daha önce kaydedilmiş YANLIŞ bir varsayımın düzeltilmesidir - "sohbet yanıtları konuşmaya uyan herhangi bir dilde kalabilir" varsayımı yanlıştı ve gerçek, tekrarlanan bir rahatsızlığa yol açtı.
 
-**How to apply, current/final version:**
-- Every new code comment (in any file, any repo touched from here on) goes in Turkish, not English - matches the existing standing convention already established in GymApp (see that repo's own "Translate code comments to Turkish" commit, `85b9483`) but now explicitly extended to GymAppApi too, which had been English throughout.
-- Every git commit message body/subject goes in Turkish from now on, in both `GymAppApi` and `GymApp`. This does NOT change the existing rule that commits carry no Claude/AI attribution line (see this project's CLAUDE.md) - just the language of the human-readable message content.
-- **Every chat reply to this user, in every repo/session, goes in Turkish only - no exceptions, no mixing in English.** This applies regardless of what language internal tool descriptions or other system text uses.
-- This applies going forward to NEW commits/comments. Retroactively translating the entire existing English comment history in GymAppApi is a separate, large, not-yet-requested task - don't do a sweeping pass unprompted, but if editing a file that already has English comments nearby, it's fine (not required) to leave them as-is unless asked.
+**Ayrıca kullanıcı, bu kuralın kaydedildiği hafıza dosyasının kendisinin İngilizce yazılmış olmasını da ayrıca eleştirdi** ("son işlem ne olum onu niye çevirmedin") - yani bu kural sadece kod/commit/sohbete değil, Claude'un yazdığı HER açıklayıcı metne (hafıza dosyaları dahil) uygulanmalı.
+
+**Nasıl uygulanır, güncel/son hâli:**
+- Bundan sonra yazılan her kod açıklaması (hangi dosyada, hangi repoda olursa olsun) Türkçe olacak - GymApp'te zaten var olan yerleşik kurala (bkz. o repodaki "Translate code comments to Turkish" commit'i, `85b9483`) uyuyor, ama artık GymAppApi'ye de açıkça genişletildi (o repo baştan sona İngilizceydi).
+- Bundan sonra her git commit mesajının başlığı/gövdesi Türkçe olacak, hem `GymAppApi`'de hem `GymApp`'te. Bu, commit'lerin Claude/AI imzası taşımaması kuralını değiştirmiyor (bkz. bu projenin CLAUDE.md'si) - sadece mesajın dilini değiştiriyor.
+- **Kullanıcıya verilen her sohbet yanıtı, hangi repo/oturumda olursa olsun, sadece Türkçe olacak - istisnasız, İngilizce karıştırılmadan.** Bu, araç tanımlarının veya diğer sistem metinlerinin hangi dili kullandığından bağımsız geçerlidir.
+- **Claude'un yazdığı hafıza dosyaları da dahil olmak üzere HER açıklayıcı metin Türkçe olacak.** Bu kural sadece repo içine giren içerikle (kod, commit) veya sadece sohbetle sınırlı değil - memory sistemine yazılan her yeni dosya/güncelleme de Türkçe yazılmalı.
+- Bu kural bundan sonraki YENİ commit'lere/açıklamalara/hafıza kayıtlarına uygulanır. GymAppApi'deki mevcut İngilizce açıklama geçmişinin tamamını geriye dönük çevirmek ayrı, büyük ve henüz istenmemiş bir iştir - istenmeden kapsamlı bir geçiş yapma, ama zaten İngilizce açıklamalar bulunan bir dosyayı düzenlerken onları olduğu gibi bırakmak da sorun değil (istenmedikçe).
