@@ -16,7 +16,6 @@ public static class AppMessages
     {
         // Genel / ortak
         ["UnexpectedError"] = ("An unexpected error occurred.", "Beklenmeyen bir hata oluştu."),
-        ["ConnectionError"] = ("Connection error, please try again.", "Bağlantı hatası, lütfen tekrar deneyin."),
         ["PasswordResetCodeSentIfAccountExists"] = (
             "If your account exists, a password reset code has been sent.",
             "Hesabınız varsa, şifre sıfırlama kodu gönderildi."),
@@ -36,7 +35,6 @@ public static class AppMessages
         ["PhoneNotRegistered"] = ("No registered user was found with the phone number '{0}'.", "'{0}' numaralı kayıtlı bir kullanıcı bulunamadı."),
 
         // ForbiddenException kodları
-        ["Forbidden"] = ("You are not authorized to perform this action.", "Bu işlemi yapma yetkiniz yok."),
         ["ForbiddenCreateBranch"] = ("You are not authorized to create a branch for this company.", "Bu firma için şube oluşturma yetkiniz yok."),
         ["ForbiddenSetBranchActive"] = ("You are not authorized to activate/deactivate this branch.", "Bu şubeyi aktif/pasif yapma yetkiniz yok."),
         ["ForbiddenUpdateBranch"] = ("You are not authorized to update this branch.", "Bu şubeyi güncelleme yetkiniz yok."),
@@ -54,10 +52,7 @@ public static class AppMessages
         ["ForbiddenViewProgressNotes"] = ("You are not authorized to view this package assignment's progress notes.", "Bu paket atamasının ilerleme notlarını görme yetkiniz yok."),
         ["ForbiddenViewReservations"] = ("You are not authorized to view this package assignment's reservations.", "Bu paket atamasının rezervasyonlarını görme yetkiniz yok."),
         ["ForbiddenViewTrainers"] = ("You are not authorized to view this package assignment's trainers.", "Bu paket atamasının antrenörlerini görme yetkiniz yok."),
-        ["ForbiddenManageAssignment"] = ("You are not authorized to manage this assignment.", "Bu atamayı yönetme yetkiniz yok."),
         ["ForbiddenRemoveAssignment"] = ("You are not authorized to remove this assignment.", "Bu atamayı kaldırma yetkiniz yok."),
-        ["ForbiddenManageCompany"] = ("You are not authorized to manage this company.", "Bu firmayı yönetme yetkiniz yok."),
-        ["ForbiddenReservation"] = ("You are not authorized to perform this action on this reservation.", "Bu rezervasyon üzerinde bu işlemi yapma yetkiniz yok."),
         ["ForbiddenAddStaffToBranch"] = ("You are not authorized to add staff to this branch.", "Bu şubeye personel ekleme yetkiniz yok."),
         ["ForbiddenCreateAssignment"] = ("You are not authorized to create an assignment for this company.", "Bu firma için atama yapma yetkiniz yok."),
         ["ForbiddenInviteGymAdmin"] = ("You are not authorized to send a GymAdmin invitation for this company.", "Bu firma için Gym Admin daveti gönderme yetkiniz yok."),
