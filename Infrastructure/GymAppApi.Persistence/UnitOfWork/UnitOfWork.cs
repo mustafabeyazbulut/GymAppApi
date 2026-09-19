@@ -30,4 +30,25 @@ public class UnitOfWork : IUnitOfWork
 
     public Task<TResult> ExecuteWithRetryAsync<TResult>(Func<Task<TResult>> operation)
         => _context.Database.CreateExecutionStrategy().ExecuteAsync(operation);
+
+    public async Task<T?> GetForUpdateAsync<T>(int id, CancellationToken cancellationToken = default) where T : class, IEntityBase
+    {
+        var entityType = _context.Model.FindEntityType(typeof(T))
+            ?? throw new InvalidOperationException($"'{typeof(T).Name}' is not a mapped entity type.");
+        var tableName = entityType.GetTableName()
+            ?? throw new InvalidOperationException($"'{typeof(T).Name}' has no mapped table name.");
+        var schema = entityType.GetSchema();
+        var qualifiedTable = schema is null ? $"\"{tableName}\"" : $"\"{schema}\".\"{tableName}\"";
+
+        // IgnoreQueryFilters: bu metod tenant filtresinden bağımsız - çağıran
+        // handler zaten kendi açık yetkilendirme kontrolünü yapmış olmalı
+        // (Reservation modülündeki standing rule ile aynı). FromSqlRaw +
+        // FOR UPDATE, EF Core InMemory sağlayıcısında desteklenmez - bu
+        // yüzden sadece gerçek bir ilişkisel sağlayıcıyla (Postgres) çalışır.
+        return await _context.Set<T>()
+            .FromSqlRaw($"SELECT * FROM {qualifiedTable} WHERE \"Id\" = {{0}} FOR UPDATE", id)
+            .IgnoreQueryFilters()
+            .AsTracking()
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 }

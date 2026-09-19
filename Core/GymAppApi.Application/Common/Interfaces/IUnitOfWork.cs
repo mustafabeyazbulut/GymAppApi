@@ -19,4 +19,15 @@ public interface IUnitOfWork
     // verdigi delegate'in ICINDE calisirsa yeniden deneyebiliyor - TransactionBehavior
     // bu yuzden BeginTransactionAsync'i dogrudan degil, bunun icinden cagirmali.
     Task<TResult> ExecuteWithRetryAsync<TResult>(Func<Task<TResult>> operation);
+
+    // Postgres'te "SELECT ... FOR UPDATE" ile satır seviyesinde gerçek bir
+    // kilit alır - kapasite kontrolü gibi "oku + sınırı denetle + yaz"
+    // dizilerinde iki eşzamanlı isteğin ikisinin de aynı anda "kapasite dolu
+    // değil" sonucunu okumasını (race condition) engellemek için kullanılır
+    // (bkz. EnrollInClassSessionCommandHandler). Bu metod, ITransactionalRequest
+    // ile işaretlenmiş bir komutun TransactionBehavior tarafından açılan
+    // transaction'ı İÇİNDE çağrılmalı - aksi halde kilit satır okunur
+    // okunmaz (transaction commit/rollback olmadan) serbest kalır ve hiçbir
+    // koruma sağlamaz.
+    Task<T?> GetForUpdateAsync<T>(int id, CancellationToken cancellationToken = default) where T : class, IEntityBase;
 }

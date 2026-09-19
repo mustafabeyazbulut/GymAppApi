@@ -12,6 +12,7 @@ public class PackageConfiguration : IEntityTypeConfiguration<Package>
         builder.Property(x => x.Description).HasMaxLength(1000);
         builder.Property(x => x.Type).HasConversion<string>().HasMaxLength(30);
         builder.Property(x => x.AccessTier).HasConversion<string>().HasMaxLength(30);
+        builder.Property(x => x.Category).HasConversion<string>().HasMaxLength(30);
         builder.Property(x => x.Price).HasColumnType("decimal(10,2)");
         builder.Property(x => x.IsActive).HasDefaultValue(true);
 

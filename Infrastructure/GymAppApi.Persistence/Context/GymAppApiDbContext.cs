@@ -46,6 +46,8 @@ public class GymAppApiDbContext : DbContext
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<CheckIn> CheckIns => Set<CheckIn>();
     public DbSet<ProgressNote> ProgressNotes => Set<ProgressNote>();
+    public DbSet<ClassSession> ClassSessions => Set<ClassSession>();
+    public DbSet<ClassEnrollment> ClassEnrollments => Set<ClassEnrollment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

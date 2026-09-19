@@ -33,4 +33,16 @@ public class Package : EntityBase, ICompanyScoped, IDeactivatable
     // handler'ları) - bir GymAdmin'in paketi kendi kafasına göre, sınırsız
     // dondurulabilir şekilde tanımlamasını engeller.
     public int? MaxFreezeDays { get; set; }
+
+    // null = bu paket hiçbir grup dersi/kapasiteli ders için geçerli değil
+    // (ör. sadece 1:1 Reservation için kullanılan bir PT paketi). Set
+    // edilmişse, bu paketten atanan bir PackageAssignment SADECE aynı
+    // Category'deki ClassSession'lara kayıt olabilir (bkz.
+    // EnrollInClassSessionCommandHandler ve
+    // docs/superpowers/specs/2026-09-20-group-class-scheduling-design.md'deki
+    // "Package.Category'si ClassSession.Category'sine uygun" kuralı). Not:
+    // spec bu alanın zaten var olduğunu varsayıyordu, ama Package
+    // entity'sinde hiç yoktu - grup dersi uygunluk eşleştirmesini yapabilmek
+    // için buraya eklendi.
+    public ClassSessionCategory? Category { get; set; }
 }

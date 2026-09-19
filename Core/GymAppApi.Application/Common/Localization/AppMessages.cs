@@ -128,6 +128,20 @@ public static class AppMessages
             "Bu paket ataması rezervasyon için uygun değil (aktif, seans bazlı ve seans hakkı kalmış olmalı)."),
         ["ReservationConflict"] = ("This trainer already has a reservation at this time.", "Bu antrenörün bu saatte zaten bir rezervasyonu var."),
         ["ReservationNotBooked"] = ("This reservation is no longer in 'Booked' status.", "Bu rezervasyon artık 'Booked' durumunda değil."),
+
+        // ClassScheduling özelliği
+        ["ClassSessionNotFound"] = ("Class session {0} not found.", "Ders programı {0} bulunamadı."),
+        ["ClassEnrollmentNotFound"] = ("Class enrollment {0} not found.", "Ders kaydı {0} bulunamadı."),
+        ["ForbiddenCreateClassSession"] = ("You are not authorized to create a class session for this branch.", "Bu şube için ders programı oluşturma yetkiniz yok."),
+        ["ForbiddenEnrollInClassSession"] = ("You are not authorized to enroll this package assignment in a class session.", "Bu paket ataması için ders kaydı oluşturma yetkiniz yok."),
+        ["ForbiddenCancelClassEnrollment"] = ("You are not authorized to cancel this class enrollment.", "Bu ders kaydını iptal etme yetkiniz yok."),
+        ["ClassSessionEndTimeMustBeAfterStartTime"] = ("EndTime must be after StartTime.", "Bitiş saati başlangıç saatinden sonra olmalıdır."),
+        ["ClassSessionFull"] = ("This class session is full.", "Bu ders programının kapasitesi dolu."),
+        ["PackageAssignmentNotEligibleForClass"] = (
+            "This package assignment is not eligible for this class session (must match the class category and be active with availability remaining).",
+            "Bu paket ataması bu ders için uygun değil (ders kategorisiyle eşleşen, aktif ve hakkı kalmış bir paket olmalı)."),
+        ["AlreadyEnrolledInClassSession"] = ("This package assignment is already enrolled in this class session.", "Bu paket ataması bu ders programına zaten kayıtlı."),
+        ["ClassEnrollmentNotReserved"] = ("This class enrollment is no longer in 'Reserved' status.", "Bu ders kaydı artık 'Reserved' durumunda değil."),
     };
 
     public static string Resolve(string code, string language, params object[] args)
