@@ -8,6 +8,7 @@ public class CompanyDetailDto
     public string Name { get; set; } = null!;
     public bool IsActive { get; set; }
     public List<BranchListItemDto> Branches { get; set; } = new();
+    public List<CompanyGymAdminDto> GymAdmins { get; set; } = new();
     public int GymAdminCount { get; set; }
     public int BranchManagerCount { get; set; }
     public int TrainerCount { get; set; }

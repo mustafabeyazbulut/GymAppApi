@@ -45,7 +45,11 @@ public class GetCompanyDetailQueryHandlerTests
                 It.IsAny<Func<IQueryable<Assignment>, IIncludableQueryable<Assignment, object>>?>(), null, false, default))
             .ReturnsAsync(new List<Assignment>
             {
-                new() { Id = 1, UserId = 1, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true },
+                new()
+                {
+                    Id = 1, UserId = 1, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true,
+                    User = new User { Id = 1, FullName = "Mehmet Kaya", Phone = "+905550001122", PasswordHash = "x" },
+                },
                 new()
                 {
                     Id = 2, UserId = 2, CompanyId = 1, BranchId = 5, Role = AssignmentRole.BranchManager, IsActive = true,
@@ -65,6 +69,9 @@ public class GetCompanyDetailQueryHandlerTests
         var branch = Assert.Single(result.Branches);
         Assert.Equal("Kadıköy", branch.Name);
         Assert.Equal("Ayşe Yılmaz", branch.ManagerName);
+        var gymAdmin = Assert.Single(result.GymAdmins);
+        Assert.Equal("Mehmet Kaya", gymAdmin.FullName);
+        Assert.Equal("+905550001122", gymAdmin.Phone);
         Assert.Equal(1, result.GymAdminCount);
         Assert.Equal(1, result.BranchManagerCount);
         Assert.Equal(1, result.TrainerCount);
