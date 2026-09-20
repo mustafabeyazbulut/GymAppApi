@@ -492,3 +492,6 @@ $RECYCLE.BIN/
 
 # PowerShell profilinin ürettiği transcript log klasörleri (tarih adlı, ör. 20260918/)
 [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]/
+
+# Playwright MCP test artifacts (screenshots/snapshots), never commit
+.playwright-mcp/
