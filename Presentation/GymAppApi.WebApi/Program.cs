@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Localization;
 using GymAppApi.Application;
 using GymAppApi.Infrastructure;
 using GymAppApi.Persistence;
+using GymAppApi.WebApi.BackgroundServices;
 using GymAppApi.WebApi.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -17,6 +18,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHostedService<MembershipExpiryReminderHostedService>();
 
 // AddStaffMemberCommand.Role is the first request body to expose an enum to
 // clients - without this, "role":"Member" fails model binding since

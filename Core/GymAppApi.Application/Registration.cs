@@ -2,6 +2,7 @@
 using System.Reflection;
 using FluentValidation;
 using GymAppApi.Application.Common.Behaviors;
+using GymAppApi.Application.Common.Reminders;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,8 @@ public static class Registration
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         services.AddTransient<GymAppApi.Application.Features.Branches.Rules.BranchRules>();
+
+        services.AddScoped<IMembershipExpiryReminderService, MembershipExpiryReminderService>();
 
         return services;
     }

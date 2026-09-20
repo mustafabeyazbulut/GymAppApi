@@ -32,6 +32,13 @@ public class PackageAssignment : EntityBase, ICompanyScoped
     // (now - FrozenAt) kadar ileri itilir ve bu tekrar null'a döner.
     public DateTime? FrozenAt { get; set; }
 
+    // MembershipExpiryReminderHostedService'in üyeye "üyeliğin yakında
+    // doluyor" bildirimini SADECE BİR KEZ gönderdiğini işaretler - null
+    // olduğu sürece uygun (EndDate üç gün içinde) her taramada tekrar
+    // gönderilmeye adaydır. Job'un günü kaçırması (ör. sunucu kapalıyken)
+    // sabit bir "tam olarak N gün önce" kontrolüne göre daha dayanıklı.
+    public DateTime? ExpiryReminderSentAt { get; set; }
+
     // Bugüne kadar bu atamada birden fazla dondurma döngüsünde kullanılmış
     // toplam gün sayısı - Package.MaxFreezeDays karşısında biriktirilir,
     // her yeni freeze/unfreeze döngüsünde sıfırlanmaz (aksi hâlde üye
