@@ -35,6 +35,9 @@ public static class AppMessages
         ["PhoneNotRegistered"] = ("No registered user was found with the phone number '{0}'.", "'{0}' numaralı kayıtlı bir kullanıcı bulunamadı."),
         ["ContentItemNotFound"] = ("Content item {0} not found.", "İçerik {0} bulunamadı."),
         ["MediaFileNotFound"] = ("Media file {0} not found.", "Medya dosyası {0} bulunamadı."),
+        ["ZoneNotFound"] = ("Zone {0} not found.", "Bölge {0} bulunamadı."),
+        ["DoorNotFound"] = ("Door {0} not found.", "Kapı {0} bulunamadı."),
+        ["ZoneAccessRuleNotFound"] = ("Zone access rule {0} not found.", "Bölge erişim kuralı {0} bulunamadı."),
 
         // ForbiddenException kodları
         ["ForbiddenCreateBranch"] = ("You are not authorized to create a branch for this company.", "Bu firma için şube oluşturma yetkiniz yok."),
@@ -61,6 +64,7 @@ public static class AppMessages
         ["ForbiddenCreateContentItem"] = ("You are not authorized to upload content for this company/branch.", "Bu firma/şube için içerik yükleme yetkiniz yok."),
         ["ForbiddenSetContentItemActive"] = ("You are not authorized to activate/deactivate this content item.", "Bu içeriği aktif/pasif yapma yetkiniz yok."),
         ["ForbiddenViewMedia"] = ("You are not authorized to view this media file.", "Bu medya dosyasını görüntüleme yetkiniz yok."),
+        ["ForbiddenManageDoorAccess"] = ("You are not authorized to manage door access for this branch.", "Bu şube için kapı erişimini yönetme yetkiniz yok."),
 
         // ConflictException kodları (isimlendirilmiş exception sınıfları)
         ["ConflictingAssignmentRole"] = (

@@ -51,6 +51,9 @@ public class GymAppApiDbContext : DbContext
     public DbSet<ClassEnrollment> ClassEnrollments => Set<ClassEnrollment>();
     public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
     public DbSet<ContentItem> ContentItems => Set<ContentItem>();
+    public DbSet<Zone> Zones => Set<Zone>();
+    public DbSet<Door> Doors => Set<Door>();
+    public DbSet<ZoneAccessRule> ZoneAccessRules => Set<ZoneAccessRule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
