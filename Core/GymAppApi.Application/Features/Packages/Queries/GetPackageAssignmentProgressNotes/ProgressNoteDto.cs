@@ -8,4 +8,5 @@ public class ProgressNoteDto
     public string? NoteText { get; set; }
     public DateTime CreatedAt { get; set; }
     public int? MediaFileId { get; set; }
+    public string? MediaContentType { get; set; }
 }

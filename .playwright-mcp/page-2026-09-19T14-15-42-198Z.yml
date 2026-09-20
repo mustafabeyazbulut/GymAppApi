@@ -1,0 +1,14 @@
+- generic [ref=e7]:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - group:
+            - generic [ref=e8]: MAT & MOVE
+            - generic [ref=e9]: Welcome back
+            - generic [ref=e10]: Discipline is with you today
+            - generic:
+              - textbox "Phone or email" [disabled] [ref=e12]: "+905551000001"
+              - textbox "Password" [disabled] [ref=e14]: Test1234!
+              - button "Forgot password" [disabled] [ref=e16]
+              - button "No account? Sign up" [disabled] [ref=e17]

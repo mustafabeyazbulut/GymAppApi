@@ -1,0 +1,18 @@
+- generic [ref=f4e7]:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - button "Menüyü aç" [active] [ref=f4e18]
+                - heading "GymApp" [level=2] [ref=f4e19]
+                - button "Bildirimler" [ref=f4e20]
+              - generic [ref=f4e21]: Henüz aktif üyeliğin yok
+              - generic [ref=f4e22]: Bir gym'e üye olduğunda paketin, derslerin ve gelişimin burada görünecek.
+          - tablist:
+            - tab "Ana Sayfa" [selected] [ref=f4e23]
+            - tab "Dersler" [ref=f4e24]
+            - tab "Gelişim" [ref=f4e25]
+            - tab "Profil" [ref=f4e26]

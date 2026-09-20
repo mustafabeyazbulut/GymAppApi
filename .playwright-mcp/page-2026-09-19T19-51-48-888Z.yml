@@ -1,0 +1,13 @@
+- generic [ref=e7] [cursor=pointer]:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - button "Geri" [active] [ref=e32]
+            - heading "Şubelerim" [level=2] [ref=e33]
+            - button "Yeni Şube" [ref=e34]
+          - generic:
+            - group:
+              - group "Merkezce Sube Ataturk Cad. No:1, Ankara Aktif" [ref=e35]:
+                - button "Şubeyi Kapat" [ref=e36]

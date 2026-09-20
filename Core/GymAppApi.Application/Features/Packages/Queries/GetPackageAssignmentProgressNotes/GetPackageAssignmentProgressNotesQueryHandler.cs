@@ -44,7 +44,7 @@ public class GetPackageAssignmentProgressNotesQueryHandler : IRequestHandler<Get
 
         var notes = await _unitOfWork.GetReadRepository<ProgressNote>().GetAllAsync(
             n => n.PackageAssignmentId == assignment.Id,
-            include: q => q.IgnoreQueryFilters().Include(n => n.PackageAssignment),
+            include: q => q.IgnoreQueryFilters().Include(n => n.PackageAssignment).Include(n => n.MediaFile),
             cancellationToken: cancellationToken);
 
         return notes
@@ -57,6 +57,7 @@ public class GetPackageAssignmentProgressNotesQueryHandler : IRequestHandler<Get
                 NoteText = n.NoteText,
                 CreatedAt = n.CreatedAt,
                 MediaFileId = n.MediaFileId,
+                MediaContentType = n.MediaFile?.ContentType,
             })
             .ToList();
     }
