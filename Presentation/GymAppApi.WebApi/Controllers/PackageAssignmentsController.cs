@@ -142,14 +142,39 @@ public class PackageAssignmentsController : ControllerBase
     // [Authorize(Policy = "StaffManagement")] DEĞİL - handler'ın kendisi bir
     // Trainer'ın da (bu şubede çalışıyorsa) not bırakabilmesine izin veriyor,
     // StaffManagement policy'si Trainer rolünü hiç kapsamıyor.
+    // multipart/form-data: opsiyonel mediaFile alanı için (bkz.
+    // docs/superpowers/specs/2026-09-20-progress-media-design.md).
     [Authorize]
     [HttpPost("{id}/progress-notes")]
-    public async Task<IActionResult> RecordProgressNote(int id, RecordProgressNoteCommand command, CancellationToken cancellationToken)
+    [RequestSizeLimit(200_000_000)]
+    public async Task<IActionResult> RecordProgressNote(
+        int id,
+        [FromForm] int techniqueScore,
+        [FromForm] int conditionScore,
+        [FromForm] string? noteText,
+        IFormFile? mediaFile,
+        CancellationToken cancellationToken)
     {
-        command.PackageAssignmentId = id;
-        command.RequestedByUserId = CurrentUserId;
-        var result = await _mediator.Send(command, cancellationToken);
-        return StatusCode(StatusCodes.Status201Created, result);
+        Stream? mediaFileContent = mediaFile is null ? null : mediaFile.OpenReadStream();
+        try
+        {
+            var command = new RecordProgressNoteCommand
+            {
+                PackageAssignmentId = id,
+                TechniqueScore = techniqueScore,
+                ConditionScore = conditionScore,
+                NoteText = noteText,
+                MediaFileContent = mediaFileContent,
+                MediaFileContentType = mediaFile?.ContentType,
+                RequestedByUserId = CurrentUserId,
+            };
+            var result = await _mediator.Send(command, cancellationToken);
+            return StatusCode(StatusCodes.Status201Created, result);
+        }
+        finally
+        {
+            if (mediaFileContent is not null) await mediaFileContent.DisposeAsync();
+        }
     }
 
     // [Authorize] - handler'ın kendisi hem atamanın sahibi Member'a hem de

@@ -9,8 +9,13 @@ namespace GymAppApi.Application.Features.Packages.Commands.RecordProgressNote;
 public class RecordProgressNoteCommandHandler : IRequestHandler<RecordProgressNoteCommand, RecordProgressNoteCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IMediaStorage _mediaStorage;
 
-    public RecordProgressNoteCommandHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+    public RecordProgressNoteCommandHandler(IUnitOfWork unitOfWork, IMediaStorage mediaStorage)
+    {
+        _unitOfWork = unitOfWork;
+        _mediaStorage = mediaStorage;
+    }
 
     public async Task<RecordProgressNoteCommandResult> Handle(RecordProgressNoteCommand request, CancellationToken cancellationToken)
     {
@@ -36,6 +41,22 @@ public class RecordProgressNoteCommandHandler : IRequestHandler<RecordProgressNo
             throw new ForbiddenException("ForbiddenRecordProgressNote");
         }
 
+        int? mediaFileId = null;
+        if (request.MediaFileContent is not null)
+        {
+            var storagePath = await _mediaStorage.SaveAsync(request.MediaFileContent, request.MediaFileContentType!, cancellationToken);
+            var mediaFile = new MediaFile
+            {
+                StoragePath = storagePath,
+                ContentType = request.MediaFileContentType!,
+                SizeBytes = request.MediaFileContent.Length,
+                UploadedByUserId = request.RequestedByUserId,
+            };
+            await _unitOfWork.GetWriteRepository<MediaFile>().AddAsync(mediaFile, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            mediaFileId = mediaFile.Id;
+        }
+
         var note = new ProgressNote
         {
             PackageAssignmentId = assignment.Id,
@@ -45,6 +66,7 @@ public class RecordProgressNoteCommandHandler : IRequestHandler<RecordProgressNo
             TechniqueScore = request.TechniqueScore,
             ConditionScore = request.ConditionScore,
             NoteText = request.NoteText,
+            MediaFileId = mediaFileId,
         };
         await _unitOfWork.GetWriteRepository<ProgressNote>().AddAsync(note, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -56,6 +78,7 @@ public class RecordProgressNoteCommandHandler : IRequestHandler<RecordProgressNo
             ConditionScore = note.ConditionScore,
             NoteText = note.NoteText,
             CreatedAt = note.CreatedAt,
+            MediaFileId = note.MediaFileId,
         };
     }
 }

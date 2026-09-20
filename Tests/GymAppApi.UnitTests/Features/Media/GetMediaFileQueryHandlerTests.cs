@@ -16,7 +16,11 @@ public class GetMediaFileQueryHandlerTests
     private const int MediaFileId = 5;
 
     private static (Mock<IUnitOfWork> UnitOfWork, Mock<IMediaStorage> MediaStorage) Wire(
-        MediaFile? mediaFile, ContentItem? contentItem, IReadOnlyList<Assignment> callerAssignments, IReadOnlyList<PackageAssignment> memberAssignments)
+        MediaFile? mediaFile,
+        ContentItem? contentItem,
+        IReadOnlyList<Assignment> callerAssignments,
+        IReadOnlyList<PackageAssignment> memberAssignments,
+        ProgressNote? progressNote = null)
     {
         var mediaFileReadRepo = new Mock<IReadRepository<MediaFile>>();
         mediaFileReadRepo.Setup(r => r.GetAsync(
@@ -28,6 +32,12 @@ public class GetMediaFileQueryHandlerTests
                 It.IsAny<Expression<Func<ContentItem, bool>>>(),
                 It.IsAny<Func<IQueryable<ContentItem>, IIncludableQueryable<ContentItem, object>>?>(), false, default))
             .ReturnsAsync(contentItem);
+
+        var progressNoteReadRepo = new Mock<IReadRepository<ProgressNote>>();
+        progressNoteReadRepo.Setup(r => r.GetAsync(
+                It.IsAny<Expression<Func<ProgressNote, bool>>>(),
+                It.IsAny<Func<IQueryable<ProgressNote>, IIncludableQueryable<ProgressNote, object>>?>(), false, default))
+            .ReturnsAsync(progressNote);
 
         var callerReadRepo = new Mock<IReadRepository<Assignment>>();
         callerReadRepo.Setup(r => r.GetAllAsync(
@@ -47,6 +57,7 @@ public class GetMediaFileQueryHandlerTests
         var uow = new Mock<IUnitOfWork>();
         uow.Setup(u => u.GetReadRepository<MediaFile>()).Returns(mediaFileReadRepo.Object);
         uow.Setup(u => u.GetReadRepository<ContentItem>()).Returns(contentItemReadRepo.Object);
+        uow.Setup(u => u.GetReadRepository<ProgressNote>()).Returns(progressNoteReadRepo.Object);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(callerReadRepo.Object);
         uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(packageAssignmentReadRepo.Object);
         return (uow, mediaStorage);
@@ -66,12 +77,61 @@ public class GetMediaFileQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenNoContentItemReferencesTheFile_ThrowsNotFoundException()
+    public async Task Handle_WhenNeitherContentItemNorProgressNoteReferenceTheFile_ThrowsNotFoundException()
     {
         var (uow, storage) = Wire(File(), contentItem: null, callerAssignments: new List<Assignment>(), memberAssignments: new List<PackageAssignment>());
         var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
+            handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None));
+    }
+
+    private static ProgressNote Note() => new()
+    {
+        Id = 1,
+        CompanyId = CompanyId,
+        BranchId = 10,
+        MediaFileId = MediaFileId,
+        PackageAssignmentId = 1,
+        PackageAssignment = new PackageAssignment { Id = 1, MemberUserId = 7, CompanyId = CompanyId },
+    };
+
+    [Fact]
+    public async Task Handle_WhenCallerIsTheProgressNotesOwnMember_ReturnsContent()
+    {
+        var (uow, storage) = Wire(
+            File(), contentItem: null, callerAssignments: new List<Assignment>(), memberAssignments: new List<PackageAssignment>(),
+            progressNote: Note());
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+
+        var result = await handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = 7 }, CancellationToken.None);
+
+        Assert.Equal("video/mp4", result.ContentType);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsTheBranchsTrainer_ReturnsContent()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true } };
+        var (uow, storage) = Wire(
+            File(), contentItem: null, callerAssignments, memberAssignments: new List<PackageAssignment>(),
+            progressNote: Note());
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+
+        var result = await handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None);
+
+        Assert.Equal("video/mp4", result.ContentType);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsUnrelatedToTheProgressNote_ThrowsForbiddenException()
+    {
+        var (uow, storage) = Wire(
+            File(), contentItem: null, callerAssignments: new List<Assignment>(), memberAssignments: new List<PackageAssignment>(),
+            progressNote: Note());
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None));
     }
 

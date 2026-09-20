@@ -20,6 +20,11 @@ public class ProgressNoteConfiguration : IEntityTypeConfiguration<ProgressNote>
             .HasForeignKey(x => x.CompanyId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(x => x.MediaFile)
+            .WithMany()
+            .HasForeignKey(x => x.MediaFileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(x => x.PackageAssignmentId);
     }
 }

@@ -56,6 +56,7 @@ public class GetPackageAssignmentProgressNotesQueryHandler : IRequestHandler<Get
                 ConditionScore = n.ConditionScore,
                 NoteText = n.NoteText,
                 CreatedAt = n.CreatedAt,
+                MediaFileId = n.MediaFileId,
             })
             .ToList();
     }

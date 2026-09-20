@@ -7,4 +7,5 @@ public class ProgressNoteDto
     public int ConditionScore { get; set; }
     public string? NoteText { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int? MediaFileId { get; set; }
 }

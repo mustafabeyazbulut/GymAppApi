@@ -29,4 +29,11 @@ public class ProgressNote : EntityBase, ICompanyScoped
     // GymAppApiDbContext.SaveChangesAsync tarafından otomatik dolduruluyor,
     // burada ayrıca bir alan tekrar edilmiyor.
     public string? NoteText { get; set; }
+
+    // null = medyasız not (mevcut davranış). Opsiyonel "önce/sonra" fotoğraf/
+    // video eki - bkz. docs/superpowers/specs/2026-09-20-progress-media-design.md.
+    // ContentItem'in kullandığı aynı MediaFile/IMediaStorage altyapısını
+    // paylaşır, ayrı bir depolama mekanizması icat edilmez.
+    public int? MediaFileId { get; set; }
+    public MediaFile? MediaFile { get; set; }
 }

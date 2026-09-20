@@ -40,9 +40,16 @@ public class GetMediaFileQueryHandler : IRequestHandler<GetMediaFileQuery, GetMe
         }
         else
         {
-            // Şimdilik tek olası sahip ContentItem - Gelişim Takibi medyası
-            // eklendiğinde buraya bir ProgressNote kontrolü de eklenecek.
-            throw new NotFoundException("MediaFileNotFound", request.MediaFileId);
+            var progressNote = await _unitOfWork.GetReadRepository<ProgressNote>().GetAsync(
+                n => n.MediaFileId == request.MediaFileId,
+                include: q => q.IgnoreQueryFilters().Include(n => n.PackageAssignment),
+                cancellationToken: cancellationToken);
+            if (progressNote is null)
+            {
+                throw new NotFoundException("MediaFileNotFound", request.MediaFileId);
+            }
+
+            await EnsureCanViewProgressNoteAsync(progressNote, request.RequestedByUserId, cancellationToken);
         }
 
         var content = await _mediaStorage.OpenReadAsync(mediaFile.StoragePath, cancellationToken);
@@ -71,6 +78,29 @@ public class GetMediaFileQueryHandler : IRequestHandler<GetMediaFileQuery, GetMe
 
         var hasAccess = memberAssignments.Any(p => p.Package!.AccessTier >= contentItem.RequiredAccessTier);
         if (!hasAccess)
+        {
+            throw new ForbiddenException("ForbiddenViewMedia");
+        }
+    }
+
+    // GetPackageAssignmentProgressNotesQueryHandler'ın aynı yetki kontrolü -
+    // notun ait olduğu üye ya da o notu görebilen personel (antrenörün
+    // kendisi/GymAdmin/BranchManager).
+    private async Task EnsureCanViewProgressNoteAsync(ProgressNote progressNote, int requestedByUserId, CancellationToken cancellationToken)
+    {
+        if (progressNote.PackageAssignment!.MemberUserId == requestedByUserId)
+        {
+            return;
+        }
+
+        var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
+            a => a.UserId == requestedByUserId && a.IsActive, cancellationToken: cancellationToken);
+        var callerIsAuthorized = callerAssignments.Any(a =>
+            a.Role == AssignmentRole.SuperAdmin ||
+            (a.Role == AssignmentRole.GymAdmin && a.CompanyId == progressNote.CompanyId) ||
+            (a.Role == AssignmentRole.BranchManager && a.BranchId == progressNote.BranchId) ||
+            (a.Role == AssignmentRole.Trainer && a.BranchId == progressNote.BranchId));
+        if (!callerIsAuthorized)
         {
             throw new ForbiddenException("ForbiddenViewMedia");
         }
