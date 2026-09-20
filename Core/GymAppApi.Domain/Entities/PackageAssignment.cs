@@ -39,6 +39,12 @@ public class PackageAssignment : EntityBase, ICompanyScoped
     // sabit bir "tam olarak N gün önce" kontrolüne göre daha dayanıklı.
     public DateTime? ExpiryReminderSentAt { get; set; }
 
+    // OutstandingBalanceReminderHostedService'in ödeme hatırlatması
+    // gönderdiği son an - bakiye sıfırlanana kadar süresiz açık kalabilen bir
+    // borç için (ExpiryReminderSentAt'ın aksine) "bir kez ve bitti" değil,
+    // bir bekleme süresi (cooldown) uygulanır; bkz. OutstandingBalanceReminderService.
+    public DateTime? LastPaymentReminderSentAt { get; set; }
+
     // Bugüne kadar bu atamada birden fazla dondurma döngüsünde kullanılmış
     // toplam gün sayısı - Package.MaxFreezeDays karşısında biriktirilir,
     // her yeni freeze/unfreeze döngüsünde sıfırlanmaz (aksi hâlde üye

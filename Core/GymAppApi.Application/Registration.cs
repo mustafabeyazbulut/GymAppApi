@@ -23,6 +23,7 @@ public static class Registration
         services.AddTransient<GymAppApi.Application.Features.Branches.Rules.BranchRules>();
 
         services.AddScoped<IMembershipExpiryReminderService, MembershipExpiryReminderService>();
+        services.AddScoped<IOutstandingBalanceReminderService, OutstandingBalanceReminderService>();
 
         return services;
     }

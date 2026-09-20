@@ -3,6 +3,7 @@ using System;
 using GymAppApi.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GymAppApi.Persistence.Migrations
 {
     [DbContext(typeof(GymAppApiDbContext))]
-    partial class GymAppApiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260920132520_AddPackageAssignmentPaymentReminder")]
+    partial class AddPackageAssignmentPaymentReminder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
