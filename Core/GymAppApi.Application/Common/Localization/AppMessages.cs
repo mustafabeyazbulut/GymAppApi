@@ -33,6 +33,8 @@ public static class AppMessages
         ["ForbiddenCreateReservation"] = ("You are not authorized to create a reservation for this package assignment.", "Bu paket ataması için rezervasyon oluşturma yetkiniz yok."),
         ["ForbiddenMarkNoShow"] = ("You are not authorized to mark this reservation as a no-show.", "Bu rezervasyonu 'gelmedi' olarak işaretleme yetkiniz yok."),
         ["PhoneNotRegistered"] = ("No registered user was found with the phone number '{0}'.", "'{0}' numaralı kayıtlı bir kullanıcı bulunamadı."),
+        ["ContentItemNotFound"] = ("Content item {0} not found.", "İçerik {0} bulunamadı."),
+        ["MediaFileNotFound"] = ("Media file {0} not found.", "Medya dosyası {0} bulunamadı."),
 
         // ForbiddenException kodları
         ["ForbiddenCreateBranch"] = ("You are not authorized to create a branch for this company.", "Bu firma için şube oluşturma yetkiniz yok."),
@@ -56,6 +58,9 @@ public static class AppMessages
         ["ForbiddenAddStaffToBranch"] = ("You are not authorized to add staff to this branch.", "Bu şubeye personel ekleme yetkiniz yok."),
         ["ForbiddenCreateAssignment"] = ("You are not authorized to create an assignment for this company.", "Bu firma için atama yapma yetkiniz yok."),
         ["ForbiddenInviteGymAdmin"] = ("You are not authorized to send a GymAdmin invitation for this company.", "Bu firma için Gym Admin daveti gönderme yetkiniz yok."),
+        ["ForbiddenCreateContentItem"] = ("You are not authorized to upload content for this company/branch.", "Bu firma/şube için içerik yükleme yetkiniz yok."),
+        ["ForbiddenSetContentItemActive"] = ("You are not authorized to activate/deactivate this content item.", "Bu içeriği aktif/pasif yapma yetkiniz yok."),
+        ["ForbiddenViewMedia"] = ("You are not authorized to view this media file.", "Bu medya dosyasını görüntüleme yetkiniz yok."),
 
         // ConflictException kodları (isimlendirilmiş exception sınıfları)
         ["ConflictingAssignmentRole"] = (

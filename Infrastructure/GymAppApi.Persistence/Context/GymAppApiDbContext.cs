@@ -18,6 +18,7 @@ public class GymAppApiDbContext : DbContext
         typeof(Notification),
         typeof(PendingAssignmentInvitation),
         typeof(PendingPackageAssignmentInvitation),
+        typeof(MediaFile),
     };
 
     private readonly ITenantContext _tenantContext;
@@ -48,6 +49,8 @@ public class GymAppApiDbContext : DbContext
     public DbSet<ProgressNote> ProgressNotes => Set<ProgressNote>();
     public DbSet<ClassSession> ClassSessions => Set<ClassSession>();
     public DbSet<ClassEnrollment> ClassEnrollments => Set<ClassEnrollment>();
+    public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
+    public DbSet<ContentItem> ContentItems => Set<ContentItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

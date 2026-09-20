@@ -2,6 +2,7 @@ using System.Text;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Infrastructure.Notifications;
 using GymAppApi.Infrastructure.Security;
+using GymAppApi.Infrastructure.Storage;
 using GymAppApi.Infrastructure.Tenancy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,21 @@ public static class Registration
         services.AddSingleton<IEmailSender, LoggingEmailSender>();
         services.AddSingleton<IPushNotificationSender, LoggingPushNotificationSender>();
         services.AddSingleton<IPhoneNumberNormalizer, PhoneNumberNormalizer>();
+
+        // Bos birakilirsa (appsettings'te ayarlanmamissa) calisma dizini
+        // altinda bir "media-storage" klasoru kullanilir - gelistirme
+        // ortaminda elle konfigurasyon gerekmez. IWebHostEnvironment'a kasitli
+        // olarak bagli degil - bu proje web-ozel bir referans tasimiyor.
+        services.AddOptions<MediaStorageOptions>()
+            .Configure(options =>
+            {
+                configuration.GetSection("MediaStorage").Bind(options);
+                if (string.IsNullOrWhiteSpace(options.RootPath))
+                {
+                    options.RootPath = Path.Combine(Directory.GetCurrentDirectory(), "media-storage");
+                }
+            });
+        services.AddSingleton<IMediaStorage, LocalDiskMediaStorage>();
 
         return services;
     }

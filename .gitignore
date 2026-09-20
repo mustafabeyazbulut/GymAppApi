@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Yerel medya deposu (bkz. docs/superpowers/specs/2026-09-20-content-library-design.md)
+media-storage/
+
 # User-specific files
 *.rsuser
 *.suo
