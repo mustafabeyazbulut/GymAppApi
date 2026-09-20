@@ -44,6 +44,8 @@ public class CreateCompanyCommandHandlerTests
 
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
         uow.Setup(u => u.BeginTransactionAsync(default)).ReturnsAsync(Mock.Of<IAsyncDisposable>());
+        uow.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<(Company, string)>>>()))
+            .Returns((Func<Task<(Company, string)>> operation) => operation());
 
         return (uow, userReadRepo, companyWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo);
     }

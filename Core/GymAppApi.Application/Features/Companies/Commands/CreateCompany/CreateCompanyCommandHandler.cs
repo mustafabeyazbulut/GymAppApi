@@ -39,47 +39,59 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
             throw new NotFoundException("PhoneNotRegistered", request.GymAdminPhone);
         }
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
+        // ExecuteWithRetryAsync icinden aciliyor - RegisterCompleteCommandHandler'daki
+        // ayni fix ve gerekce (bkz. o dosyadaki yorum): DbContext'in
+        // EnableRetryOnFailure execution strategy'si, kullanici tarafindan
+        // baslatilan bir transaction'i ancak begin/commit/rollback'in TAMAMI
+        // kendi ExecuteAsync delegate'inin icindeyse yeniden deneyebiliyor.
+        // SMS/push bildirimleri kasitli olarak DISARIDA - commit'ten sonra
+        // bir retry bu yan etkileri tekrar tetiklemesin diye.
+        var (company, code) = await _unitOfWork.ExecuteWithRetryAsync(async () =>
         {
-            var company = new Company { Name = request.CompanyName, IsActive = true };
-            await _unitOfWork.GetWriteRepository<Company>().AddAsync(company, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken); // need company.Id for the invitation
-
-            // Security requirement: SuperAdmin knowing this phone number is
-            // never enough by itself to make someone a GymAdmin - the
-            // Assignment only comes into existence once the invitee confirms
-            // this code themselves (ConfirmAssignmentInvitationCommand).
-            // No Branch is created here either - that's the new GymAdmin's
-            // own call once they've confirmed (POST /api/branches), not
-            // something SuperAdmin decides on their behalf.
-            var code = await AssignmentInvitationService.IssueAsync(
-                _unitOfWork, gymAdminUser.Id, company.Id, null, AssignmentRole.GymAdmin, request.RequestedByUserId, cancellationToken);
-
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            await _smsSender.SendAsync(
-                request.GymAdminPhone,
-                $"GymApp'te '{request.CompanyName}' firmasının Gym Admin'i olmak üzeresiniz. Onay kodu: {code} (10 dakika geçerli).",
-                cancellationToken);
-            await NotificationDispatcher.NotifyUserAsync(
-                _unitOfWork, _pushNotificationSender, gymAdminUser.Id,
-                "Yeni firma daveti",
-                "Bir firmanın Gym Admin'i olmanız için davet gönderildi. Telefonunuza gelen kodla onaylayabilirsiniz.",
-                cancellationToken);
-
-            return new CreateCompanyCommandResult
+            await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
             {
-                CompanyId = company.Id,
-                GymAdminUserId = gymAdminUser.Id,
-                GymAdminPhone = gymAdminUser.Phone,
-            };
-        }
-        catch
+                var company = new Company { Name = request.CompanyName, IsActive = true };
+                await _unitOfWork.GetWriteRepository<Company>().AddAsync(company, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken); // need company.Id for the invitation
+
+                // Security requirement: SuperAdmin knowing this phone number is
+                // never enough by itself to make someone a GymAdmin - the
+                // Assignment only comes into existence once the invitee confirms
+                // this code themselves (ConfirmAssignmentInvitationCommand).
+                // No Branch is created here either - that's the new GymAdmin's
+                // own call once they've confirmed (POST /api/branches), not
+                // something SuperAdmin decides on their behalf.
+                var code = await AssignmentInvitationService.IssueAsync(
+                    _unitOfWork, gymAdminUser.Id, company.Id, null, AssignmentRole.GymAdmin, request.RequestedByUserId, cancellationToken);
+
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+                return (company, code);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
+        });
+
+        await _smsSender.SendAsync(
+            request.GymAdminPhone,
+            $"GymApp'te '{request.CompanyName}' firmasının Gym Admin'i olmak üzeresiniz. Onay kodu: {code} (10 dakika geçerli).",
+            cancellationToken);
+        await NotificationDispatcher.NotifyUserAsync(
+            _unitOfWork, _pushNotificationSender, gymAdminUser.Id,
+            "Yeni firma daveti",
+            "Bir firmanın Gym Admin'i olmanız için davet gönderildi. Telefonunuza gelen kodla onaylayabilirsiniz.",
+            cancellationToken);
+
+        return new CreateCompanyCommandResult
         {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            throw;
-        }
+            CompanyId = company.Id,
+            GymAdminUserId = gymAdminUser.Id,
+            GymAdminPhone = gymAdminUser.Phone,
+        };
     }
 }

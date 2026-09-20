@@ -42,6 +42,8 @@ public class RegisterCompleteCommandHandlerTests
         uow.Setup(u => u.BeginTransactionAsync(default)).ReturnsAsync(Mock.Of<IAsyncDisposable>());
         uow.Setup(u => u.CommitTransactionAsync(default)).Returns(Task.CompletedTask);
         uow.Setup(u => u.RollbackTransactionAsync(default)).Returns(Task.CompletedTask);
+        uow.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<GymAppApi.Application.Features.Auth.Common.AuthTokenResult>>>()))
+            .Returns((Func<Task<GymAppApi.Application.Features.Auth.Common.AuthTokenResult>> operation) => operation());
 
         var hasher = new Mock<IPasswordHasher>();
         hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");

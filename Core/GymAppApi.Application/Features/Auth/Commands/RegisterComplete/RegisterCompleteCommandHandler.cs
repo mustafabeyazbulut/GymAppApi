@@ -61,51 +61,62 @@ public class RegisterCompleteCommandHandler : IRequestHandler<RegisterCompleteCo
             throw new EmailAlreadyRegisteredException();
         }
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
+        // ExecuteWithRetryAsync icinden aciliyor: DbContext'in EnableRetryOnFailure
+        // execution strategy'si, kullanici tarafindan baslatilan bir transaction'i
+        // ancak begin/commit/rollback'in TAMAMI kendi ExecuteAsync delegate'inin
+        // icindeyse yeniden deneyebiliyor - aksi halde EF Core calisma zamaninda
+        // "does not support user-initiated transactions" firlatiyor (bkz.
+        // TransactionBehavior.cs'in ayni gerekcesi - bu handler ITransactionalRequest
+        // KULLANMIYOR, cunku yukaridaki OTP-basarisizligi save'i transaction DISINDA
+        // kalmali, bu yuzden ayni sarmalama burada elle tekrarlaniyor).
+        return await _unitOfWork.ExecuteWithRetryAsync(async () =>
         {
-            var user = new User
+            await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
             {
-                FullName = request.FullName,
-                Phone = request.Phone,
-                Email = request.Email,
-                PasswordHash = _passwordHasher.Hash(request.Password),
-                PhoneVerified = true,
-                EmailVerified = hasEmail,
-            };
-            await _unitOfWork.GetWriteRepository<User>().AddAsync(user, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken); // need user.Id before issuing tokens
+                var user = new User
+                {
+                    FullName = request.FullName,
+                    Phone = request.Phone,
+                    Email = request.Email,
+                    PasswordHash = _passwordHasher.Hash(request.Password),
+                    PhoneVerified = true,
+                    EmailVerified = hasEmail,
+                };
+                await _unitOfWork.GetWriteRepository<User>().AddAsync(user, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken); // need user.Id before issuing tokens
 
-            var access = _jwtTokenService.GenerateAccessToken(new AccessTokenClaims(user.Id, user.FullName, user.Email, user.Phone));
-            var rawRefreshToken = _jwtTokenService.GenerateRefreshTokenValue();
+                var access = _jwtTokenService.GenerateAccessToken(new AccessTokenClaims(user.Id, user.FullName, user.Email, user.Phone));
+                var rawRefreshToken = _jwtTokenService.GenerateRefreshTokenValue();
 
-            await _unitOfWork.GetWriteRepository<RefreshToken>().AddAsync(new RefreshToken
-            {
-                UserId = user.Id,
-                TokenHash = _passwordHasher.Hash(rawRefreshToken),
-                ExpiresAt = DateTime.UtcNow.AddDays(30),
-            }, cancellationToken);
+                await _unitOfWork.GetWriteRepository<RefreshToken>().AddAsync(new RefreshToken
+                {
+                    UserId = user.Id,
+                    TokenHash = _passwordHasher.Hash(rawRefreshToken),
+                    ExpiresAt = DateTime.UtcNow.AddDays(30),
+                }, cancellationToken);
 
-            pendingWriteRepo.Remove(phonePending!);
-            if (emailPending is not null)
-            {
-                pendingWriteRepo.Remove(emailPending);
+                pendingWriteRepo.Remove(phonePending!);
+                if (emailPending is not null)
+                {
+                    pendingWriteRepo.Remove(emailPending);
+                }
+
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+                return new AuthTokenResult
+                {
+                    AccessToken = access.Token,
+                    ExpiresAtUtc = access.ExpiresAtUtc,
+                    RefreshToken = rawRefreshToken,
+                };
             }
-
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitTransactionAsync(cancellationToken);
-
-            return new AuthTokenResult
+            catch
             {
-                AccessToken = access.Token,
-                ExpiresAtUtc = access.ExpiresAtUtc,
-                RefreshToken = rawRefreshToken,
-            };
-        }
-        catch
-        {
-            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
-            throw;
-        }
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 }
