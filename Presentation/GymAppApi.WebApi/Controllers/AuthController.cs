@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using GymAppApi.Application.Features.Auth.Commands.ChangePassword;
 using GymAppApi.Application.Features.Auth.Commands.DeleteMe;
 using GymAppApi.Application.Features.Auth.Commands.DeleteMeRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.ForgotPassword;
@@ -12,6 +13,7 @@ using GymAppApi.Application.Features.Auth.Commands.ResetPassword;
 using GymAppApi.Application.Features.Auth.Commands.UnfreezeAccount;
 using GymAppApi.Application.Features.Auth.Commands.UnfreezeAccountRequestOtp;
 using GymAppApi.Application.Features.Auth.Commands.UpdatePreferredLanguage;
+using GymAppApi.Application.Features.Auth.Commands.UpdateProfile;
 using GymAppApi.Application.Features.Auth.Queries.GetMe;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -93,6 +95,24 @@ public class AuthController : ControllerBase
     [Authorize]
     [HttpPatch("me/language")]
     public async Task<IActionResult> UpdatePreferredLanguage(UpdatePreferredLanguageCommand command, CancellationToken cancellationToken)
+    {
+        command.UserId = CurrentUserId;
+        await _mediator.Send(command, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPatch("me/profile")]
+    public async Task<IActionResult> UpdateProfile(UpdateProfileCommand command, CancellationToken cancellationToken)
+    {
+        command.UserId = CurrentUserId;
+        await _mediator.Send(command, cancellationToken);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("me/change-password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordCommand command, CancellationToken cancellationToken)
     {
         command.UserId = CurrentUserId;
         await _mediator.Send(command, cancellationToken);
