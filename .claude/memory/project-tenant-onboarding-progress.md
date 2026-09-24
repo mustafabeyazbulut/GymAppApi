@@ -34,6 +34,8 @@ metadata:
 
 `Presentation/GymAppApi.WebApi/Program.cs` always carries an **uncommitted, local-only** dev CORS block (`AddCors("DevClients", AllowAnyOrigin/Header/Method)` + `app.UseCors("DevClients")` inside the `IsDevelopment()` block) — used to let the mobile app hit this API from a LAN device during manual testing. It was accidentally committed once and reverted (commit 135b67a "Remove accidentally-committed dev-only CORS block from Program.cs"). When staging/committing any other Program.cs change, split the diff so this block stays uncommitted (edit it out, stage, commit, then paste it back in) rather than committing it or deleting it.
 
+**GÜNCELLEME (2026-09-23'te fark edildi): yukarıdaki kural artık GEÇERLİ DEĞİL.** Kullanıcı 2026-09-19'da `705b9eb` commit'iyle ("Development ortaminda Flutter web istemcisinin farkli porttan ... CORS politikasi ekle") dev CORS bloğunu bilerek commit'ledi - Flutter web istemcisi başka porttan API'ye bağlanabilsin diye. Blok artık `IsDevelopment()` içinde, repoda kalıcı. Program.cs'i commit'lerken bu bloğu ayırmaya/çıkarmaya çalışma.
+
 ## If resuming from a new console/account
 
 1. Read this file, then `docs/superpowers/plans/2026-09-17-tenant-onboarding.md` in full (its "Key facts" section has load-bearing context, e.g. why `ITenantResolutionService` needs `.IgnoreQueryFilters()`).
