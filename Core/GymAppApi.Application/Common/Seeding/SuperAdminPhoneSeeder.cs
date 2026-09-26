@@ -3,6 +3,13 @@ using GymAppApi.Domain.Entities;
 
 namespace GymAppApi.Application.Common.Seeding;
 
+// Açılışı durdurması gereken yapılandırma hatası - geçici altyapı
+// hatalarından (DB erişimi) ayırt edilebilsin diye ayrı tip.
+public class SeedConfigurationException : InvalidOperationException
+{
+    public SeedConfigurationException(string message) : base(message) { }
+}
+
 public enum SuperAdminPhoneSeedOutcome
 {
     SeedUserMissing,
@@ -43,7 +50,7 @@ public class SuperAdminPhoneSeeder
         {
             if (!_phoneNumberNormalizer.TryNormalize(configuredPhone, out var e164))
             {
-                throw new InvalidOperationException(
+                throw new SeedConfigurationException(
                     $"'{ConfigurationKey}' yapılandırması geçerli bir telefon numarası değil. " +
                     "Ülke koduyla birlikte gerçek bir numara girin (ör. +905551234567).");
             }

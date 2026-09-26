@@ -87,7 +87,7 @@ public class SuperAdminPhoneSeederTests
     {
         var (seeder, _, _) = Create(SeedUser(SuperAdminPhoneSeeder.PlaceholderPhone));
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => seeder.ApplyAsync(configured, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<SeedConfigurationException>(() => seeder.ApplyAsync(configured, CancellationToken.None));
 
         Assert.Contains("Seed:SuperAdminPhone", ex.Message);
     }

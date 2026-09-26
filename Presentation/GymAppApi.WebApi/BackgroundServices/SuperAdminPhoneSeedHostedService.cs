@@ -11,6 +11,9 @@ namespace GymAppApi.WebApi.BackgroundServices;
 //   - Değer yok ve placeholder duruyorsa: Development dışında açılış
 //     durur (SuperAdmin giriş yapamaz hâlde yayına çıkılmasın);
 //     Development'ta sadece uyarı loglanır.
+//   - DB'ye erişilemezse (taze/migration uygulanmamış DB, geçici kesinti):
+//     sadece loglanır, API açılır - bu bir yapılandırma hatası değil ve
+//     tüm API'yi düşürmemeli. Seed bir sonraki açılışta tekrar denenir.
 public class SuperAdminPhoneSeedHostedService : IHostedService
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -34,7 +37,18 @@ public class SuperAdminPhoneSeedHostedService : IHostedService
     {
         using var scope = _scopeFactory.CreateScope();
         var seeder = scope.ServiceProvider.GetRequiredService<SuperAdminPhoneSeeder>();
-        var outcome = await seeder.ApplyAsync(_configuration[SuperAdminPhoneSeeder.ConfigurationKey], cancellationToken);
+
+        SuperAdminPhoneSeedOutcome outcome;
+        try
+        {
+            outcome = await seeder.ApplyAsync(_configuration[SuperAdminPhoneSeeder.ConfigurationKey], cancellationToken);
+        }
+        catch (Exception ex) when (ex is not SeedConfigurationException and not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "Seed SuperAdmin telefonu kontrol edilemedi: veritabanına erişilemedi. API açılıyor; kontrol bir sonraki açılışta tekrar denenecek.");
+            return;
+        }
 
         switch (outcome)
         {
@@ -42,7 +56,7 @@ public class SuperAdminPhoneSeedHostedService : IHostedService
                 _logger.LogInformation("Seed SuperAdmin telefonu '{Key}' yapılandırmasından güncellendi.", SuperAdminPhoneSeeder.ConfigurationKey);
                 break;
             case SuperAdminPhoneSeedOutcome.PlaceholderRemains when !_environment.IsDevelopment():
-                throw new InvalidOperationException(
+                throw new SeedConfigurationException(
                     $"Seed SuperAdmin hâlâ geçersiz placeholder telefonu ({SuperAdminPhoneSeeder.PlaceholderPhone}) kullanıyor. " +
                     $"'{SuperAdminPhoneSeeder.ConfigurationKey}' yapılandırmasına (appsettings / user-secrets / ortam değişkeni) gerçek bir numara girin.");
             case SuperAdminPhoneSeedOutcome.PlaceholderRemains:
