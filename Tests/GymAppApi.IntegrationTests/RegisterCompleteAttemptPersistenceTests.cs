@@ -81,7 +81,7 @@ public class RegisterCompleteAttemptPersistenceTests
         var (context, uow) = CreateStack(dbName);
         await using (context)
         {
-            var handler = new RegisterCompleteCommandHandler(uow, new StubPasswordHasher(), new StubJwtTokenService());
+            var handler = new RegisterCompleteCommandHandler(uow, new StubPasswordHasher(), new StubJwtTokenService(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
             var command = new RegisterCompleteCommand
             {
                 FullName = "Ayşe", Phone = "+905551112233", PhoneCode = "000000", Email = null, EmailCode = null, Password = "Sifre123!",
@@ -120,7 +120,7 @@ public class RegisterCompleteAttemptPersistenceTests
         var (context, uow) = CreateStack(dbName);
         await using (context)
         {
-            var handler = new RegisterCompleteCommandHandler(uow, new StubPasswordHasher(), new StubJwtTokenService());
+            var handler = new RegisterCompleteCommandHandler(uow, new StubPasswordHasher(), new StubJwtTokenService(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
             var command = new RegisterCompleteCommand
             {
                 FullName = "Mert", Phone = "+905559998877", PhoneCode = "654321", Email = null, EmailCode = null, Password = "Sifre123!",

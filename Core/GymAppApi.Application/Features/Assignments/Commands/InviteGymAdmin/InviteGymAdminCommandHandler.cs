@@ -12,18 +12,24 @@ namespace GymAppApi.Application.Features.Assignments.Commands.InviteGymAdmin;
 public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminCommand, InviteGymAdminCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
     private readonly ISmsSender _smsSender;
     private readonly IPushNotificationSender _pushNotificationSender;
 
-    public InviteGymAdminCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IPushNotificationSender pushNotificationSender)
+    public InviteGymAdminCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IPushNotificationSender pushNotificationSender, IPhoneNumberNormalizer phoneNumberNormalizer)
     {
         _unitOfWork = unitOfWork;
+        _phoneNumberNormalizer = phoneNumberNormalizer;
         _smsSender = smsSender;
         _pushNotificationSender = pushNotificationSender;
     }
 
     public async Task<InviteGymAdminCommandResult> Handle(InviteGymAdminCommand request, CancellationToken cancellationToken)
     {
+        // Telefon her zaman kanonik E.164 olarak aranır/saklanır/SMS'e verilir -
+        // validator ValidPhoneNumber ile geçerliliği zaten garanti ediyor.
+        var phone = _phoneNumberNormalizer.NormalizeIfPhone(request.Phone);
+
         var company = await _unitOfWork.GetReadRepository<Company>()
             .GetAsync(c => c.Id == request.CompanyId, cancellationToken: cancellationToken);
         if (company is null)
@@ -47,10 +53,10 @@ public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminComman
         // Never creates a new User - same rule as CreateCompanyCommand. See
         // .claude/memory/feedback-never-remove-registration-pointer.md.
         var invitedUser = await _unitOfWork.GetReadRepository<User>()
-            .GetAsync(u => u.Phone == request.Phone, cancellationToken: cancellationToken);
+            .GetAsync(u => u.Phone == phone, cancellationToken: cancellationToken);
         if (invitedUser is null)
         {
-            throw new NotFoundException("PhoneNotRegistered", request.Phone);
+            throw new NotFoundException("PhoneNotRegistered", phone);
         }
 
         var alreadyGymAdminOfThisCompany = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
@@ -80,7 +86,7 @@ public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminComman
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await _smsSender.SendAsync(
-            request.Phone,
+            phone,
             $"GymApp'te '{company.Name}' firmasının Gym Admin'i olmak üzeresiniz. Onay kodu: {code} (10 dakika geçerli).",
             cancellationToken);
         await NotificationDispatcher.NotifyUserAsync(

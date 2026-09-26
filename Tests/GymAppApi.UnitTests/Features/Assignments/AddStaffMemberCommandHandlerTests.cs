@@ -82,7 +82,7 @@ public class AddStaffMemberCommandHandlerTests
         var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
-        var handler = new AddStaffMemberCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
+        var handler = new AddStaffMemberCommandHandler(uow.Object, smsSender.Object, pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -101,7 +101,7 @@ public class AddStaffMemberCommandHandlerTests
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser: null, alreadyAssigned: false);
         var pushSender = new Mock<IPushNotificationSender>();
-        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object);
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
@@ -114,7 +114,7 @@ public class AddStaffMemberCommandHandlerTests
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, BranchId = 999, Role = AssignmentRole.BranchManager, IsActive = true } };
         var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser: null, alreadyAssigned: false);
         var pushSender = new Mock<IPushNotificationSender>();
-        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object);
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingAssignmentInvitation>(), default), Times.Never);
@@ -126,7 +126,7 @@ public class AddStaffMemberCommandHandlerTests
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var (uow, _, _) = Wire(callerAssignments, branch: null, existingUser: null, alreadyAssigned: false);
         var pushSender = new Mock<IPushNotificationSender>();
-        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object);
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
     }
@@ -138,7 +138,7 @@ public class AddStaffMemberCommandHandlerTests
         var existingUser = new User { Id = 7, FullName = "Existing", Phone = "+905550003333", PasswordHash = "x" };
         var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: true);
         var pushSender = new Mock<IPushNotificationSender>();
-        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object);
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<UserAlreadyAssignedException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
@@ -153,7 +153,7 @@ public class AddStaffMemberCommandHandlerTests
         var (uow, assignmentWriteRepo, _) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false);
         var command = ValidCommand();
         command.Role = AssignmentRole.BranchManager;
-        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await handler.Handle(command, CancellationToken.None);
 
@@ -168,7 +168,7 @@ public class AddStaffMemberCommandHandlerTests
         var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false, hasConflictingRole: true);
         var command = ValidCommand();
         command.Role = AssignmentRole.BranchManager;
-        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<ConflictingAssignmentRoleException>(() => handler.Handle(command, CancellationToken.None));
 
@@ -183,7 +183,7 @@ public class AddStaffMemberCommandHandlerTests
         var (uow, assignmentWriteRepo, invitationWriteRepo) = Wire(callerAssignments, Branch1(), existingUser, alreadyAssigned: false);
         var command = ValidCommand();
         command.Role = AssignmentRole.BranchManager;
-        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+        var handler = new AddStaffMemberCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(command, CancellationToken.None));
 

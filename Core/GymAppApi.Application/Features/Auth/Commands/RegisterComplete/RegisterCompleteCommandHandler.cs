@@ -11,25 +11,31 @@ namespace GymAppApi.Application.Features.Auth.Commands.RegisterComplete;
 public class RegisterCompleteCommandHandler : IRequestHandler<RegisterCompleteCommand, AuthTokenResult>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
 
-    public RegisterCompleteCommandHandler(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IJwtTokenService jwtTokenService)
+    public RegisterCompleteCommandHandler(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IJwtTokenService jwtTokenService, IPhoneNumberNormalizer phoneNumberNormalizer)
     {
         _unitOfWork = unitOfWork;
+        _phoneNumberNormalizer = phoneNumberNormalizer;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
     }
 
     public async Task<AuthTokenResult> Handle(RegisterCompleteCommand request, CancellationToken cancellationToken)
     {
+        // Telefon her zaman kanonik E.164 olarak aranır/saklanır/SMS'e verilir -
+        // validator ValidPhoneNumber ile geçerliliği zaten garanti ediyor.
+        var phone = _phoneNumberNormalizer.NormalizeIfPhone(request.Phone);
+
         var pendingReadRepo = _unitOfWork.GetReadRepository<PendingContactVerification>();
         var pendingWriteRepo = _unitOfWork.GetWriteRepository<PendingContactVerification>();
         var hasEmail = !string.IsNullOrWhiteSpace(request.Email);
         var normalizedEmail = hasEmail ? request.Email!.Trim().ToLowerInvariant() : null;
 
         var phonePending = await pendingReadRepo.GetAsync(
-            p => p.Channel == ContactChannel.Phone && p.Target == request.Phone, cancellationToken: cancellationToken);
+            p => p.Channel == ContactChannel.Phone && p.Target == phone, cancellationToken: cancellationToken);
         var phoneValid = PendingVerificationCodeService.TryConsumeAttempt(phonePending, request.PhoneCode, pendingWriteRepo);
 
         PendingContactVerification? emailPending = null;
@@ -52,7 +58,7 @@ public class RegisterCompleteCommandHandler : IRequestHandler<RegisterCompleteCo
         }
 
         var userReadRepo = _unitOfWork.GetReadRepository<User>();
-        if (await userReadRepo.AnyAsync(u => u.Phone == request.Phone, cancellationToken))
+        if (await userReadRepo.AnyAsync(u => u.Phone == phone, cancellationToken))
         {
             throw new PhoneAlreadyRegisteredException();
         }
@@ -77,7 +83,7 @@ public class RegisterCompleteCommandHandler : IRequestHandler<RegisterCompleteCo
                 var user = new User
                 {
                     FullName = request.FullName,
-                    Phone = request.Phone,
+                    Phone = phone,
                     Email = request.Email,
                     PasswordHash = _passwordHasher.Hash(request.Password),
                     PhoneVerified = true,

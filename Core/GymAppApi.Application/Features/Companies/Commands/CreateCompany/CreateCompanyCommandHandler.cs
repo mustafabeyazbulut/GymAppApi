@@ -11,18 +11,24 @@ namespace GymAppApi.Application.Features.Companies.Commands.CreateCompany;
 public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand, CreateCompanyCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
     private readonly ISmsSender _smsSender;
     private readonly IPushNotificationSender _pushNotificationSender;
 
-    public CreateCompanyCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IPushNotificationSender pushNotificationSender)
+    public CreateCompanyCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IPushNotificationSender pushNotificationSender, IPhoneNumberNormalizer phoneNumberNormalizer)
     {
         _unitOfWork = unitOfWork;
+        _phoneNumberNormalizer = phoneNumberNormalizer;
         _smsSender = smsSender;
         _pushNotificationSender = pushNotificationSender;
     }
 
     public async Task<CreateCompanyCommandResult> Handle(CreateCompanyCommand request, CancellationToken cancellationToken)
     {
+        // Telefon her zaman kanonik E.164 olarak aranır/saklanır/SMS'e verilir -
+        // validator ValidPhoneNumber ile geçerliliği zaten garanti ediyor.
+        var phone = _phoneNumberNormalizer.NormalizeIfPhone(request.GymAdminPhone);
+
         // No [Authorize(Policy = "SuperAdminOnly")]-level re-check needed here
         // unlike CreateAssignmentCommandHandler's GymAdmin case - a SuperAdmin
         // has no per-company scope to violate, so the policy's own fresh
@@ -33,10 +39,10 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
         // registered user, picked up by phone. See
         // .claude/memory/feedback-never-remove-registration-pointer.md.
         var gymAdminUser = await _unitOfWork.GetReadRepository<User>()
-            .GetAsync(u => u.Phone == request.GymAdminPhone, cancellationToken: cancellationToken);
+            .GetAsync(u => u.Phone == phone, cancellationToken: cancellationToken);
         if (gymAdminUser is null)
         {
-            throw new NotFoundException("PhoneNotRegistered", request.GymAdminPhone);
+            throw new NotFoundException("PhoneNotRegistered", phone);
         }
 
         // ExecuteWithRetryAsync icinden aciliyor - RegisterCompleteCommandHandler'daki
@@ -78,7 +84,7 @@ public class CreateCompanyCommandHandler : IRequestHandler<CreateCompanyCommand,
         });
 
         await _smsSender.SendAsync(
-            request.GymAdminPhone,
+            phone,
             $"GymApp'te '{request.CompanyName}' firmasının Gym Admin'i olmak üzeresiniz. Onay kodu: {code} (10 dakika geçerli).",
             cancellationToken);
         await NotificationDispatcher.NotifyUserAsync(

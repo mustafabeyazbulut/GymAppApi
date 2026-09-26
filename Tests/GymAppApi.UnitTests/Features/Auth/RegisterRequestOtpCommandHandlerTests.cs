@@ -61,7 +61,7 @@ public class RegisterRequestOtpCommandHandlerTests
     public async Task Handle_WhenPhoneAlreadyRegistered_ThrowsPhoneAlreadyRegisteredException_AndSendsNothing()
     {
         var (uow, _, _, pendingWriteRepo, sms, email) = Wire(phoneRegistered: true);
-        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object);
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterRequestOtpCommand { Phone = "+905551112233", Email = null };
 
         await Assert.ThrowsAsync<PhoneAlreadyRegisteredException>(() => handler.Handle(command, CancellationToken.None));
@@ -74,7 +74,7 @@ public class RegisterRequestOtpCommandHandlerTests
     public async Task Handle_WhenEmailAlreadyRegistered_ThrowsEmailAlreadyRegisteredException_AndSendsNothing()
     {
         var (uow, _, _, pendingWriteRepo, sms, email) = Wire(emailRegistered: true);
-        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object);
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterRequestOtpCommand { Phone = "+905550000000", Email = "taken@test.com" };
 
         await Assert.ThrowsAsync<EmailAlreadyRegisteredException>(() => handler.Handle(command, CancellationToken.None));
@@ -87,7 +87,7 @@ public class RegisterRequestOtpCommandHandlerTests
     public async Task Handle_WhenPhoneOnly_CreatesPendingRowAndSendsSms_NotEmail()
     {
         var (uow, _, _, pendingWriteRepo, sms, email) = Wire();
-        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object);
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterRequestOtpCommand { Phone = "+905551112233", Email = null };
 
         await handler.Handle(command, CancellationToken.None);
@@ -103,7 +103,7 @@ public class RegisterRequestOtpCommandHandlerTests
     public async Task Handle_WhenPhoneAndEmail_CreatesBothPendingRowsAndSendsBoth()
     {
         var (uow, _, _, pendingWriteRepo, sms, email) = Wire();
-        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object);
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterRequestOtpCommand { Phone = "+905551112233", Email = "ayse@test.com" };
 
         await handler.Handle(command, CancellationToken.None);
@@ -124,7 +124,7 @@ public class RegisterRequestOtpCommandHandlerTests
             LastSentAt = DateTime.UtcNow.AddSeconds(-30), SendCount = 1, WindowStartAt = DateTime.UtcNow.AddSeconds(-30),
         };
         var (uow, _, _, pendingWriteRepo, sms, _) = Wire(existingPhonePending: existingPhonePending);
-        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, new Mock<IEmailSender>().Object);
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, new Mock<IEmailSender>().Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterRequestOtpCommand { Phone = "+905551112233", Email = null };
 
         await Assert.ThrowsAsync<TooManyVerificationRequestsException>(() => handler.Handle(command, CancellationToken.None));
@@ -143,7 +143,7 @@ public class RegisterRequestOtpCommandHandlerTests
             LastSentAt = DateTime.UtcNow.AddMinutes(-5), SendCount = 5, WindowStartAt = DateTime.UtcNow.AddMinutes(-10),
         };
         var (uow, _, _, pendingWriteRepo, sms, _) = Wire(existingPhonePending: existingPhonePending);
-        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, new Mock<IEmailSender>().Object);
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, new Mock<IEmailSender>().Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterRequestOtpCommand { Phone = "+905551112233", Email = null };
 
         await Assert.ThrowsAsync<TooManyVerificationRequestsException>(() => handler.Handle(command, CancellationToken.None));
@@ -161,12 +161,37 @@ public class RegisterRequestOtpCommandHandlerTests
             LastSentAt = DateTime.UtcNow.AddHours(-2), SendCount = 5, WindowStartAt = DateTime.UtcNow.AddHours(-2),
         };
         var (uow, _, _, pendingWriteRepo, sms, _) = Wire(existingPhonePending: existingPhonePending);
-        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, new Mock<IEmailSender>().Object);
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, new Mock<IEmailSender>().Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterRequestOtpCommand { Phone = "+905551112233", Email = null };
 
         await handler.Handle(command, CancellationToken.None);
 
         pendingWriteRepo.Verify(r => r.Update(It.Is<PendingContactVerification>(p => p.SendCount == 1 && p.AttemptCount == 0)), Times.Once);
         sms.Verify(s => s.SendAsync("+905551112233", It.IsAny<string>(), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WithTurkishLocalFormat_MatchesTheCanonicalE164AlreadyRegisteredUser()
+    {
+        // "0555 111 22 33" DB'deki "+905551112233" ile aynı numara - ikinci
+        // bir hesap açılmamalı.
+        var (uow, _, _, pendingWriteRepo, sms, email) = Wire(phoneRegistered: true);
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
+        var command = new RegisterRequestOtpCommand { Phone = "0555 111 22 33", Email = null };
+
+        await Assert.ThrowsAsync<PhoneAlreadyRegisteredException>(() => handler.Handle(command, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_WithFormattedForeignNumber_IssuesCodeForAndTextsTheCanonicalE164()
+    {
+        var (uow, _, _, pendingWriteRepo, sms, email) = Wire();
+        var handler = new RegisterRequestOtpCommandHandler(uow.Object, sms.Object, email.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
+        var command = new RegisterRequestOtpCommand { Phone = "+49 151 234-56789", Email = null };
+
+        await handler.Handle(command, CancellationToken.None);
+
+        pendingWriteRepo.Verify(r => r.AddAsync(It.Is<PendingContactVerification>(p => p.Target == "+4915123456789"), default), Times.Once);
+        sms.Verify(s => s.SendAsync("+4915123456789", It.IsAny<string>(), default), Times.Once);
     }
 }

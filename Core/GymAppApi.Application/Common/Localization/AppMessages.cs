@@ -102,6 +102,9 @@ public static class AppMessages
         // FluentValidation .WithMessage kodları
         ["UnsupportedLanguage"] = ("Language must be one of: {0}.", "Dil şunlardan biri olmalıdır: {0}."),
         ["RoleMustBeTrainerOrBranchManager"] = ("Role must be Trainer or BranchManager.", "Rol Trainer veya BranchManager olmalıdır."),
+        ["InvalidPhoneNumber"] = (
+            "Please enter a valid phone number with its country code (e.g. +905551234567).",
+            "Lütfen ülke koduyla birlikte geçerli bir telefon numarası girin (ör. +905551234567)."),
         ["DurationDaysRequiredForDurationPackage"] = (
             "DurationDays is required and must be greater than 0 for a Duration package.",
             "Süreli paket için DurationDays zorunludur ve 0'dan büyük olmalıdır."),

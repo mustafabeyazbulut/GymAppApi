@@ -66,7 +66,7 @@ public class RegisterCompleteCommandHandlerTests
     {
         var phonePending = MakePending(ContactChannel.Phone, "+905551112233", "111111");
         var (uow, _, pendingWriteRepo, _, userWriteRepo, _, hasher, jwt) = Wire(phonePending);
-        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object);
+        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterCompleteCommand
         {
             FullName = "Ayşe", Phone = "+905551112233", PhoneCode = "000000", Email = null, EmailCode = null, Password = "Sifre123!",
@@ -86,7 +86,7 @@ public class RegisterCompleteCommandHandlerTests
     public async Task Handle_WhenPendingRowMissing_ThrowsInvalidContactVerificationCodeException()
     {
         var (uow, _, _, _, _, _, hasher, jwt) = Wire(phonePending: null);
-        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object);
+        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterCompleteCommand
         {
             FullName = "Ayşe", Phone = "+905559999999", PhoneCode = "123456", Email = null, EmailCode = null, Password = "Sifre123!",
@@ -100,7 +100,7 @@ public class RegisterCompleteCommandHandlerTests
     {
         var phonePending = MakePending(ContactChannel.Phone, "+905551112233", "123456", attemptCount: 5);
         var (uow, _, pendingWriteRepo, _, _, _, hasher, jwt) = Wire(phonePending);
-        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object);
+        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterCompleteCommand
         {
             FullName = "Ayşe", Phone = "+905551112233", PhoneCode = "123456", Email = null, EmailCode = null, Password = "Sifre123!",
@@ -116,7 +116,7 @@ public class RegisterCompleteCommandHandlerTests
     {
         var phonePending = MakePending(ContactChannel.Phone, "+905551112233", "123456");
         var (uow, _, pendingWriteRepo, _, userWriteRepo, refreshWriteRepo, hasher, jwt) = Wire(phonePending);
-        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object);
+        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterCompleteCommand
         {
             FullName = "Ayşe Yılmaz", Phone = "+905551112233", PhoneCode = "123456", Email = null, EmailCode = null, Password = "Sifre123!",
@@ -139,7 +139,7 @@ public class RegisterCompleteCommandHandlerTests
         var phonePending = MakePending(ContactChannel.Phone, "+905551112233", "123456");
         var emailPending = MakePending(ContactChannel.Email, "ayse@test.com", "654321");
         var (uow, _, pendingWriteRepo, _, userWriteRepo, _, hasher, jwt) = Wire(phonePending, emailPending);
-        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object);
+        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterCompleteCommand
         {
             FullName = "Ayşe", Phone = "+905551112233", PhoneCode = "123456", Email = "ayse@test.com", EmailCode = "654321", Password = "Sifre123!",
@@ -158,7 +158,7 @@ public class RegisterCompleteCommandHandlerTests
         var phonePending = MakePending(ContactChannel.Phone, "+905551112233", "123456");
         var emailPending = MakePending(ContactChannel.Email, "ayse@test.com", "654321");
         var (uow, _, pendingWriteRepo, _, userWriteRepo, _, hasher, jwt) = Wire(phonePending, emailPending);
-        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object);
+        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterCompleteCommand
         {
             FullName = "Ayşe", Phone = "+905551112233", PhoneCode = "123456", Email = "ayse@test.com", EmailCode = "000000", Password = "Sifre123!",
@@ -180,7 +180,7 @@ public class RegisterCompleteCommandHandlerTests
         refreshWriteRepo
             .Setup(r => r.AddAsync(It.IsAny<RefreshToken>(), default))
             .ThrowsAsync(new InvalidOperationException("simulated failure"));
-        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object);
+        var handler = new RegisterCompleteCommandHandler(uow.Object, hasher.Object, jwt.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
         var command = new RegisterCompleteCommand
         {
             FullName = "Ayşe", Phone = "+905551112233", PhoneCode = "123456", Email = null, EmailCode = null, Password = "Sifre123!",

@@ -76,7 +76,7 @@ public class CreatePackageAssignmentCommandHandlerTests
         var existingUser = new User { Id = 7, FullName = "Member", Phone = "+905550003333", PasswordHash = "x" };
         var (uow, invitationWriteRepo) = Wire(callerAssignments, BranchPackage(), existingUser, alreadyAssigned: false);
         var smsSender = new Mock<ISmsSender>();
-        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, smsSender.Object, Mock.Of<IPushNotificationSender>());
+        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, smsSender.Object, Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -92,7 +92,7 @@ public class CreatePackageAssignmentCommandHandlerTests
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, BranchId = 999, Role = AssignmentRole.BranchManager, IsActive = true } };
         var (uow, invitationWriteRepo) = Wire(callerAssignments, BranchPackage(), existingUser: null, alreadyAssigned: false);
-        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingPackageAssignmentInvitation>(), default), Times.Never);
@@ -103,7 +103,7 @@ public class CreatePackageAssignmentCommandHandlerTests
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var (uow, _) = Wire(callerAssignments, package: null, existingUser: null, alreadyAssigned: false);
-        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
     }
@@ -113,7 +113,7 @@ public class CreatePackageAssignmentCommandHandlerTests
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var (uow, invitationWriteRepo) = Wire(callerAssignments, BranchPackage(), existingUser: null, alreadyAssigned: false);
-        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingPackageAssignmentInvitation>(), default), Times.Never);
@@ -125,7 +125,7 @@ public class CreatePackageAssignmentCommandHandlerTests
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var existingUser = new User { Id = 7, FullName = "Member", Phone = "+905550003333", PasswordHash = "x" };
         var (uow, invitationWriteRepo) = Wire(callerAssignments, BranchPackage(), existingUser, alreadyAssigned: true);
-        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>());
+        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<MemberAlreadyHasThisPackageException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingPackageAssignmentInvitation>(), default), Times.Never);

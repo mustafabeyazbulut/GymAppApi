@@ -12,18 +12,24 @@ namespace GymAppApi.Application.Features.Assignments.Commands.AddStaffMember;
 public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberCommand, AddStaffMemberCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
     private readonly ISmsSender _smsSender;
     private readonly IPushNotificationSender _pushNotificationSender;
 
-    public AddStaffMemberCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IPushNotificationSender pushNotificationSender)
+    public AddStaffMemberCommandHandler(IUnitOfWork unitOfWork, ISmsSender smsSender, IPushNotificationSender pushNotificationSender, IPhoneNumberNormalizer phoneNumberNormalizer)
     {
         _unitOfWork = unitOfWork;
+        _phoneNumberNormalizer = phoneNumberNormalizer;
         _smsSender = smsSender;
         _pushNotificationSender = pushNotificationSender;
     }
 
     public async Task<AddStaffMemberCommandResult> Handle(AddStaffMemberCommand request, CancellationToken cancellationToken)
     {
+        // Telefon her zaman kanonik E.164 olarak aranır/saklanır/SMS'e verilir -
+        // validator ValidPhoneNumber ile geçerliliği zaten garanti ediyor.
+        var phone = _phoneNumberNormalizer.NormalizeIfPhone(request.Phone);
+
         var branch = await _unitOfWork.GetReadRepository<Branch>()
             .GetAsync(b => b.Id == request.BranchId, cancellationToken: cancellationToken);
         if (branch is null)
@@ -57,10 +63,10 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
         // person to a branch, they don't mint accounts by phone. See
         // .claude/memory/feedback-never-remove-registration-pointer.md.
         var user = await _unitOfWork.GetReadRepository<User>()
-            .GetAsync(u => u.Phone == request.Phone, cancellationToken: cancellationToken);
+            .GetAsync(u => u.Phone == phone, cancellationToken: cancellationToken);
         if (user is null)
         {
-            throw new NotFoundException("PhoneNotRegistered", request.Phone);
+            throw new NotFoundException("PhoneNotRegistered", phone);
         }
 
         // Scoped to (CompanyId, BranchId, Role), not just CompanyId - a
@@ -99,7 +105,7 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await _smsSender.SendAsync(
-            request.Phone,
+            phone,
             $"GymApp'te bir şubeye {request.Role} olarak eklenmek üzeresiniz. Onay kodu: {code} (10 dakika geçerli).",
             cancellationToken);
         await NotificationDispatcher.NotifyUserAsync(

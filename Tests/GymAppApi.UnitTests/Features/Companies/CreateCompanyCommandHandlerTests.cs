@@ -64,7 +64,7 @@ public class CreateCompanyCommandHandlerTests
         var (uow, _, companyWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo) = Wire(existingGymAdmin);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
-        var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
+        var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -83,7 +83,7 @@ public class CreateCompanyCommandHandlerTests
         var (uow, _, companyWriteRepo, assignmentWriteRepo, notificationWriteRepo, invitationWriteRepo) = Wire(existingGymAdmin: null);
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
-        var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
+        var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
 
@@ -115,7 +115,7 @@ public class CreateCompanyCommandHandlerTests
             .Callback(() => callOrder.Add("sms"))
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
+        var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -130,7 +130,7 @@ public class CreateCompanyCommandHandlerTests
         var smsSender = new Mock<ISmsSender>();
         var pushSender = new Mock<IPushNotificationSender>();
         uow.Setup(u => u.GetWriteRepository<PendingAssignmentInvitation>()).Returns(() => throw new InvalidOperationException("boom"));
-        var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object);
+        var handler = new CreateCompanyCommandHandler(uow.Object, smsSender.Object, pushSender.Object, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
 

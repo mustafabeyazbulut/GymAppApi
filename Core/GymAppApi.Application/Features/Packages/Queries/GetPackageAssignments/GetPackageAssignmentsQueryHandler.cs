@@ -9,11 +9,29 @@ public class GetPackageAssignmentsQueryHandler : IRequestHandler<GetPackageAssig
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITenantContext _tenantContext;
+    private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
 
-    public GetPackageAssignmentsQueryHandler(IUnitOfWork unitOfWork, ITenantContext tenantContext)
+    public GetPackageAssignmentsQueryHandler(IUnitOfWork unitOfWork, ITenantContext tenantContext, IPhoneNumberNormalizer phoneNumberNormalizer)
     {
         _unitOfWork = unitOfWork;
         _tenantContext = tenantContext;
+        _phoneNumberNormalizer = phoneNumberNormalizer;
+    }
+
+    // Tam ve geçerli bir numara ("0555 123 45 67", "+49 151 23456789")
+    // kanonik E.164'e çevrilir - DB'deki değerle birebir eşleşsin. Kısmi
+    // arama terimi ("1234567") geçerli bir numara olmadığından sadece
+    // biçimlendirme karakterleri temizlenip "içerir" araması olarak kalır.
+    private string? NormalizePhoneSearchTerm(string? term)
+    {
+        if (string.IsNullOrWhiteSpace(term))
+        {
+            return null;
+        }
+
+        return _phoneNumberNormalizer.TryNormalize(term, out var e164)
+            ? e164
+            : System.Text.RegularExpressions.Regex.Replace(term, @"[\s\-().\/]", string.Empty);
     }
 
     public async Task<IReadOnlyList<PackageAssignmentDto>> Handle(GetPackageAssignmentsQuery request, CancellationToken cancellationToken)
@@ -26,7 +44,7 @@ public class GetPackageAssignmentsQueryHandler : IRequestHandler<GetPackageAssig
         // gibi id bazlı uç noktaların BranchManager kuralıyla
         // (a.BranchId == assignment.BranchId) tutarlı.
         var branchId = _tenantContext.BranchId;
-        var memberPhone = request.MemberPhone;
+        var memberPhone = NormalizePhoneSearchTerm(request.MemberPhone);
         var filterByPhone = !string.IsNullOrWhiteSpace(memberPhone);
         var assignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
             predicate: a => (branchId == null || a.BranchId == branchId) &&

@@ -61,7 +61,7 @@ public class GetPackageAssignmentsQueryHandlerTests
             new() { PackageAssignmentId = 1, Amount = 400m },
         };
         var (uow, _) = Wire(assignments, payments);
-        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, CompanyWideContext);
+        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, CompanyWideContext, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         var result = await handler.Handle(new GetPackageAssignmentsQuery(null), CancellationToken.None);
 
@@ -76,7 +76,7 @@ public class GetPackageAssignmentsQueryHandlerTests
     public async Task Handle_WhenNoAssignments_ReturnsEmptyListWithoutQueryingPayments()
     {
         var (uow, paymentRepo) = Wire(new List<PackageAssignment>(), new List<PackageAssignmentPayment>());
-        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, CompanyWideContext);
+        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, CompanyWideContext, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         var result = await handler.Handle(new GetPackageAssignmentsQuery(null), CancellationToken.None);
 
@@ -90,7 +90,7 @@ public class GetPackageAssignmentsQueryHandlerTests
     {
         var assignments = new List<PackageAssignment> { AssignmentAt(1, branchId: 10), AssignmentAt(2, branchId: 11), AssignmentAt(3, branchId: null) };
         var (uow, _) = Wire(assignments, new List<PackageAssignmentPayment>());
-        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, CompanyWideContext);
+        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, CompanyWideContext, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         var result = await handler.Handle(new GetPackageAssignmentsQuery(null), CancellationToken.None);
 
@@ -105,7 +105,7 @@ public class GetPackageAssignmentsQueryHandlerTests
         // sadece a.BranchId == assignment.BranchId eşleşmesinde izin veriyor.
         var assignments = new List<PackageAssignment> { AssignmentAt(1, branchId: 10), AssignmentAt(2, branchId: 11), AssignmentAt(3, branchId: null) };
         var (uow, _) = Wire(assignments, new List<PackageAssignmentPayment>());
-        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, BranchScopedContext);
+        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, BranchScopedContext, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         var result = await handler.Handle(new GetPackageAssignmentsQuery(null), CancellationToken.None);
 
@@ -122,9 +122,31 @@ public class GetPackageAssignmentsQueryHandlerTests
             AssignmentAt(3, branchId: 11, phone: "+905551112233"),
         };
         var (uow, _) = Wire(assignments, new List<PackageAssignmentPayment>());
-        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, BranchScopedContext);
+        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, BranchScopedContext, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
 
         var result = await handler.Handle(new GetPackageAssignmentsQuery("1112233"), CancellationToken.None);
+
+        Assert.Equal(new[] { 1 }, result.Select(a => a.Id));
+    }
+
+    [Theory]
+    // Tam numaranın farklı yazımları DB'deki kanonik E.164 ile eşleşmeli.
+    [InlineData("0555 111 22 33")]
+    [InlineData("+90 555 111-22-33")]
+    [InlineData("5551112233")]
+    // Kısmi arama: biçimlendirme temizlenip "içerir" araması olarak kalır.
+    [InlineData("111 22 33")]
+    public async Task Handle_WithPhoneFilterInAnyWriting_MatchesTheCanonicalStoredNumber(string searchTerm)
+    {
+        var assignments = new List<PackageAssignment>
+        {
+            AssignmentAt(1, branchId: 10, phone: "+905551112233"),
+            AssignmentAt(2, branchId: 10, phone: "+905559998877"),
+        };
+        var (uow, _) = Wire(assignments, new List<PackageAssignmentPayment>());
+        var handler = new GetPackageAssignmentsQueryHandler(uow.Object, CompanyWideContext, new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
+
+        var result = await handler.Handle(new GetPackageAssignmentsQuery(searchTerm), CancellationToken.None);
 
         Assert.Equal(new[] { 1 }, result.Select(a => a.Id));
     }
