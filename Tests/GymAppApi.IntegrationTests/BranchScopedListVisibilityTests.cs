@@ -335,4 +335,36 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
 
         Assert.Equal(Sorted(seed.AssignmentA1Id), ids);
     }
+
+    // --- GET /api/content-items (personel kolu) ---
+
+    [Fact]
+    public async Task ContentItems_AsGymAdmin_ReturnsAllItemsOfOwnCompany()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.GymAdminAToken), "/api/content-items");
+
+        Assert.Equal(Sorted(seed.ContentA1Id, seed.ContentA2Id, seed.ContentACompanyWideId), ids);
+    }
+
+    [Fact]
+    public async Task ContentItems_AsBranchManager_ReturnsOwnBranchAndBranchlessItemsOnly()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.BranchManagerA1Token), "/api/content-items");
+
+        Assert.Equal(Sorted(seed.ContentA1Id, seed.ContentACompanyWideId), ids);
+    }
+
+    [Fact]
+    public async Task ContentItems_AsTrainer_ReturnsOwnBranchAndBranchlessItemsOnly()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.TrainerA1Token), "/api/content-items");
+
+        Assert.Equal(Sorted(seed.ContentA1Id, seed.ContentACompanyWideId), ids);
+    }
 }

@@ -12,8 +12,13 @@ namespace GymAppApi.Application.Features.ContentLibrary.Queries.GetContentItems;
 public class GetContentItemsQueryHandler : IRequestHandler<GetContentItemsQuery, IReadOnlyList<ContentItemDto>>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITenantContext _tenantContext;
 
-    public GetContentItemsQueryHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+    public GetContentItemsQueryHandler(IUnitOfWork unitOfWork, ITenantContext tenantContext)
+    {
+        _unitOfWork = unitOfWork;
+        _tenantContext = tenantContext;
+    }
 
     public async Task<IReadOnlyList<ContentItemDto>> Handle(GetContentItemsQuery request, CancellationToken cancellationToken)
     {
@@ -21,16 +26,27 @@ public class GetContentItemsQueryHandler : IRequestHandler<GetContentItemsQuery,
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
 
         var isSuperAdmin = callerAssignments.Any(a => a.Role == AssignmentRole.SuperAdmin);
-        var staffAssignment = callerAssignments.FirstOrDefault(a =>
-            a.Role == AssignmentRole.GymAdmin || a.Role == AssignmentRole.BranchManager || a.Role == AssignmentRole.Trainer);
+        // Personel kapsamı, çağıranın herhangi bir (ör. ilk) ataması değil
+        // AKTİF firmadaki ataması üzerinden belirlenir (ambient tenant
+        // context, X-Active-Company-Id) - çok firmalı personel yanlış firmanın
+        // içeriğini görmesin.
+        var activeCompanyId = _tenantContext.CompanyId;
+        var activeBranchId = _tenantContext.BranchId;
+        var isStaffInActiveCompany = activeCompanyId != null && callerAssignments.Any(a =>
+            a.CompanyId == activeCompanyId &&
+            (a.Role == AssignmentRole.GymAdmin || a.Role == AssignmentRole.BranchManager || a.Role == AssignmentRole.Trainer));
 
-        if (isSuperAdmin || staffAssignment is not null)
+        if (isSuperAdmin || isStaffInActiveCompany)
         {
-            // Staff (Trainer dahil) tüm içerikleri (IsActive filtresiz) görür -
-            // spec'in "staff tümünü görür" kuralı. SuperAdmin tüm firmaları,
-            // diğer staff sadece kendi firmasını.
+            // Staff (Trainer dahil) içerikleri IsActive filtresiz görür -
+            // spec'in "staff tümünü görür" kuralı. SuperAdmin tüm firmaları;
+            // GymAdmin aktif firmanın tüm şubelerini; şube kapsamlı personel
+            // (BranchManager/Trainer) sadece kendi şubesini + şubesiz firma
+            // içeriklerini (senaryo §10.8).
             var staffItems = await _unitOfWork.GetReadRepository<ContentItem>().GetAllAsync(
-                c => isSuperAdmin || c.CompanyId == staffAssignment!.CompanyId,
+                c => isSuperAdmin ||
+                     (c.CompanyId == activeCompanyId &&
+                      (activeBranchId == null || c.BranchId == null || c.BranchId == activeBranchId)),
                 include: q => q.IgnoreQueryFilters().Include(c => c.MediaFile),
                 orderBy: q => q.OrderByDescending(c => c.CreatedAt),
                 cancellationToken: cancellationToken);
