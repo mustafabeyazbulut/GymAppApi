@@ -159,11 +159,12 @@ public static class AppMessages
         ["SessionCountRequiredForSessionBasedPackage"] = (
             "SessionCount is required and must be greater than 0 for a SessionBased package.",
             "Seans bazlı paket için SessionCount zorunludur ve 0'dan büyük olmalıdır."),
-        ["MaxFreezeDaysMustBeGreaterThanZero"] = (
-            "MaxFreezeDays must be greater than 0 when set.",
-            "MaxFreezeDays belirtildiğinde 0'dan büyük olmalıdır."),
+        ["MaxFreezeDaysMustNotBeNegative"] = (
+            "MaxFreezeDays cannot be negative (0 = cannot be frozen, empty = unlimited).",
+            "MaxFreezeDays negatif olamaz (0 = dondurulamaz, boş = sınırsız)."),
 
         // Packages özelliği - isimlendirilmiş exception'lar
+        ["PackageNotFreezable"] = ("This package cannot be frozen.", "Bu paket dondurulamaz."),
         ["FreezeLimitExceeded"] = (
             "The maximum freeze duration allowed for this package ({0} days) has already been used.",
             "Bu paket için izin verilen maksimum dondurma süresi ({0} gün) zaten kullanıldı."),

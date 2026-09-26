@@ -53,11 +53,23 @@ public class CreatePackageCommandValidatorTests
         Assert.False(result.IsValid);
     }
 
+    // Canlı test bulgusu: 0 = "dondurulamaz paket" (null = sınırsız) - geçerli bir değer.
     [Fact]
-    public void Validate_WhenMaxFreezeDaysIsZero_HasError()
+    public void Validate_WhenMaxFreezeDaysIsZero_HasNoError()
     {
         var command = ValidDurationCommand();
         command.MaxFreezeDays = 0;
+
+        var result = _validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_WhenMaxFreezeDaysIsNegative_HasError()
+    {
+        var command = ValidDurationCommand();
+        command.MaxFreezeDays = -1;
 
         var result = _validator.Validate(command);
 

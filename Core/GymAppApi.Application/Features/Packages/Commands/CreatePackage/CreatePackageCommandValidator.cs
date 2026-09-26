@@ -26,8 +26,9 @@ public class CreatePackageCommandValidator : AbstractValidator<CreatePackageComm
         RuleFor(x => x.SessionCount).NotNull().GreaterThan(0).When(x => x.Type == PackageType.SessionBased)
             .WithMessage(_ => Localized("SessionCountRequiredForSessionBasedPackage"));
 
-        RuleFor(x => x.MaxFreezeDays).GreaterThan(0).When(x => x.MaxFreezeDays != null)
-            .WithMessage(_ => Localized("MaxFreezeDaysMustBeGreaterThanZero"));
+        // null = sınırsız dondurma, 0 = paket dondurulamaz, N = toplam en fazla N gün.
+        RuleFor(x => x.MaxFreezeDays).GreaterThanOrEqualTo(0).When(x => x.MaxFreezeDays != null)
+            .WithMessage(_ => Localized("MaxFreezeDaysMustNotBeNegative"));
     }
 
     private static string Localized(string code) =>

@@ -63,6 +63,11 @@ public class FreezePackageAssignmentCommandHandler : IRequestHandler<FreezePacka
         // paketi "kendi kafasına göre" sınırsız dondurulabilir şekilde
         // tanımlamasını engelleyen asıl kontrol burası.
         var maxFreezeDays = assignment.Package?.MaxFreezeDays;
+        if (maxFreezeDays == 0)
+        {
+            // 0 = paket hiç dondurulamaz (null = sınırsız).
+            throw new PackageNotFreezableException();
+        }
         if (maxFreezeDays is not null && assignment.TotalFrozenDays >= maxFreezeDays.Value)
         {
             throw new FreezeLimitExceededException(maxFreezeDays.Value);

@@ -136,6 +136,25 @@ public class FreezePackageAssignmentCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenThePackageIsNotFreezable_ThrowsPackageNotFreezableException()
+    {
+        const int memberId = 7;
+        var package = new Package { Id = 5, MaxFreezeDays = 0 };
+        var assignment = new PackageAssignment
+        {
+            Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, Package = package, MemberUserId = memberId,
+            Status = PackageAssignmentStatus.Active, TotalFrozenDays = 0,
+        };
+        var (uow, writeRepo) = Wire(assignment, callerAssignments: new List<Assignment>());
+        var handler = new FreezePackageAssignmentCommandHandler(uow.Object);
+
+        await Assert.ThrowsAsync<GymAppApi.Application.Features.Packages.Exceptions.PackageNotFreezableException>(() =>
+            handler.Handle(new FreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None));
+        Assert.Equal(PackageAssignmentStatus.Active, assignment.Status);
+        writeRepo.Verify(r => r.Update(It.IsAny<PackageAssignment>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_WhenTotalFrozenDaysBelowTheLimit_AllowsFreeze()
     {
         const int memberId = 7;
