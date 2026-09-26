@@ -14,8 +14,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GymAppApi.WebApi.Controllers;
 
-// Kapı Erişim Sistemi'nin yazılım iskeleti - tümü StaffManagement
-// (GymAdmin kendi firması, BranchManager kendi şubesi). Gerçek donanım
+// Kapı Erişim Sistemi'nin yazılım iskeleti. Okuma StaffManagement (GymAdmin
+// kendi firması, BranchManager kendi şubesi); yazma (bölge/kapı/kural
+// oluşturma-silme) sadece GymAdmin (senaryo §4.5). Gerçek donanım
 // olmadan bir AccessLog oluşturan hiçbir endpoint YOK (bkz.
 // docs/superpowers/specs/2026-09-20-door-access-skeleton-design.md).
 [ApiController]
@@ -29,6 +30,7 @@ public class ZonesController : ControllerBase
 
     private int CurrentUserId => int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
 
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpPost]
     public async Task<IActionResult> CreateZone(CreateZoneCommand command, CancellationToken cancellationToken)
     {
@@ -41,6 +43,7 @@ public class ZonesController : ControllerBase
     public async Task<IActionResult> GetZones([FromQuery] int branchId, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetZonesQuery { BranchId = branchId, RequestedByUserId = CurrentUserId }, cancellationToken));
 
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpDelete("{zoneId}")]
     public async Task<IActionResult> DeleteZone(int zoneId, CancellationToken cancellationToken)
     {
@@ -48,6 +51,7 @@ public class ZonesController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpPost("{zoneId}/doors")]
     public async Task<IActionResult> CreateDoor(int zoneId, CreateDoorCommand command, CancellationToken cancellationToken)
     {
@@ -61,6 +65,7 @@ public class ZonesController : ControllerBase
     public async Task<IActionResult> GetDoors(int zoneId, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetDoorsQuery { ZoneId = zoneId, RequestedByUserId = CurrentUserId }, cancellationToken));
 
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpDelete("doors/{doorId}")]
     public async Task<IActionResult> DeleteDoor(int doorId, CancellationToken cancellationToken)
     {
@@ -68,6 +73,7 @@ public class ZonesController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpPost("{zoneId}/access-rules")]
     public async Task<IActionResult> CreateZoneAccessRule(int zoneId, CreateZoneAccessRuleCommand command, CancellationToken cancellationToken)
     {
@@ -81,6 +87,7 @@ public class ZonesController : ControllerBase
     public async Task<IActionResult> GetZoneAccessRules(int zoneId, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetZoneAccessRulesQuery { ZoneId = zoneId, RequestedByUserId = CurrentUserId }, cancellationToken));
 
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpDelete("access-rules/{ruleId}")]
     public async Task<IActionResult> DeleteZoneAccessRule(int ruleId, CancellationToken cancellationToken)
     {

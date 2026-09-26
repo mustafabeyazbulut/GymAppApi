@@ -44,7 +44,9 @@ public class CreateZoneCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenCallerIsBranchManagerOfThisBranch_CreatesZone()
+    // Kapı/bölge erişim kurallarını sadece Gym Admin tanımlar (senaryo §4.5);
+    // Şube Yöneticisi kendi şubesinde bile yazamaz, sadece görüntüler.
+    public async Task Handle_WhenCallerIsBranchManagerOfThisBranch_ThrowsForbiddenException()
     {
         var branch = new Branch { Id = BranchId, CompanyId = CompanyId, Name = "Merkez" };
         var callerAssignments = new List<Assignment>
@@ -54,9 +56,8 @@ public class CreateZoneCommandHandlerTests
         var uow = Wire(branch, callerAssignments);
         var handler = new CreateZoneCommandHandler(uow.Object);
 
-        var result = await handler.Handle(new CreateZoneCommand { BranchId = BranchId, Name = "Ana Giriş", RequestedByUserId = CallerId }, CancellationToken.None);
-
-        Assert.Equal("Ana Giriş", result.Name);
+        await Assert.ThrowsAsync<GymAppApi.Application.Common.Exceptions.ForbiddenException>(() =>
+            handler.Handle(new CreateZoneCommand { BranchId = BranchId, Name = "Ana Giriş", RequestedByUserId = CallerId }, CancellationToken.None));
     }
 
     [Fact]

@@ -24,8 +24,7 @@ public class CreateZoneAccessRuleCommandHandler : IRequestHandler<CreateZoneAcce
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = callerAssignments.Any(a =>
-            (a.Role == AssignmentRole.GymAdmin && a.CompanyId == zone.CompanyId) ||
-            (a.Role == AssignmentRole.BranchManager && a.BranchId == zone.BranchId));
+            (a.Role == AssignmentRole.GymAdmin && a.CompanyId == zone.CompanyId));
         if (!callerIsAuthorized)
         {
             throw new ForbiddenException("ForbiddenManageDoorAccess");

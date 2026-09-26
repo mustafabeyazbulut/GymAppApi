@@ -57,7 +57,8 @@ public class DeleteDoorCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenCallerIsBranchManagerOfTheZonesBranch_DeletesDoor()
+    // Sadece Gym Admin kapı siler (senaryo §4.5).
+    public async Task Handle_WhenCallerIsBranchManagerOfTheZonesBranch_ThrowsForbiddenException()
     {
         var callerAssignments = new List<Assignment>
         {
@@ -66,9 +67,9 @@ public class DeleteDoorCommandHandlerTests
         var uow = Wire(TestDoor(), callerAssignments);
         var handler = new DeleteDoorCommandHandler(uow.Object);
 
-        await handler.Handle(new DeleteDoorCommand { DoorId = 1, RequestedByUserId = CallerId }, CancellationToken.None);
-
-        uow.Verify(u => u.SaveChangesAsync(default), Times.Once);
+        await Assert.ThrowsAsync<GymAppApi.Application.Common.Exceptions.ForbiddenException>(() =>
+            handler.Handle(new DeleteDoorCommand { DoorId = 1, RequestedByUserId = CallerId }, CancellationToken.None));
+        uow.Verify(u => u.SaveChangesAsync(default), Times.Never);
     }
 
     [Fact]
