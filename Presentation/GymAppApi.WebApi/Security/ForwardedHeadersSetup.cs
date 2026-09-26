@@ -1,32 +1,60 @@
 using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
 
 namespace GymAppApi.WebApi.Security;
 
+// "ForwardedHeaders" yapılandırma bölümü:
+//   "ForwardedHeaders": { "KnownProxies": ["10.0.0.5"], "KnownNetworks": ["10.0.0.0/8"], "ForwardLimit": 1 }
+// ForwardLimit, X-Forwarded-For'un sağından kaç girişin işleneceğidir: tek
+// proxy için 1 (varsayılan); CDN/LB -> iç proxy -> API gibi iki katmanda 2
+// (ve iki proxy de güven listesinde olmalı).
+public class ForwardedHeadersSettings
+{
+    public const string SectionName = "ForwardedHeaders";
+
+    public string[] KnownProxies { get; set; } = Array.Empty<string>();
+    public string[] KnownNetworks { get; set; } = Array.Empty<string>();
+    public int ForwardLimit { get; set; } = 1;
+
+    public IEnumerable<string> Proxies => KnownProxies.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v.Trim());
+    public IEnumerable<string> Networks => KnownNetworks.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v.Trim());
+    public bool HasTrustedProxies => Proxies.Any() || Networks.Any();
+}
+
 // Ters proxy / yük dengeleyici arkasında gerçek istemci IP'si (rate limit ve
 // hesap+IP giriş kilidi bunu kullanır) X-Forwarded-For'dan alınır - AMA sadece
-// yapılandırmada açıkça güvenilen proxy'lerden gelen isteklerde:
-//   "ForwardedHeaders": { "KnownProxies": ["10.0.0.5"], "KnownNetworks": ["10.0.0.0/8"] }
-// Liste boşsa X-Forwarded-For'a HİÇ güvenilmez (herkes sahte başlıkla kendi
-// IP'sini seçebilirdi) ve Development dışında açılışta uyarı loglanır.
+// yapılandırmada açıkça güvenilen proxy'lerden gelen isteklerde. Liste boşsa
+// X-Forwarded-For'a HİÇ güvenilmez (herkes sahte başlıkla kendi IP'sini
+// seçebilirdi) ve Development dışında açılışta uyarı loglanır. Hatalı girdi
+// ilk istekte değil açılışta uygulamayı durdurur.
 public static class ForwardedHeadersSetup
 {
-    private const string KnownProxiesKey = "ForwardedHeaders:KnownProxies";
-    private const string KnownNetworksKey = "ForwardedHeaders:KnownNetworks";
-
     public static IServiceCollection AddConfiguredForwardedHeaders(this IServiceCollection services)
     {
-        services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>((options, configuration) =>
+        services.AddOptions<ForwardedHeadersSettings>()
+            .BindConfiguration(ForwardedHeadersSettings.SectionName)
+            .Validate(s => s.Proxies.All(p => IPAddress.TryParse(p, out _)),
+                "ForwardedHeaders:KnownProxies contains an invalid IP address.")
+            .Validate(s => s.Networks.All(n => System.Net.IPNetwork.TryParse(n, out _)),
+                "ForwardedHeaders:KnownNetworks contains an invalid CIDR network (e.g. 10.0.0.0/8).")
+            .Validate(s => s.ForwardLimit >= 1,
+                "ForwardedHeaders:ForwardLimit must be at least 1.")
+            .ValidateOnStart();
+
+        services.AddOptions<ForwardedHeadersOptions>().Configure<IOptions<ForwardedHeadersSettings>>((options, settings) =>
         {
+            var value = settings.Value;
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.ForwardLimit = value.ForwardLimit;
             // Varsayılan (loopback) güven listesi temizlenir - sadece yapılandırılanlar.
             options.KnownProxies.Clear();
             options.KnownIPNetworks.Clear();
-            foreach (var proxy in ReadList(configuration, KnownProxiesKey))
+            foreach (var proxy in value.Proxies)
             {
                 options.KnownProxies.Add(IPAddress.Parse(proxy));
             }
-            foreach (var network in ReadList(configuration, KnownNetworksKey))
+            foreach (var network in value.Networks)
             {
                 options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
             }
@@ -35,11 +63,11 @@ public static class ForwardedHeadersSetup
     }
 
     // Pipeline'ın EN BAŞINDA çağrılmalı (rate limiter ve auth'tan önce).
+    // Ayarları burada okumak doğrulamayı da tetikler: hatalı liste açılışı durdurur.
     public static WebApplication UseConfiguredForwardedHeaders(this WebApplication app)
     {
-        var hasTrustedProxies = ReadList(app.Configuration, KnownProxiesKey).Length > 0
-                                || ReadList(app.Configuration, KnownNetworksKey).Length > 0;
-        if (!hasTrustedProxies)
+        var settings = app.Services.GetRequiredService<IOptions<ForwardedHeadersSettings>>().Value;
+        if (!settings.HasTrustedProxies)
         {
             if (!app.Environment.IsDevelopment())
             {
@@ -53,7 +81,4 @@ public static class ForwardedHeadersSetup
         app.UseForwardedHeaders();
         return app;
     }
-
-    private static string[] ReadList(IConfiguration configuration, string key) =>
-        configuration.GetSection(key).Get<string[]>()?.Where(v => !string.IsNullOrWhiteSpace(v)).ToArray() ?? Array.Empty<string>();
 }

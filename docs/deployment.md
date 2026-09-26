@@ -30,6 +30,42 @@ placeholder duruyorsa uygulama açılmaz. Değer ülke koduyla gerçek bir
 numara olmalıdır (örn. `+90XXXXXXXXXX`). Elle değiştirilmiş bir telefona
 dokunulmaz.
 
+## Ters proxy / X-Forwarded-For (`ForwardedHeaders`)
+
+IP bazlı rate limit ve hesap+IP giriş kilidi istemci IP'sini kullanır. API
+bir ters proxy veya yük dengeleyici arkasındaysa gerçek IP
+`X-Forwarded-For`'dan alınır, ama **sadece güvenilen proxy'lerden gelen
+isteklerde**:
+
+```json
+"ForwardedHeaders": {
+  "KnownProxies": ["10.0.0.5"],
+  "KnownNetworks": ["10.0.0.0/8"],
+  "ForwardLimit": 1
+}
+```
+
+(Ortam değişkeni: `ForwardedHeaders__KnownProxies__0=10.0.0.5`,
+`ForwardedHeaders__ForwardLimit=2` vb.)
+
+- Liste boşsa `X-Forwarded-For` tamamen yok sayılır (sahte başlıkla IP
+  seçmeyi önler). Development dışında açılışta uyarı loglanır. Proxy
+  arkasında liste boş kalırsa tüm istemciler proxy'nin IP'sinde toplanır ve
+  birbirinin limitini tüketir.
+- `ForwardLimit` başlığın sağından kaç girişin işleneceğidir (varsayılan 1).
+  CDN/LB -> iç proxy -> API gibi iki katmanlı zincirde `2` yapın ve **her iki**
+  proxy'yi de `KnownProxies`/`KnownNetworks`'e ekleyin.
+- Geçersiz IP/CIDR veya `ForwardLimit < 1` uygulamanın açılmasını engeller.
+- `X-Forwarded-Proto` da aynı güven kuralıyla işlenir.
+- **İstemci IP'si bilinmiyorsa** (`RemoteIpAddress` null) IP bazlı rate
+  limit ve IP bazlı giriş kilidi uygulanmaz; sadece tanımlayıcı limiti
+  geçerlidir. Kestrel bir **Unix Domain Socket** üzerinde dinliyorsa
+  (örn. nginx -> `unix:/run/gymapp.sock`) `RemoteIpAddress` her zaman null
+  olur ve socket bağlantısı güven listesiyle eşleşemediği için
+  `X-Forwarded-For` da işlenmez; yani IP limitleri fiilen devre dışı kalır.
+  IP limitleri isteniyorsa UDS yerine loopback TCP'de dinleyin
+  (örn. `http://127.0.0.1:5000`) ve `KnownProxies: ["127.0.0.1"]` verin.
+
 ## Dağıtım varsayımları
 
 - **Tek instance:** Tanımlayıcı bazlı rate limit (`IdentifierRateLimiter`)
