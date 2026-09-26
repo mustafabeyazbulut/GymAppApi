@@ -1,14 +1,14 @@
 using GymAppApi.Application.Common.Interfaces;
-using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Application.Common.Invitations;
 using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
-using GymAppApi.Domain.Enums;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Packages.Commands.ConfirmPackageAssignment;
 
+// SMS koduyla paket davetini onaylama. Kabulün iş kuralları (geçerli paket
+// engeli, atamanın oluşturulması) uygulama içi davet kabulüyle ortak:
+// PackageInvitationAcceptance.
 public class ConfirmPackageAssignmentCommandHandler : IRequestHandler<ConfirmPackageAssignmentCommand, ConfirmPackageAssignmentCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -19,9 +19,13 @@ public class ConfirmPackageAssignmentCommandHandler : IRequestHandler<ConfirmPac
     {
         var invitationWriteRepo = _unitOfWork.GetWriteRepository<PendingPackageAssignmentInvitation>();
         var now = DateTime.UtcNow;
+        // Davet 7 gün yaşar (uygulama içi kabul için), ama SMS KODU sadece
+        // gönderildikten sonraki kısa pencerede geçerlidir.
+        var codeIssuedAfter = now.AddMinutes(-PackageAssignmentInvitationService.CodeValidityMinutes);
 
         var liveInvitations = await _unitOfWork.GetReadRepository<PendingPackageAssignmentInvitation>().GetAllAsync(
-            p => p.TargetUserId == request.UserId && !p.IsUsed && p.ExpiresAt > now, cancellationToken: cancellationToken);
+            p => p.TargetUserId == request.UserId && !p.IsUsed && p.ExpiresAt > now && p.CreatedAt > codeIssuedAfter,
+            cancellationToken: cancellationToken);
 
         var matching = liveInvitations.FirstOrDefault(p => p.Code == request.Code && p.AttemptCount < PackageAssignmentInvitationService.MaxAttempts);
         if (matching is null)
@@ -35,54 +39,7 @@ public class ConfirmPackageAssignmentCommandHandler : IRequestHandler<ConfirmPac
             throw new InvalidPackageAssignmentInvitationCodeException();
         }
 
-        matching.IsUsed = true;
-        invitationWriteRepo.Update(matching);
-
-        // Defense in depth, same rationale as ConfirmAssignmentInvitationCommandHandler:
-        // something else could have assigned this package to the member in the
-        // meantime. The invitation is consumed either way.
-        // IgnoreQueryFilters (here and on the Package fetch below): the
-        // confirming caller is the MEMBER, who typically has no Assignment
-        // row at all, so their ambient CompanyId is always null (see the
-        // standing rule in .claude/memory/project-member-package-linkage-design.md)
-        // - without this, PackageAssignment/Package are invisible to them via
-        // the ICompanyScoped filter, silently defeating the duplicate check
-        // above and leaving RemainingSessions/EndDate null below (a package
-        // fetch that "succeeds" with null). Safe because AnyAsync/the
-        // downstream write are scoped by matching.PackageId/TargetUserId, not
-        // by tenant.
-        // Engel sadece bu pakette şu an GEÇERLİ bir atama (CreatePackageAssignment
-        // ile aynı kural) - süresi dolmuş/hakkı bitmiş/iptal eski atama yenilemeyi
-        // engellemez.
-        var membersValidAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
-            PackageAssignmentValidity.UsableOwnedBy(matching.TargetUserId, now),
-            include: q => q.IgnoreQueryFilters().Include(pa => pa.Package),
-            cancellationToken: cancellationToken);
-        if (membersValidAssignments.Any(pa => pa.PackageId == matching.PackageId))
-        {
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            throw new MemberAlreadyHasThisPackageException();
-        }
-
-        var package = await _unitOfWork.GetReadRepository<Package>().GetAsync(
-            p => p.Id == matching.PackageId,
-            include: q => q.IgnoreQueryFilters().Include(p => p.Company),
-            cancellationToken: cancellationToken);
-
-        var assignment = new PackageAssignment
-        {
-            PackageId = matching.PackageId,
-            MemberUserId = matching.TargetUserId,
-            CompanyId = matching.CompanyId,
-            BranchId = matching.BranchId,
-            AssignedByUserId = matching.RequestedByUserId,
-            StartDate = now,
-            EndDate = package?.DurationDays is int days ? now.AddDays(days) : null,
-            RemainingSessions = package?.SessionCount,
-            Status = PackageAssignmentStatus.Active,
-        };
-        await _unitOfWork.GetWriteRepository<PackageAssignment>().AddAsync(assignment, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var assignment = await PackageInvitationAcceptance.AcceptAsync(_unitOfWork, matching, now, cancellationToken);
 
         return new ConfirmPackageAssignmentCommandResult
         {

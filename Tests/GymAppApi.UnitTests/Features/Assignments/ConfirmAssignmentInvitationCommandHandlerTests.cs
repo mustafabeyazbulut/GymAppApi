@@ -20,12 +20,12 @@ public class ConfirmAssignmentInvitationCommandHandlerTests
             .ReturnsAsync(liveInvitations);
         var invitationWriteRepo = new Mock<IWriteRepository<PendingAssignmentInvitation>>();
 
-        var assignmentReadRepo = new Mock<IReadRepository<Assignment>>();
-        // Called up to twice: first the exact-duplicate defense-in-depth check, then (only if
-        // that's false, and only for GymAdmin/BranchManager) the cross-role conflict check.
-        assignmentReadRepo.SetupSequence(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
-            .ReturnsAsync(alreadyAssigned)
-            .ReturnsAsync(hasConflictingRole);
+        // Davetlinin o firmadaki mevcut atamaları (ortak AssignmentInvitationAcceptance
+        // tek okumayla hem duplicate hem rol çakışması kontrolü yapıyor).
+        var existing = new List<Assignment>();
+        if (alreadyAssigned) existing.Add(new Assignment { Id = 90, UserId = TargetUserId, CompanyId = 3, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true });
+        if (hasConflictingRole) existing.Add(new Assignment { Id = 91, UserId = TargetUserId, CompanyId = 3, BranchId = 11, Role = AssignmentRole.BranchManager, IsActive = true });
+        var assignmentReadRepo = GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(existing);
         var assignmentWriteRepo = new Mock<IWriteRepository<Assignment>>();
 
         var uow = new Mock<IUnitOfWork>();
@@ -49,6 +49,7 @@ public class ConfirmAssignmentInvitationCommandHandlerTests
         Code = code,
         IsUsed = false,
         ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+        CreatedAt = DateTime.UtcNow.AddMinutes(-1),
         AttemptCount = attemptCount,
     };
 

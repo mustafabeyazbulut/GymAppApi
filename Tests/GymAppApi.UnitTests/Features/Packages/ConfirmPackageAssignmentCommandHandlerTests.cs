@@ -52,6 +52,7 @@ public class ConfirmPackageAssignmentCommandHandlerTests
         Code = code,
         IsUsed = false,
         ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+        CreatedAt = DateTime.UtcNow.AddMinutes(-1),
         AttemptCount = attemptCount,
     };
 

@@ -2,11 +2,13 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.Invitations;
 using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
-using GymAppApi.Domain.Enums;
 using MediatR;
 
 namespace GymAppApi.Application.Features.Assignments.Commands.ConfirmAssignmentInvitation;
 
+// SMS koduyla personel davetini onaylama. Kabulün iş kuralları (duplicate,
+// GymAdmin+BranchManager çakışması, atamanın oluşturulması) uygulama içi
+// davet kabulüyle ortak: AssignmentInvitationAcceptance.
 public class ConfirmAssignmentInvitationCommandHandler : IRequestHandler<ConfirmAssignmentInvitationCommand, ConfirmAssignmentInvitationCommandResult>
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -17,11 +19,15 @@ public class ConfirmAssignmentInvitationCommandHandler : IRequestHandler<Confirm
     {
         var invitationWriteRepo = _unitOfWork.GetWriteRepository<PendingAssignmentInvitation>();
         var now = DateTime.UtcNow;
+        // Davet 7 gün yaşar (uygulama içi kabul için), ama SMS KODU sadece
+        // gönderildikten sonraki kısa pencerede geçerlidir.
+        var codeIssuedAfter = now.AddMinutes(-AssignmentInvitationService.CodeValidityMinutes);
 
         // A user can have more than one live invitation at once (different
         // companies) - fetch all of them rather than assuming exactly one.
         var liveInvitations = await _unitOfWork.GetReadRepository<PendingAssignmentInvitation>().GetAllAsync(
-            p => p.TargetUserId == request.UserId && !p.IsUsed && p.ExpiresAt > now, cancellationToken: cancellationToken);
+            p => p.TargetUserId == request.UserId && !p.IsUsed && p.ExpiresAt > now && p.CreatedAt > codeIssuedAfter,
+            cancellationToken: cancellationToken);
 
         var matching = liveInvitations.FirstOrDefault(p => p.Code == request.Code && p.AttemptCount < AssignmentInvitationService.MaxAttempts);
         if (matching is null)
@@ -39,50 +45,7 @@ public class ConfirmAssignmentInvitationCommandHandler : IRequestHandler<Confirm
             throw new InvalidAssignmentInvitationCodeException();
         }
 
-        matching.IsUsed = true;
-        invitationWriteRepo.Update(matching);
-
-        // Defense in depth: something else (another invitation, another
-        // route) could have assigned this user to the company in the
-        // meantime. The invitation is still consumed either way - it must
-        // never be redeemable twice.
-        var alreadyAssigned = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
-            a => a.UserId == matching.TargetUserId && a.CompanyId == matching.CompanyId &&
-                 a.BranchId == matching.BranchId && a.Role == matching.Role && a.IsActive, cancellationToken);
-        if (alreadyAssigned)
-        {
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            throw new UserAlreadyAssignedException();
-        }
-
-        // Closes the race window between the two issue-time checks in
-        // AddStaffMemberCommandHandler/InviteGymAdminCommandHandler: a second,
-        // conflicting invitation (GymAdmin vs BranchManager, same company) could
-        // have been issued and confirmed first. GymAdmin already covers every
-        // branch, so the two roles can never coexist for the same user+company.
-        if (matching.Role == AssignmentRole.GymAdmin || matching.Role == AssignmentRole.BranchManager)
-        {
-            var conflictingRole = matching.Role == AssignmentRole.GymAdmin ? AssignmentRole.BranchManager : AssignmentRole.GymAdmin;
-            var hasConflictingRole = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
-                a => a.UserId == matching.TargetUserId && a.CompanyId == matching.CompanyId &&
-                     a.Role == conflictingRole && a.IsActive, cancellationToken);
-            if (hasConflictingRole)
-            {
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
-                throw new ConflictingAssignmentRoleException();
-            }
-        }
-
-        var assignment = new Assignment
-        {
-            UserId = matching.TargetUserId,
-            CompanyId = matching.CompanyId,
-            BranchId = matching.BranchId,
-            Role = matching.Role,
-            IsActive = true,
-        };
-        await _unitOfWork.GetWriteRepository<Assignment>().AddAsync(assignment, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var assignment = await AssignmentInvitationAcceptance.AcceptAsync(_unitOfWork, matching, cancellationToken);
 
         return new ConfirmAssignmentInvitationCommandResult
         {

@@ -9,7 +9,11 @@ namespace GymAppApi.Application.Common.Invitations;
 public static class PackageAssignmentInvitationService
 {
     public const int MaxAttempts = 5;
-    private const int CodeExpiryMinutes = 10;
+    // Davetin kendisi uygulama içi "Davetlerim" listesinden kabul/red edilebilsin
+    // diye günlerce yaşar; SMS kodu ise sadece gönderildikten sonraki kısa
+    // pencerede geçerlidir (confirm handler'ı CreatedAt ile kontrol eder).
+    public const int InvitationValidityDays = 7;
+    public const int CodeValidityMinutes = 10;
     private const int CooldownSeconds = 60;
 
     public static async Task<string> IssueAsync(
@@ -45,7 +49,7 @@ public static class PackageAssignmentInvitationService
             BranchId = branchId,
             RequestedByUserId = requestedByUserId,
             Code = code,
-            ExpiresAt = now.AddMinutes(CodeExpiryMinutes),
+            ExpiresAt = now.AddDays(InvitationValidityDays),
             AttemptCount = 0,
             IsUsed = false,
         }, cancellationToken);
