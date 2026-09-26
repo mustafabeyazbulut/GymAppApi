@@ -24,7 +24,7 @@ builder.Services.AddHostedService<OutstandingBalanceReminderHostedService>();
 builder.Services.AddHostedService<SuperAdminPhoneSeedHostedService>();
 
 // AddStaffMemberCommand.Role is the first request body to expose an enum to
-// clients - without this, "role":"Member" fails model binding since
+// clients - without this, "role":"Trainer" fails model binding since
 // System.Text.Json defaults to numeric enum (de)serialization.
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));

@@ -68,7 +68,6 @@ public static class AppMessages
         ["ForbiddenViewTrainers"] = ("You are not authorized to view this package assignment's trainers.", "Bu paket atamasının antrenörlerini görme yetkiniz yok."),
         ["ForbiddenRemoveAssignment"] = ("You are not authorized to remove this assignment.", "Bu atamayı kaldırma yetkiniz yok."),
         ["ForbiddenAddStaffToBranch"] = ("You are not authorized to add staff to this branch.", "Bu şubeye personel ekleme yetkiniz yok."),
-        ["ForbiddenCreateAssignment"] = ("You are not authorized to create an assignment for this company.", "Bu firma için atama yapma yetkiniz yok."),
         ["ForbiddenInviteGymAdmin"] = ("You are not authorized to send a GymAdmin invitation for this company.", "Bu firma için Gym Admin daveti gönderme yetkiniz yok."),
         ["ForbiddenCreateContentItem"] = ("You are not authorized to upload content for this company/branch.", "Bu firma/şube için içerik yükleme yetkiniz yok."),
         ["ForbiddenSetContentItemActive"] = ("You are not authorized to activate/deactivate this content item.", "Bu içeriği aktif/pasif yapma yetkiniz yok."),

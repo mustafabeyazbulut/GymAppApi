@@ -70,11 +70,8 @@ public class TenantResolutionService : ITenantResolutionService
             return FromAssignment(chosen);
         }
 
-        // 4) Sadece eski modelden kalan (Member) atamalar: önceki davranış
-        //    korunuyor - en eski atamanın firma kapsamı. Bu satırlar senaryo
-        //    §10.7 gereği ayrı bir adımda tamamen silinecek.
-        var legacy = assignments.OrderBy(a => a.Id).First();
-        return FromAssignment(legacy);
+        // Personel ataması yok (ör. sadece paketli üye): personel bağlamı yok.
+        return new ResolvedTenant(false, null, null);
     }
 
     private static bool IsStaffRole(AssignmentRole role) =>

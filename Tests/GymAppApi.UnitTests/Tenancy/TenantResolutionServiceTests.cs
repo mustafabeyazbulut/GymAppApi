@@ -268,9 +268,10 @@ public class TenantResolutionServiceTests
     [Fact]
     public async Task ResolveForUserAsync_WithOwnNonStaffAssignmentId_IsRejected()
     {
-        // Eski modelden kalan Member ataması personel bağlamı olamaz.
+        // SuperAdmin ataması bir gym personel ataması değil - aktif atama
+        // olarak seçilemez (firma yönetimi header'sız yapılır).
         var dbName = Guid.NewGuid().ToString();
-        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName, (1, null, AssignmentRole.Member, true));
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName, (null, null, AssignmentRole.SuperAdmin, true));
 
         var resolved = await ResolveAsync(dbName, userId, activeAssignmentId: ids[0]);
 

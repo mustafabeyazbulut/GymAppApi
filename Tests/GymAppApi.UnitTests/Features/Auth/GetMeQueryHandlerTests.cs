@@ -70,7 +70,7 @@ public class GetMeQueryHandlerTests
             Id = 1, FullName = "Ayşe", Phone = "+905551112233", PasswordHash = "x",
             Assignments = new List<Assignment>
             {
-                new() { Id = 10, UserId = 1, CompanyId = 3, Company = company, BranchId = null, Role = AssignmentRole.Member, IsActive = true },
+                new() { Id = 10, UserId = 1, CompanyId = 3, Company = company, BranchId = null, Role = AssignmentRole.GymAdmin, IsActive = true },
             },
         };
         var userReadRepo = new Mock<IReadRepository<User>>();
@@ -85,7 +85,7 @@ public class GetMeQueryHandlerTests
         var assignment = Assert.Single(result.Assignments);
         Assert.Equal(3, assignment.CompanyId);
         Assert.Equal("MAT & MOVE Kadıköy", assignment.CompanyName);
-        Assert.Equal("Member", assignment.Role);
+        Assert.Equal("GymAdmin", assignment.Role);
     }
 
     [Fact]

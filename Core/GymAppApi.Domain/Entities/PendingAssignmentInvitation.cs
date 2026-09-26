@@ -4,7 +4,7 @@ using GymAppApi.Domain.Enums;
 namespace GymAppApi.Domain.Entities;
 
 // The security gate for CreateCompany's GymAdmin and AddStaffMember's
-// Member/Trainer flows: attaching an existing, already-registered user to a
+// Trainer/BranchManager flows: attaching an existing, already-registered user to a
 // company/branch never happens immediately from the inviter's request alone
 // — it only takes effect once the INVITEE proves control of their own phone
 // by confirming this row's Code (see ConfirmAssignmentInvitationCommand).

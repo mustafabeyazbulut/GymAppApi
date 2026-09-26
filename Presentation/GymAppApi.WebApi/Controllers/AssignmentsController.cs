@@ -1,7 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using GymAppApi.Application.Features.Assignments.Commands.AddStaffMember;
 using GymAppApi.Application.Features.Assignments.Commands.ConfirmAssignmentInvitation;
-using GymAppApi.Application.Features.Assignments.Commands.CreateAssignment;
 using GymAppApi.Application.Features.Assignments.Commands.InviteGymAdmin;
 using GymAppApi.Application.Features.Assignments.Commands.RemoveAssignment;
 using GymAppApi.Application.Features.Assignments.Queries.GetStaffMembers;
@@ -20,15 +19,6 @@ public class AssignmentsController : ControllerBase
     public AssignmentsController(IMediator mediator) => _mediator = mediator;
 
     private int CurrentUserId => int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
-
-    [Authorize(Policy = "GymAdminOrSuperAdmin")]
-    [HttpPost]
-    public async Task<IActionResult> Create(CreateAssignmentCommand command, CancellationToken cancellationToken)
-    {
-        command.RequestedByUserId = CurrentUserId;
-        var result = await _mediator.Send(command, cancellationToken);
-        return StatusCode(StatusCodes.Status201Created, result);
-    }
 
     // Personelin (ekleme/kaldırma zaten vardı) kendi şirketinin personelini
     // görebilmesi için - kim çalışıyor sorusunun tek cevabı Swagger'dı.

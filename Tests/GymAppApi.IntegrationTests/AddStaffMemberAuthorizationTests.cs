@@ -73,7 +73,9 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
     }
 
     [Fact]
-    public async Task AddStaff_WithRoleMember_Returns422()
+    // Member artık bir AssignmentRole değeri değil (senaryo §10.7) - istek
+    // model binding'de (bilinmeyen enum değeri) reddedilir.
+    public async Task AddStaff_WithRemovedRoleMember_Returns400()
     {
         var (branchId, _, candidatePhone, branchManagerToken, _, _, _) = await SeedAsync();
         var client = _factory.CreateClient();
@@ -81,7 +83,7 @@ public class AddStaffMemberAuthorizationTests : IClassFixture<CustomWebApplicati
 
         var response = await client.PostAsJsonAsync("/api/assignments/staff", new { phone = candidatePhone, role = "Member", branchId });
 
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
