@@ -34,4 +34,7 @@ public record ResolvedTenant(
     int? BranchId,
     int? AssignmentId = null,
     AssignmentRole? Role = null,
-    bool ActiveAssignmentRejected = false);
+    bool ActiveAssignmentRejected = false,
+    // Aktif atamanın firması pasif (kapatılmış) - personel yazma uçları 403
+    // CompanyInactive döner (bkz. WebApi ActiveCompanyRequiredFilter).
+    bool CompanyInactive = false);

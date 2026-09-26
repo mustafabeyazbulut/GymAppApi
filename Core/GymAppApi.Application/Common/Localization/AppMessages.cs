@@ -109,6 +109,9 @@ public static class AppMessages
         ["InvalidActiveAssignment"] = (
             "The selected role is not valid for your account. Please select one of your active roles again.",
             "Seçili rol hesabınız için geçerli değil. Lütfen aktif rollerinizden birini yeniden seçin."),
+        ["CompanyInactive"] = (
+            "This company has been deactivated; no changes can be made on its behalf.",
+            "Bu firma pasife alınmış; firma adına değişiklik yapılamaz."),
         ["ForbiddenManageDoorAccess"] = ("You are not authorized to manage door access for this branch.", "Bu şube için kapı erişimini yönetme yetkiniz yok."),
 
         // ConflictException kodları (isimlendirilmiş exception sınıfları)

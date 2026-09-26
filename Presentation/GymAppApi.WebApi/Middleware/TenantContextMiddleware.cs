@@ -67,6 +67,7 @@ public class TenantContextMiddleware
             tenantContext.BranchId = resolved.BranchId;
             tenantContext.AssignmentId = resolved.AssignmentId;
             tenantContext.Role = resolved.Role;
+            tenantContext.CompanyInactive = resolved.CompanyInactive;
         }
 
         await _next(context);

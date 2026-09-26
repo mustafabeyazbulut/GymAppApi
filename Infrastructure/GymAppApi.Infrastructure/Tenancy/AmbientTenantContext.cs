@@ -17,4 +17,5 @@ public class AmbientTenantContext : ITenantContext
     public bool IsSuperAdmin { get; set; }
     public int? AssignmentId { get; set; }
     public AssignmentRole? Role { get; set; }
+    public bool CompanyInactive { get; set; }
 }

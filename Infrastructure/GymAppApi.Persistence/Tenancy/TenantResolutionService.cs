@@ -21,8 +21,14 @@ public class TenantResolutionService : ITenantResolutionService
         // One of the few places allowed to bypass the tenant query filter (see
         // also GetMeQueryHandler, same rationale) — resolving a user's OWN
         // assignments must not itself already be tenant-filtered.
+        // Company: firmanın aktifliği bağlama taşınır (CompanyInactive) - filtre
+        // IgnoreQueryFilters ile include'a da uygulanmaz, pasif firma da yüklenir.
+        // AsNoTracking: istek boyunca aynı (scoped) DbContext'i kullanan
+        // handler'ların Company/Assignment güncellemeleriyle izleme çakışmasın.
         var assignments = await _dbContext.Assignments
+            .AsNoTracking()
             .IgnoreQueryFilters()
+            .Include(a => a.Company)
             .Where(a => a.UserId == userId && a.IsActive)
             .ToListAsync(cancellationToken);
 
@@ -90,5 +96,6 @@ public class TenantResolutionService : ITenantResolutionService
     };
 
     private static ResolvedTenant FromAssignment(Assignment assignment) =>
-        new(false, assignment.CompanyId, assignment.BranchId, assignment.Id, assignment.Role);
+        new(false, assignment.CompanyId, assignment.BranchId, assignment.Id, assignment.Role,
+            CompanyInactive: assignment.Company is { IsActive: false });
 }

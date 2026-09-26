@@ -32,7 +32,8 @@ builder.Services.AddHostedService<LoginFailureCleanupHostedService>();
 // AddStaffMemberCommand.Role is the first request body to expose an enum to
 // clients - without this, "role":"Trainer" fails model binding since
 // System.Text.Json defaults to numeric enum (de)serialization.
-builder.Services.AddControllers()
+// ActiveCompanyRequiredFilter: pasif firmadaki personelin yazma uçları 403 CompanyInactive.
+builder.Services.AddControllers(options => options.Filters.Add<GymAppApi.WebApi.Authorization.ActiveCompanyRequiredFilter>())
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddCors(options =>

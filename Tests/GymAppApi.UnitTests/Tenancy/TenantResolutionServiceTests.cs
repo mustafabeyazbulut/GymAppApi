@@ -68,6 +68,32 @@ public class TenantResolutionServiceTests
         Assert.Null(resolved.BranchId);
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task ResolveForUserAsync_CarriesWhetherTheActiveCompanyIsInactive(bool companyActive, bool expectedInactive)
+    {
+        var dbName = Guid.NewGuid().ToString();
+        int userId;
+        await using (var seedContext = CreateSeedContext(dbName))
+        {
+            var company = new Company { Name = "Firma", IsActive = companyActive };
+            var user = new User { FullName = "Gym Admin", Phone = "+905550000019", PasswordHash = "x" };
+            seedContext.Companies.Add(company);
+            seedContext.Users.Add(user);
+            await seedContext.SaveChangesAsync();
+            userId = user.Id;
+            seedContext.Assignments.Add(new Assignment { UserId = user.Id, CompanyId = company.Id, Role = AssignmentRole.GymAdmin, IsActive = true });
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var context = CreateUnresolvedContext(dbName);
+        var resolved = await new TenantResolutionService(context).ResolveForUserAsync(userId);
+
+        Assert.Equal(AssignmentRole.GymAdmin, resolved.Role);
+        Assert.Equal(expectedInactive, resolved.CompanyInactive);
+    }
+
     [Fact]
     public async Task ResolveForUserAsync_WhenUserIsSuperAdmin_ReturnsSuperAdminRegardlessOfOtherAssignments()
     {

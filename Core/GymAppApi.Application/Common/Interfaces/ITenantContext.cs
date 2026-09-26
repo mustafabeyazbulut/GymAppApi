@@ -14,4 +14,7 @@ public interface ITenantContext
     // uygulamalarının derlenmeye devam etmesi için.
     int? AssignmentId => null;
     AssignmentRole? Role => null;
+
+    // Aktif atamanın firması pasif mi (bkz. ResolvedTenant.CompanyInactive).
+    bool CompanyInactive => false;
 }
