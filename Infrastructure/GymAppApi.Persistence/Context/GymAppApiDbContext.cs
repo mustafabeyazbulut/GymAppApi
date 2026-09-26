@@ -58,6 +58,7 @@ public class GymAppApiDbContext : DbContext
     public DbSet<Door> Doors => Set<Door>();
     public DbSet<ZoneAccessRule> ZoneAccessRules => Set<ZoneAccessRule>();
     public DbSet<PersonalLog> PersonalLogs => Set<PersonalLog>();
+    public DbSet<Service> Services => Set<Service>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

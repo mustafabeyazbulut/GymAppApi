@@ -147,6 +147,14 @@ public static class AppMessages
             "Too many code requests were sent. Please try again later.",
             "Çok fazla kod isteği gönderildi. Lütfen daha sonra tekrar deneyin."),
 
+        // Hizmetler (Services)
+        ["ServiceNotFound"] = ("Service {0} not found.", "Hizmet {0} bulunamadı."),
+        ["ServiceNameTaken"] = ("A service with this name already exists in this branch.", "Bu şubede aynı adda bir hizmet zaten var."),
+        ["ServiceNameRequired"] = ("Service name is required.", "Hizmet adı zorunludur."),
+        ["ServiceNameTooLong"] = ("Service name can be at most 60 characters.", "Hizmet adı en fazla 60 karakter olabilir."),
+        ["ForbiddenManageService"] = ("You are not authorized to manage services of this branch.", "Bu şubenin hizmetlerini yönetme yetkiniz yok."),
+        ["ForbiddenViewServices"] = ("You are not authorized to view services of this branch.", "Bu şubenin hizmetlerini görüntüleme yetkiniz yok."),
+
         // Platform raporları
         ["InvalidReportPeriod"] = ("The report period must be one of: {0} days.", "Rapor dönemi şunlardan biri olmalıdır: {0} gün."),
 
