@@ -24,6 +24,14 @@ public static class PackageAssignmentValidity
     // Bellekteki tek bir atama için (ör. derse kayıt / rezervasyon kontrolü).
     public static bool IsUsable(PackageAssignment assignment, DateTime now) => CompiledDefinition(assignment, now);
 
+    // EF sorgusu için: tüm geçerli paketler (ör. firma bazlı üye sayımı).
+    public static Expression<Func<PackageAssignment, bool>> Usable(DateTime now)
+    {
+        var assignment = Definition.Parameters[0];
+        var usableAtNow = new ParameterReplacer(Definition.Parameters[1], Expression.Constant(now)).Visit(Definition.Body);
+        return Expression.Lambda<Func<PackageAssignment, bool>>(usableAtNow, assignment);
+    }
+
     // EF sorgusu için: bir üyenin kendi geçerli paketleri. Aynı Definition
     // gövdesi SQL'e çevrilebilir bir predicate'e dönüştürülür - kural iki
     // ayrı yerde elle tekrarlanmaz.

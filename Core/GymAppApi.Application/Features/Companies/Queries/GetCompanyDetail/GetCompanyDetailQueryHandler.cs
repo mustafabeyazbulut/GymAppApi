@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Application.Features.Branches.Queries.GetBranches;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -35,6 +36,17 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
             include: q => q.Include(a => a.User!),
             cancellationToken: cancellationToken);
 
+        // Senaryo §3.2: firmanın üyesi = o firmada GEÇERLİ paketi olan tekil kullanıcı.
+        var validPackageAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
+            PackageAssignmentValidity.Usable(DateTime.UtcNow),
+            include: q => q.IgnoreQueryFilters().Include(pa => pa.Package),
+            cancellationToken: cancellationToken);
+        var memberCount = validPackageAssignments
+            .Where(pa => pa.CompanyId == request.CompanyId)
+            .Select(pa => pa.MemberUserId)
+            .Distinct()
+            .Count();
+
         // Bir subenin BranchManager'i - ayni subeye birden fazla BranchManager
         // atanmasi teoride mumkun olsa da (AddStaffMember bunu engellemiyor),
         // pratikte her zaman tek kisi olduğundan ilkini gostermek yeterli.
@@ -69,7 +81,7 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
             GymAdminCount = assignments.Count(a => a.Role == AssignmentRole.GymAdmin),
             BranchManagerCount = assignments.Count(a => a.Role == AssignmentRole.BranchManager),
             TrainerCount = assignments.Count(a => a.Role == AssignmentRole.Trainer),
-            MemberCount = assignments.Count(a => a.Role == AssignmentRole.Member),
+            MemberCount = memberCount,
         };
     }
 }

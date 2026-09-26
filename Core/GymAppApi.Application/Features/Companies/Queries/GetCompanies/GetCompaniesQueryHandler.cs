@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -27,6 +28,16 @@ public class GetCompaniesQueryHandler : IRequestHandler<GetCompaniesQuery, IRead
             cancellationToken: cancellationToken);
         var assignmentsByCompany = assignments.ToLookup(a => a.CompanyId!.Value);
 
+        // Senaryo §3.2: firmanın üyesi = o firmada GEÇERLİ paketi olan kullanıcı.
+        // Aynı kişinin birden fazla geçerli paketi tek üye sayılır.
+        var validPackageAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
+            PackageAssignmentValidity.Usable(DateTime.UtcNow),
+            include: q => q.IgnoreQueryFilters().Include(pa => pa.Package),
+            cancellationToken: cancellationToken);
+        var memberCountByCompany = validPackageAssignments
+            .GroupBy(pa => pa.CompanyId)
+            .ToDictionary(g => g.Key, g => g.Select(pa => pa.MemberUserId).Distinct().Count());
+
         return companies.Select(c =>
         {
             var companyAssignments = assignmentsByCompany[c.Id];
@@ -39,7 +50,7 @@ public class GetCompaniesQueryHandler : IRequestHandler<GetCompaniesQuery, IRead
                 GymAdminCount = companyAssignments.Count(a => a.Role == AssignmentRole.GymAdmin),
                 BranchManagerCount = companyAssignments.Count(a => a.Role == AssignmentRole.BranchManager),
                 TrainerCount = companyAssignments.Count(a => a.Role == AssignmentRole.Trainer),
-                MemberCount = companyAssignments.Count(a => a.Role == AssignmentRole.Member),
+                MemberCount = memberCountByCompany.GetValueOrDefault(c.Id),
             };
         }).ToList();
     }

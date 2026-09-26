@@ -51,6 +51,13 @@ public class PackageAssignmentValidityTests
         Assert.Equal(expected, predicate(assignment));
     }
 
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void Usable_ExpressionAgreesWithIsUsable(PackageAssignment assignment, bool expected)
+    {
+        Assert.Equal(expected, PackageAssignmentValidity.Usable(Now).Compile()(assignment));
+    }
+
     [Fact]
     public void UsableOwnedBy_ExcludesAnotherMembersValidPackage()
     {
