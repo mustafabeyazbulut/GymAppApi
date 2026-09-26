@@ -15,7 +15,7 @@ public class CancelClassEnrollmentCommandHandler : IRequestHandler<CancelClassEn
     // zaman alanları timezone bilgisi taşımaz." ClassSession.Date/StartTime bu
     // yüzden TR yerel saatini (UTC+3, DST yok) temsil eder - cutoff
     // karşılaştırması da aynı saat diliminde yapılmalı.
-    public const int TurkeyUtcOffsetHours = 3;
+    public const int TurkeyUtcOffsetHours = GymAppApi.Application.Common.Time.TurkeyCalendar.UtcOffsetHours;
 
     private readonly IUnitOfWork _unitOfWork;
 

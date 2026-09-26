@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Time;
 using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -56,24 +57,27 @@ public class UnfreezePackageAssignmentCommandHandler : IRequestHandler<UnfreezeP
         var now = DateTime.UtcNow;
         if (assignment.FrozenAt is not null)
         {
-            var elapsedDays = (now - assignment.FrozenAt.Value).TotalDays;
+            // Gün bazlı (Türkiye yerel günü): dondurulan günler, dondurma günü
+            // ile açılıştan önceki gün arasıdır, iki uç dahil. Açılış günü üyenin
+            // kullandığı aktif bir gündür; aynı gün içinde dondurup açmak 0 gün.
+            // Saat/saniye kesirleri hak yemez (eski Math.Ceiling 5 gün + birkaç
+            // saniyeyi 6 gün sayıyordu).
+            var frozenDays = Math.Max(0,
+                TurkeyCalendar.LocalDate(now).DayNumber - TurkeyCalendar.LocalDate(assignment.FrozenAt.Value).DayNumber);
             var maxFreezeDays = assignment.Package?.MaxFreezeDays;
             // Paketin bir dondurma sınırı varsa, EndDate'e eklenecek süre bu
             // döngüde kalan hakla sınırlanır - sınırsız süre dondurup
             // sonradan açarak sınırı aşmayı engeller (bkz.
             // FreezePackageAssignmentCommandHandler'ın giriş kontrolü).
             var appliedDays = maxFreezeDays is null
-                ? elapsedDays
-                : Math.Min(elapsedDays, Math.Max(0, maxFreezeDays.Value - assignment.TotalFrozenDays));
+                ? frozenDays
+                : Math.Min(frozenDays, Math.Max(0, maxFreezeDays.Value - assignment.TotalFrozenDays));
 
             if (assignment.EndDate is not null)
             {
                 assignment.EndDate = assignment.EndDate.Value.AddDays(appliedDays);
             }
-            // Kısmi bir gün her zaman tam gün olarak sayılır (yukarı
-            // yuvarlama) - dondurma hakkını birkaç saatlik döngülere bölüp
-            // sınırı aşmaya çalışmayı anlamsız kılar.
-            assignment.TotalFrozenDays += (int)Math.Ceiling(appliedDays);
+            assignment.TotalFrozenDays += appliedDays;
         }
         assignment.Status = PackageAssignmentStatus.Active;
         assignment.FrozenAt = null;

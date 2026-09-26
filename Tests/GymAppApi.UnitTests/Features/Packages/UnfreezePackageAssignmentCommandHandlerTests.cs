@@ -132,27 +132,62 @@ public class UnfreezePackageAssignmentCommandHandlerTests
         writeRepo.Verify(r => r.Update(assignment), Times.Once);
     }
 
-    [Fact]
-    public async Task Handle_WhenNoFreezeLimit_AppliesTheFullFrozenDuration()
+    // Dondurma gün bazlı (Türkiye yerel günü): dondurulan günler, dondurma
+    // günü ile açılıştan önceki gün arasıdır (iki uç dahil) - açılış günü
+    // üyenin kullandığı aktif bir gündür. Saniye/saat kesirleri hak yemez.
+    // FrozenAt, testin çalıştığı andan bağımsız olsun diye N gün önceki
+    // TR yerel gününün öğlesine sabitleniyor.
+    private static DateTime TurkeyNoonDaysAgo(int days)
+    {
+        var localDate = GymAppApi.Application.Common.Time.TurkeyCalendar.LocalDate(DateTime.UtcNow).AddDays(-days);
+        return DateTime.SpecifyKind(localDate.ToDateTime(new TimeOnly(12, 0)), DateTimeKind.Utc)
+            .AddHours(-GymAppApi.Application.Common.Time.TurkeyCalendar.UtcOffsetHours);
+    }
+
+    private static async Task<PackageAssignment> UnfreezeAsync(DateTime frozenAt, DateTime? endDate, int? maxFreezeDays = null, int totalFrozenDays = 0)
     {
         const int memberId = 7;
-        var package = new Package { Id = 5, MaxFreezeDays = null };
-        // Tam 15.0 gün DEĞİL, kasıtlı olarak 10.5 saat - testin çalışma
-        // süresindeki birkaç milisaniyelik farkın Math.Ceiling sonucunu
-        // (handler'ın "kısmi gün her zaman tam gün sayılır" kuralı)
-        // belirsizleştirmesini önlemek için net bir kesirli değer kullanılıyor.
-        var frozenAt = DateTime.UtcNow.AddHours(-(15 * 24 + 10));
-        var originalEndDate = DateTime.UtcNow.AddDays(30);
         var assignment = new PackageAssignment
         {
-            Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, Package = package, MemberUserId = memberId,
-            Status = PackageAssignmentStatus.Frozen, FrozenAt = frozenAt, EndDate = originalEndDate, TotalFrozenDays = 0,
+            Id = 1, CompanyId = 1, BranchId = 10, PackageId = 5, Package = new Package { Id = 5, MaxFreezeDays = maxFreezeDays }, MemberUserId = memberId,
+            Status = PackageAssignmentStatus.Frozen, FrozenAt = frozenAt, EndDate = endDate, TotalFrozenDays = totalFrozenDays,
         };
         var (uow, _) = Wire(assignment, callerAssignments: new List<Assignment>());
-        var handler = new UnfreezePackageAssignmentCommandHandler(uow.Object);
+        await new UnfreezePackageAssignmentCommandHandler(uow.Object)
+            .Handle(new UnfreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None);
+        return assignment;
+    }
 
-        await handler.Handle(new UnfreezePackageAssignmentCommand { PackageAssignmentId = 1, RequestedByUserId = memberId }, CancellationToken.None);
+    [Fact]
+    public async Task Handle_WhenNoFreezeLimit_AppliesTheFullFrozenDuration_InWholeDays()
+    {
+        var originalEndDate = DateTime.UtcNow.AddDays(30);
 
-        Assert.Equal(16, assignment.TotalFrozenDays);
+        var assignment = await UnfreezeAsync(TurkeyNoonDaysAgo(15), originalEndDate);
+
+        Assert.Equal(15, assignment.TotalFrozenDays);
+        Assert.Equal(originalEndDate.AddDays(15), assignment.EndDate);
+    }
+
+    [Fact]
+    public async Task Handle_FiveDaysAndAFewSeconds_CountsAsFiveDays()
+    {
+        // Canlı test bulgusu: Math.Ceiling yüzünden 5 gün + birkaç saniye 6 gün sayılıyordu.
+        var frozenAt = TurkeyNoonDaysAgo(5).AddSeconds(-5);
+
+        var assignment = await UnfreezeAsync(frozenAt, DateTime.UtcNow.AddDays(30));
+
+        Assert.Equal(5, assignment.TotalFrozenDays);
+    }
+
+    [Fact]
+    public async Task Handle_FrozenAndUnfrozenOnTheSameLocalDay_CountsNoDays()
+    {
+        var originalEndDate = DateTime.UtcNow.AddDays(30);
+
+        var assignment = await UnfreezeAsync(TurkeyNoonDaysAgo(0).AddHours(-11), originalEndDate);
+
+        Assert.Equal(0, assignment.TotalFrozenDays);
+        Assert.Equal(originalEndDate, assignment.EndDate);
     }
 }
