@@ -15,19 +15,28 @@ namespace GymAppApi.Application.Features.Reservations.Queries.GetMyReservations;
 public class GetMyReservationsQueryHandler : IRequestHandler<GetMyReservationsQuery, IReadOnlyList<MyReservationDto>>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITenantContext _tenantContext;
 
-    public GetMyReservationsQueryHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+    public GetMyReservationsQueryHandler(IUnitOfWork unitOfWork, ITenantContext tenantContext)
+    {
+        _unitOfWork = unitOfWork;
+        _tenantContext = tenantContext;
+    }
 
     public async Task<IReadOnlyList<MyReservationDto>> Handle(GetMyReservationsQuery request, CancellationToken cancellationToken)
     {
-        // IgnoreQueryFilters: bir antrenörün ambient CompanyId'si (kendi
-        // Assignment'ından çözülür) sadece TEK bir şirkete işaret eder, ama
-        // bir antrenör birden fazla şubede/şirkette çalışıyor olabilir -
-        // filtre olmadan bu sorgu o antrenörün diğer şirketlerdeki
-        // rezervasyonlarını sessizce gizlerdi. Güvenli, çünkü tek gerçek
-        // yetki kontrolü zaten r.TrainerId == caller eşleşmesi.
+        // IgnoreQueryFilters + elle kapsam: antrenör birden fazla şubede/
+        // firmada çalışabilir; liste AKTİF atamanın (X-Active-Assignment-Id)
+        // firması/şubesiyle sınırlanır - A1'de antrenör olarak bakan biri
+        // A2'deki rezervasyonlarını görmez, rol değiştirince görür. Aktif
+        // personel bağlamı yoksa (ör. SuperAdmin) kapsam daraltılmaz; tek
+        // gerçek yetki kontrolü yine r.TrainerId == caller eşleşmesi.
+        var companyId = _tenantContext.IsSuperAdmin ? null : _tenantContext.CompanyId;
+        var branchId = _tenantContext.IsSuperAdmin ? null : _tenantContext.BranchId;
         var reservations = await _unitOfWork.GetReadRepository<Reservation>().GetAllAsync(
-            r => r.TrainerId == request.TrainerUserId,
+            r => r.TrainerId == request.TrainerUserId &&
+                 (companyId == null || r.CompanyId == companyId) &&
+                 (branchId == null || r.BranchId == branchId),
             include: q => q.IgnoreQueryFilters()
                 .Include(r => r.PackageAssignment!).ThenInclude(pa => pa!.MemberUser),
             cancellationToken: cancellationToken);
