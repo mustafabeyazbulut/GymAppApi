@@ -64,21 +64,22 @@ public class RemoveAssignmentCommandHandler : IRequestHandler<RemoveAssignmentCo
         // is intentionally allowed - it is just "stepping down" - and remains
         // subject to the same last-GymAdmin protection below, so it is safe by
         // construction rather than an oversight.
-        // A company must always keep at least one active GymAdmin - unless
-        // SuperAdmin is the one removing it (the explicit platform-level
-        // override the user asked for, e.g. to force a replacement later).
+        // A company must always keep at least one active GymAdmin (senaryo §4.5) -
+        // Sistem Sahibi dahil, istisna yok. Yerine yeni biri gerekiyorsa önce
+        // yenisi davet edilip onaylanır, sonra eskisi kaldırılır.
+        // GetAllAsync + IgnoreQueryFilters: AnyAsync'in filtre kaçışı yok ve
+        // Sistem Sahibi'nin tenant bağlamı olmadığı için filtreli sorgu diğer
+        // Gym Admin'leri göremez, her zaman "yok" derdi.
         if (assignment.Role == AssignmentRole.GymAdmin)
         {
-            var callerIsSuperAdmin = callerAssignments.Any(a => a.Role == AssignmentRole.SuperAdmin);
-            if (!callerIsSuperAdmin)
+            var otherActiveGymAdmins = await assignmentReadRepo.GetAllAsync(
+                a => a.CompanyId == assignment.CompanyId && a.BranchId == null &&
+                     a.Role == AssignmentRole.GymAdmin && a.IsActive && a.Id != assignment.Id,
+                include: q => q.IgnoreQueryFilters().Include(a => a.User),
+                cancellationToken: cancellationToken);
+            if (otherActiveGymAdmins.Count == 0)
             {
-                var otherActiveGymAdminExists = await assignmentReadRepo.AnyAsync(
-                    a => a.CompanyId == assignment.CompanyId && a.BranchId == null &&
-                         a.Role == AssignmentRole.GymAdmin && a.IsActive && a.Id != assignment.Id, cancellationToken);
-                if (!otherActiveGymAdminExists)
-                {
-                    throw new LastGymAdminException();
-                }
+                throw new LastGymAdminException();
             }
         }
 

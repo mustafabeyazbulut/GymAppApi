@@ -23,8 +23,14 @@ public class RemoveAssignmentCommandHandlerTests
         assignmentReadRepo.Setup(r => r.GetAllAsync(
                 It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), null, null, false, default))
             .ReturnsAsync(callerAssignments);
-        assignmentReadRepo.Setup(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
-            .ReturnsAsync(otherActiveGymAdminExists);
+        // "Başka aktif Gym Admin var mı" okuması (IgnoreQueryFilters include'lu).
+        assignmentReadRepo.Setup(r => r.GetAllAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(),
+                It.Is<Func<IQueryable<Assignment>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<Assignment, object>>?>(f => f != null),
+                null, false, default))
+            .ReturnsAsync(otherActiveGymAdminExists
+                ? new List<Assignment> { new() { Id = 99, UserId = 99, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } }
+                : new List<Assignment>());
         var assignmentWriteRepo = new Mock<IWriteRepository<Assignment>>();
 
         var notificationWriteRepo = new Mock<IWriteRepository<Notification>>();
@@ -123,17 +129,18 @@ public class RemoveAssignmentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenSuperAdminRemovesTheLastGymAdmin_Succeeds()
+    public async Task Handle_WhenSuperAdminRemovesTheLastGymAdmin_ThrowsLastGymAdminException()
     {
+        // Senaryo §4.5: firmada en az bir Gym Admin kalır - Sistem Sahibi dahil.
         var target = new Assignment { Id = 1, UserId = 7, CompanyId = 1, BranchId = null, Role = AssignmentRole.GymAdmin, IsActive = true };
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = null, Role = AssignmentRole.SuperAdmin, IsActive = true } };
         var (uow, assignmentWriteRepo) = Wire(target, callerAssignments, otherActiveGymAdminExists: false);
         var handler = new RemoveAssignmentCommandHandler(uow.Object, Mock.Of<IPushNotificationSender>());
 
-        await handler.Handle(new RemoveAssignmentCommand { AssignmentId = 1, RequestedByUserId = CallerId }, CancellationToken.None);
-
-        Assert.False(target.IsActive);
-        assignmentWriteRepo.Verify(r => r.Update(target), Times.Once);
+        await Assert.ThrowsAsync<LastGymAdminException>(() =>
+            handler.Handle(new RemoveAssignmentCommand { AssignmentId = 1, RequestedByUserId = CallerId }, CancellationToken.None));
+        Assert.True(target.IsActive);
+        assignmentWriteRepo.Verify(r => r.Update(It.IsAny<Assignment>()), Times.Never);
     }
 
     [Fact]
