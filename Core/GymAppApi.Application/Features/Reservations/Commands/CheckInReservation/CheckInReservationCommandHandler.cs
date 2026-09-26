@@ -46,13 +46,18 @@ public class CheckInReservationCommandHandler : IRequestHandler<CheckInReservati
 
         await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, reservation.CompanyId, cancellationToken);
 
+        // Yarış güvenliği (TransactionBehavior transaction'ı içinde): önce
+        // rezervasyon, sonra paket ataması FOR UPDATE ile kilitlenir ve GÜNCEL
+        // durum üzerinden kontrol edilir - aynı rezervasyona / aynı son hakka
+        // eşzamanlı iki check-in hakkı iki kez düşemez.
+        reservation = await _unitOfWork.GetForUpdateAsync<Reservation>(reservation.Id, cancellationToken)
+            ?? throw new NotFoundException("ReservationNotFound", request.ReservationId);
         if (reservation.Status != ReservationStatus.Booked)
         {
             throw new ReservationNotBookedException();
         }
 
-        var assignment = await _unitOfWork.GetReadRepository<PackageAssignment>()
-            .GetAsync(a => a.Id == reservation.PackageAssignmentId, cancellationToken: cancellationToken);
+        var assignment = await _unitOfWork.GetForUpdateAsync<PackageAssignment>(reservation.PackageAssignmentId, cancellationToken);
         if (assignment is null || assignment.RemainingSessions is null or <= 0)
         {
             throw new NoRemainingSessionsException();

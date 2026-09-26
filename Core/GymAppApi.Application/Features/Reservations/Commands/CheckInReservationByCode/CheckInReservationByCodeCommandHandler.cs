@@ -48,8 +48,15 @@ public class CheckInReservationByCodeCommandHandler : IRequestHandler<CheckInRes
 
         await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, reservation.CompanyId, cancellationToken);
 
-        var assignment = await _unitOfWork.GetReadRepository<PackageAssignment>()
-            .GetAsync(a => a.Id == reservation.PackageAssignmentId, cancellationToken: cancellationToken);
+        // Yarış güvenliği: bkz. CheckInReservationCommandHandler - rezervasyon ve
+        // paket ataması FOR UPDATE ile kilitlenip güncel durum yeniden kontrol edilir.
+        reservation = await _unitOfWork.GetForUpdateAsync<Reservation>(reservation.Id, cancellationToken);
+        if (reservation is null || reservation.Status != ReservationStatus.Booked)
+        {
+            throw new InvalidReservationCodeException();
+        }
+
+        var assignment = await _unitOfWork.GetForUpdateAsync<PackageAssignment>(reservation.PackageAssignmentId, cancellationToken);
         if (assignment is null || assignment.RemainingSessions is null or <= 0)
         {
             throw new NoRemainingSessionsException();

@@ -38,6 +38,13 @@ public class RecordGeneralCheckInCommandHandler : IRequestHandler<RecordGeneralC
 
         await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, assignment.CompanyId, cancellationToken);
 
+        // Seans hakkı yarışı: kalan son hakla aynı anda iki giriş yapılırsa
+        // ikisi de "hak var" okuyup hakkı iki kez düşebilirdi. Satır FOR UPDATE
+        // ile kilitlenip GÜNCEL değer üzerinden kontrol + düşüm yapılır
+        // (TransactionBehavior'ın transaction'ı içinde).
+        assignment = await _unitOfWork.GetForUpdateAsync<PackageAssignment>(assignment.Id, cancellationToken)
+            ?? throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
+
         // Süresi dolmuş/dondurulmuş/iptal paketle giriş yok (PackageAssignmentValidity).
         PackageAssignmentValidity.EnsureUsableForCheckIn(assignment, DateTime.UtcNow);
 

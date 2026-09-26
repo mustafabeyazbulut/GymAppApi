@@ -37,6 +37,12 @@ public class CheckInReservationByCodeCommandHandlerTests
         var uow = new Mock<IUnitOfWork>();
 
         uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
+
+        // Kilitli (FOR UPDATE) okuma - seans hakkı yarışı düzeltmesi.
+
+        uow.Setup(u => u.GetForUpdateAsync<PackageAssignment>(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(assignment);
+
+        uow.Setup(u => u.GetForUpdateAsync<Reservation>(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync((int id, CancellationToken _) => matchingReservations.FirstOrDefault(r => r.Id == id));
         uow.Setup(u => u.GetReadRepository<Reservation>()).Returns(reservationReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<Reservation>()).Returns(reservationWriteRepo.Object);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(callerReadRepo.Object);

@@ -52,15 +52,23 @@ public class EnrollInClassSessionCommandHandler : IRequestHandler<EnrollInClassS
             throw new NotFoundException("ClassSessionNotFound", request.ClassSessionId);
         }
 
+        // Seans hakkı yarışı: paket ataması da FOR UPDATE ile kilitlenir (kilit
+        // sırası hep ders -> paket ataması, deadlock olmasın). Geçerlilik ve
+        // hak kontrolü kilitli GÜNCEL satır üzerinden; paket şablonu (tip,
+        // kategori) ilk okumadan.
+        var package = assignment.Package;
+        assignment = await _unitOfWork.GetForUpdateAsync<PackageAssignment>(assignment.Id, cancellationToken)
+            ?? throw new NotFoundException("PackageAssignmentNotFound", request.PackageAssignmentId);
+
         // Ortak "geçerli paket" tanımı (PackageAssignmentValidity: aktif,
         // süresi dolmamış, hakkı kalmış) + bu modüle özgü şartlar: paket
         // kategorisi dersin kategorisiyle eşleşmeli ve seans bazlı pakette
         // hak sayısı tanımlı olmalı.
         var now = DateTime.UtcNow;
         var isEligible = PackageAssignmentValidity.IsUsable(assignment, now) &&
-            assignment.Package is not null &&
-            assignment.Package.Category == classSession.Category &&
-            (assignment.Package.Type == PackageType.Duration || assignment.RemainingSessions is > 0);
+            package is not null &&
+            package.Category == classSession.Category &&
+            (package.Type == PackageType.Duration || assignment.RemainingSessions is > 0);
         if (!isEligible)
         {
             throw new PackageAssignmentNotEligibleForClassException();
@@ -87,7 +95,7 @@ public class EnrollInClassSessionCommandHandler : IRequestHandler<EnrollInClassS
         // SessionBased paketlerde kayıt anında RemainingSessions 1 azalır -
         // mevcut CheckInReservationCommandHandler'daki düşüm deseniyle birebir
         // aynı (Duration paketlerde RemainingSessions zaten hep null'dır).
-        if (assignment.Package!.Type == PackageType.SessionBased)
+        if (package!.Type == PackageType.SessionBased)
         {
             assignment.RemainingSessions -= 1;
             _unitOfWork.GetWriteRepository<PackageAssignment>().Update(assignment);
