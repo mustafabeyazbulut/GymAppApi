@@ -47,6 +47,12 @@ public class MarkReservationNoShowCommandHandler : IRequestHandler<MarkReservati
             throw new ReservationNotBookedException();
         }
 
+        // "Gelmedi" ancak randevu saati geldikten sonra söylenebilir.
+        if (reservation.ScheduledAt > DateTime.UtcNow)
+        {
+            throw new ReservationNotStartedException();
+        }
+
         reservation.Status = ReservationStatus.NoShow;
         _unitOfWork.GetWriteRepository<Reservation>().Update(reservation);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

@@ -188,6 +188,9 @@ public static class AppMessages
             "Bu paket ataması rezervasyon için uygun değil (aktif, seans bazlı ve seans hakkı kalmış olmalı)."),
         ["ReservationConflict"] = ("This trainer already has a reservation at this time.", "Bu antrenörün bu saatte zaten bir rezervasyonu var."),
         ["ReservationNotBooked"] = ("This reservation is no longer in 'Booked' status.", "Bu rezervasyon artık 'Booked' durumunda değil."),
+        ["ReservationNotStarted"] = (
+            "A reservation can only be marked as a no-show after its scheduled time.",
+            "Randevu ancak saati geldikten sonra 'gelmedi' olarak işaretlenebilir."),
 
         // ClassScheduling özelliği
         ["ClassSessionNotFound"] = ("Class session {0} not found.", "Ders programı {0} bulunamadı."),

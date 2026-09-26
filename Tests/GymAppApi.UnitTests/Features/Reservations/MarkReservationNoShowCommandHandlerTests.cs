@@ -88,4 +88,19 @@ public class MarkReservationNoShowCommandHandlerTests
             handler.Handle(new MarkReservationNoShowCommand { ReservationId = 1, RequestedByUserId = TrainerId }, CancellationToken.None));
         writeRepo.Verify(r => r.Update(It.IsAny<Reservation>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_WhenTheReservationTimeHasNotComeYet_ThrowsReservationNotStartedException()
+    {
+        // Canlı test bulgusu: saati gelmemiş randevu no-show işaretlenebiliyordu.
+        var reservation = BookedReservation();
+        reservation.ScheduledAt = DateTime.UtcNow.AddHours(2);
+        var (uow, writeRepo) = Wire(reservation, callerAssignments: new List<Assignment>());
+        var handler = new MarkReservationNoShowCommandHandler(uow.Object);
+
+        await Assert.ThrowsAsync<ReservationNotStartedException>(() =>
+            handler.Handle(new MarkReservationNoShowCommand { ReservationId = 1, RequestedByUserId = TrainerId }, CancellationToken.None));
+        Assert.Equal(ReservationStatus.Booked, reservation.Status);
+        writeRepo.Verify(r => r.Update(It.IsAny<Reservation>()), Times.Never);
+    }
 }
