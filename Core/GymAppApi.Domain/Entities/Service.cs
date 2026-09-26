@@ -16,5 +16,19 @@ public class Service : EntityBase, ICompanyScoped, IDeactivatable
     public Branch? Branch { get; set; }
 
     public string Name { get; set; } = null!;
+
+    // Tekillik anahtarı: Name'in baş/son boşluksuz, küçük harfli (invariant)
+    // hali. DB'deki tekil indeks bunun üzerinde - "Yoga" ve "yoga" eşzamanlı
+    // eklense bile ikisi birden kaydedilemez. Her zaman Normalize ile set edilir.
+    public string NameNormalized { get; set; } = null!;
+
     public bool IsActive { get; set; } = true;
+
+    public static string Normalize(string name) => name.Trim().ToLowerInvariant();
+
+    public void Rename(string name)
+    {
+        Name = name.Trim();
+        NameNormalized = Normalize(name);
+    }
 }

@@ -30,7 +30,7 @@ public class PackageAssignmentFlowTests : IClassFixture<CustomWebApplicationFact
         var branch = new Branch { CompanyId = company.Id, Name = "Merkez", Address = "..." };
         db.Branches.Add(branch);
         await db.SaveChangesAsync();
-        var service = new Service { CompanyId = company.Id, BranchId = branch.Id, Name = "PT" };
+        var service = new Service { CompanyId = company.Id, BranchId = branch.Id, Name = "PT", NameNormalized = "pt" };
         db.Services.Add(service);
         await db.SaveChangesAsync();
 
@@ -138,8 +138,8 @@ public class PackageAssignmentFlowTests : IClassFixture<CustomWebApplicationFact
             var otherBranch = new Branch { CompanyId = companyId, Name = "Diğer", Address = "..." };
             db.Branches.Add(otherBranch);
             await db.SaveChangesAsync();
-            var otherBranchService = new Service { CompanyId = companyId, BranchId = otherBranch.Id, Name = "Yoga" };
-            var inactiveService = new Service { CompanyId = companyId, BranchId = branchId, Name = "Eski", IsActive = false };
+            var otherBranchService = new Service { CompanyId = companyId, BranchId = otherBranch.Id, Name = "Yoga", NameNormalized = "yoga" };
+            var inactiveService = new Service { CompanyId = companyId, BranchId = branchId, Name = "Eski", NameNormalized = "eski", IsActive = false };
             db.Services.AddRange(otherBranchService, inactiveService);
             await db.SaveChangesAsync();
             otherBranchServiceId = otherBranchService.Id;

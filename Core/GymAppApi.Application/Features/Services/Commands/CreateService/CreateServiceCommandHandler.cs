@@ -37,9 +37,10 @@ public class CreateServiceCommandHandler : IRequestHandler<CreateServiceCommand,
         var name = request.Name.Trim();
         await ServiceRules.EnsureNameAvailableAsync(_unitOfWork, branch.Id, name, exceptServiceId: null, cancellationToken);
 
-        var service = new Service { CompanyId = branch.CompanyId, BranchId = branch.Id, Name = name };
+        var service = new Service { CompanyId = branch.CompanyId, BranchId = branch.Id };
+        service.Rename(name);
         await _unitOfWork.GetWriteRepository<Service>().AddAsync(service, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await ServiceRules.SaveHandlingNameClashAsync(_unitOfWork, cancellationToken);
         return ServiceDto.From(service);
     }
 }

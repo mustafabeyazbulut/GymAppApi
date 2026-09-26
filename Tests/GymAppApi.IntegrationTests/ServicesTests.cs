@@ -6,6 +6,7 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using GymAppApi.Persistence.Context;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace GymAppApi.IntegrationTests;
@@ -135,6 +136,25 @@ public class ServicesTests : IClassFixture<CustomWebApplicationFactory>
 
         // Başka şubede aynı ad serbest.
         await CreateAsync(admin, seed.BranchA2Id, "Fonksiyonel");
+    }
+
+    // İnceleme bulgusu: uygulama kontrolü harf duyarsız, DB indeksi duyarlıydı -
+    // yarışta "Yoga" ve "yoga" ikisi birden kaydedilebiliyordu. Artık tekil
+    // indeks normalize edilmiş ad üzerinde.
+    [Fact]
+    public async Task UniquenessIsEnforcedByTheDatabase_OnTheNormalizedName()
+    {
+        var seed = await SeedAsync();
+        var id = (await CreateAsync(ClientFor(seed.GymAdminToken), seed.BranchA1Id, "  Kick Boks ")).GetProperty("id").GetInt32();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
+        var stored = db.Services.IgnoreQueryFilters().Single(s => s.Id == id);
+        Assert.Equal("Kick Boks", stored.Name);
+        Assert.Equal("kick boks", stored.NameNormalized);
+
+        var uniqueIndex = Assert.Single(db.Model.FindEntityType(typeof(Service))!.GetIndexes(), i => i.IsUnique);
+        Assert.Equal(new[] { nameof(Service.BranchId), nameof(Service.NameNormalized) }, uniqueIndex.Properties.Select(p => p.Name));
     }
 
     [Fact]

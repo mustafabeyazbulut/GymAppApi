@@ -22,9 +22,9 @@ public class UpdateServiceCommandHandler : IRequestHandler<UpdateServiceCommand,
         var name = request.Name.Trim();
         await ServiceRules.EnsureNameAvailableAsync(_unitOfWork, service.BranchId, name, exceptServiceId: service.Id, cancellationToken);
 
-        service.Name = name;
+        service.Rename(name);
         _unitOfWork.GetWriteRepository<Service>().Update(service);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await ServiceRules.SaveHandlingNameClashAsync(_unitOfWork, cancellationToken);
         return ServiceDto.From(service);
     }
 }

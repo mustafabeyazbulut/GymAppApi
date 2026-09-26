@@ -40,16 +40,31 @@ public static class ServiceRules
         return service;
     }
 
-    // Büyük/küçük harf ve baş/son boşluk duyarsız; pasif hizmetler de sayılır
-    // (DB'deki tekil indeks onları da kapsar).
+    // Büyük/küçük harf ve baş/son boşluk duyarsız (Service.NameNormalized);
+    // pasif hizmetler de sayılır (DB'deki tekil indeks onları da kapsar).
     public static async Task EnsureNameAvailableAsync(IUnitOfWork unitOfWork, int branchId, string name, int? exceptServiceId, CancellationToken cancellationToken)
     {
-        var lowered = name.ToLower();
+        var normalized = Service.Normalize(name);
         var clashes = await unitOfWork.GetReadRepository<Service>().GetAllAsync(
-            s => s.BranchId == branchId && s.Name.ToLower() == lowered && (exceptServiceId == null || s.Id != exceptServiceId),
+            s => s.BranchId == branchId && s.NameNormalized == normalized && (exceptServiceId == null || s.Id != exceptServiceId),
             include: q => q.IgnoreQueryFilters().Include(s => s.Branch),
             cancellationToken: cancellationToken);
         if (clashes.Count > 0)
+        {
+            throw new ConflictException("ServiceNameTaken");
+        }
+    }
+
+    // Önden kontrolü geçen eşzamanlı iki istekten ikincisini DB'nin tekil
+    // indeksi durdurur; o durumda 500 yerine aynı 409 döner. Bu kayıtta
+    // başka bir kısıt olmadığı için DbUpdateException burada tekillik ihlalidir.
+    public static async Task SaveHandlingNameClashAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
         {
             throw new ConflictException("ServiceNameTaken");
         }
