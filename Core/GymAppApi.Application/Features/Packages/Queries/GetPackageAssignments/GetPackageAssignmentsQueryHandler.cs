@@ -8,19 +8,29 @@ namespace GymAppApi.Application.Features.Packages.Queries.GetPackageAssignments;
 public class GetPackageAssignmentsQueryHandler : IRequestHandler<GetPackageAssignmentsQuery, IReadOnlyList<PackageAssignmentDto>>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITenantContext _tenantContext;
 
-    public GetPackageAssignmentsQueryHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+    public GetPackageAssignmentsQueryHandler(IUnitOfWork unitOfWork, ITenantContext tenantContext)
+    {
+        _unitOfWork = unitOfWork;
+        _tenantContext = tenantContext;
+    }
 
     public async Task<IReadOnlyList<PackageAssignmentDto>> Handle(GetPackageAssignmentsQuery request, CancellationToken cancellationToken)
     {
         // PackageAssignment ICompanyScoped olduğu için global filtre çağıranın
-        // ambient CompanyId'sine göre zaten daraltıyor - GetPackagesQueryHandler
-        // ile aynı yetkilendirme yaklaşımı (BranchManager de kendi şirketindeki
-        // tüm atamaları görür, GetPackages'ın da yaptığı gibi).
+        // ambient CompanyId'sine göre zaten daraltıyor. Şube kapsamlı personel
+        // (BranchManager, ambient BranchId set) ek olarak sadece kendi
+        // şubesinin atamalarını görür (senaryo §10.8) - firma geneli pakete
+        // bağlı (BranchId null) atamalar da dahil değil, payments/check-ins
+        // gibi id bazlı uç noktaların BranchManager kuralıyla
+        // (a.BranchId == assignment.BranchId) tutarlı.
+        var branchId = _tenantContext.BranchId;
+        var memberPhone = request.MemberPhone;
+        var filterByPhone = !string.IsNullOrWhiteSpace(memberPhone);
         var assignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
-            predicate: string.IsNullOrWhiteSpace(request.MemberPhone)
-                ? null
-                : a => a.MemberUser!.Phone.Contains(request.MemberPhone),
+            predicate: a => (branchId == null || a.BranchId == branchId) &&
+                            (!filterByPhone || a.MemberUser!.Phone.Contains(memberPhone!)),
             include: q => q.Include(a => a.Package!).Include(a => a.MemberUser!),
             orderBy: q => q.OrderByDescending(a => a.CreatedAt),
             cancellationToken: cancellationToken);

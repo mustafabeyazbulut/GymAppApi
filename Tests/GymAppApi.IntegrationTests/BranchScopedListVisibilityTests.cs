@@ -313,4 +313,26 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    // --- GET /api/package-assignments ---
+
+    [Fact]
+    public async Task PackageAssignments_AsGymAdmin_ReturnsAssignmentsOfAllBranches()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.GymAdminAToken), "/api/package-assignments");
+
+        Assert.Equal(Sorted(seed.AssignmentA1Id, seed.AssignmentA2Id), ids);
+    }
+
+    [Fact]
+    public async Task PackageAssignments_AsBranchManager_ReturnsOnlyOwnBranchsAssignments()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.BranchManagerA1Token), "/api/package-assignments");
+
+        Assert.Equal(Sorted(seed.AssignmentA1Id), ids);
+    }
 }
