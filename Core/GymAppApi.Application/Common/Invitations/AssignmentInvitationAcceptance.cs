@@ -1,3 +1,4 @@
+using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
@@ -16,8 +17,9 @@ public static class AssignmentInvitationAcceptance
     public static async Task<Assignment> AcceptAsync(IUnitOfWork unitOfWork, PendingAssignmentInvitation invitation, CancellationToken cancellationToken)
     {
         // Davet her durumda tüketilir - hata olsa bile ikinci kez kullanılamaz.
+        // Atomik talep: eşzamanlı ikinci onay burada durur (bkz. ClaimAsync).
         invitation.IsUsed = true;
-        unitOfWork.GetWriteRepository<PendingAssignmentInvitation>().Update(invitation);
+        await ClaimAsync(unitOfWork, invitation, invitation.Id, cancellationToken);
 
         // IgnoreQueryFilters: kabul eden davetli, o firmada henüz hiçbir
         // bağlamı olmayan bir kullanıcı olabilir - filtreli okuma (eski
@@ -60,5 +62,25 @@ public static class AssignmentInvitationAcceptance
         await unitOfWork.GetWriteRepository<Assignment>().AddAsync(assignment, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return assignment;
+    }
+
+    // Davetin "kullanıldı" işaretlemesini atamayı oluşturmadan ÖNCE ayrı bir
+    // SaveChanges ile commit eder. Davet satırı xmin concurrency token taşıdığı
+    // için aynı davete eşzamanlı iki onayda (çift tıklama, retry) sadece biri
+    // başarır; kaybeden InvitationNotFound (404) ile durur - zaten kullanılmış
+    // bir davetle aynı yanıt. Böylece "geçerli atama var mı" kontrolünün
+    // yarış penceresi (TOCTOU) kapanır.
+    internal static async Task ClaimAsync<TInvitation>(IUnitOfWork unitOfWork, TInvitation invitation, int invitationId, CancellationToken cancellationToken)
+        where TInvitation : class, GymAppApi.Domain.Common.IEntityBase
+    {
+        unitOfWork.GetWriteRepository<TInvitation>().Update(invitation);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new NotFoundException("InvitationNotFound", invitationId);
+        }
     }
 }

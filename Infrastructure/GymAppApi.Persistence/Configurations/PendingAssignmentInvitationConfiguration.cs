@@ -17,5 +17,7 @@ public class PendingAssignmentInvitationConfiguration : IEntityTypeConfiguration
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(x => new { x.TargetUserId, x.CompanyId });
+        // xmin sistem kolonuna eşlenir, yeni DB kolonu yok (RefreshTokenConfiguration).
+        builder.Property(x => x.ConcurrencyToken).IsRowVersion();
     }
 }

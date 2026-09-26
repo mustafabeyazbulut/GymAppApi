@@ -30,4 +30,10 @@ public class PendingPackageAssignmentInvitation : EntityBase
     public DateTime ExpiresAt { get; set; }
     public int AttemptCount { get; set; }
     public bool IsUsed { get; set; }
+    // Postgres xmin concurrency token (RefreshToken ile aynı desen, bkz.
+    // RefreshTokenConfiguration): davetin "kullanıldı" işaretlemesi atomik olsun -
+    // aynı davete eşzamanlı iki onayda kaybeden DbUpdateConcurrencyException alır
+    // ve ikinci atama oluşmaz. Gerçek CLR özelliği olmak ZORUNDA (AsNoTracking
+    // okuma -> Update() döngüsünde orijinal değeri taşıyabilsin).
+    public uint ConcurrencyToken { get; set; }
 }

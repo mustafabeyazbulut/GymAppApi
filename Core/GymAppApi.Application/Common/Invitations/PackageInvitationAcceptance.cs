@@ -16,8 +16,10 @@ public static class PackageInvitationAcceptance
         IUnitOfWork unitOfWork, PendingPackageAssignmentInvitation invitation, DateTime now, CancellationToken cancellationToken)
     {
         // Davet her durumda tüketilir - hata olsa bile ikinci kez kullanılamaz.
+        // Atomik talep: eşzamanlı ikinci onay burada durur (bkz.
+        // AssignmentInvitationAcceptance.ClaimAsync).
         invitation.IsUsed = true;
-        unitOfWork.GetWriteRepository<PendingPackageAssignmentInvitation>().Update(invitation);
+        await AssignmentInvitationAcceptance.ClaimAsync(unitOfWork, invitation, invitation.Id, cancellationToken);
 
         // IgnoreQueryFilters (bu metottaki tüm okumalar): kabul eden üyenin
         // genellikle hiçbir personel ataması yok, ambient CompanyId'si null -
