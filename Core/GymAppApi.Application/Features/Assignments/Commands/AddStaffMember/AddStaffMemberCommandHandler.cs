@@ -37,21 +37,18 @@ public class AddStaffMemberCommandHandler : IRequestHandler<AddStaffMemberComman
             throw new NotFoundException("BranchNotFound", request.BranchId);
         }
 
-        // Same pattern as CreateAssignmentCommandHandler: the [Authorize]
-        // policy only proves the caller holds SOME staff role somewhere -
-        // re-check it's scoped to THIS branch's company (GymAdmin) or THIS
-        // exact branch (BranchManager). SuperAdmin bypasses both checks.
+        // The [Authorize] policy only proves the caller's active role - re-check
+        // it's scoped to THIS branch's company (GymAdmin) or THIS exact branch
+        // (BranchManager). Sistem Sahibi personel ekleyemez (senaryo §10.6).
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         // A BranchManager may add Trainers to their own branch, but must
         // never be able to create peer/other BranchManagers - only GymAdmin
-        // (of this company) or SuperAdmin can assign that role.
+        // of this company can assign that role.
         var callerIsAuthorized = request.Role == AssignmentRole.BranchManager
             ? callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId))
             : callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId) ||
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == branch.Id));
         if (!callerIsAuthorized)

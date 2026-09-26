@@ -17,18 +17,24 @@ public class InviteGymAdminCommandHandlerTests
     {
         var companyReadRepo = new Mock<IReadRepository<Company>>();
         companyReadRepo.Setup(r => r.GetAsync(
-                It.IsAny<System.Linq.Expressions.Expression<Func<Company, bool>>>(), null, false, default))
+                It.IsAny<System.Linq.Expressions.Expression<Func<Company, bool>>>(),
+                It.IsAny<Func<IQueryable<Company>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<Company, object>>?>(), false, default))
             .ReturnsAsync(companyExists ? new Company { Id = 1, Name = "Test Co", IsActive = true } : null);
 
         var assignmentReadRepo = new Mock<IReadRepository<Assignment>>();
+        // Çağıranın kendi atamaları (include yok) ve davet edilenin bu firmadaki
+        // atamaları (IgnoreQueryFilters include'lu) ayrı okumalar.
         assignmentReadRepo.Setup(r => r.GetAllAsync(
                 It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), null, null, false, default))
             .ReturnsAsync(callerAssignments);
-        // Called up to twice: first the exact-duplicate GymAdmin check, then (only if that's
-        // false) the cross-role BranchManager conflict check - matches the handler's call order.
-        assignmentReadRepo.SetupSequence(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(), default))
-            .ReturnsAsync(alreadyGymAdmin)
-            .ReturnsAsync(hasConflictingRole);
+        var inviteeAssignments = new List<Assignment>();
+        if (alreadyGymAdmin) inviteeAssignments.Add(new Assignment { UserId = existingUser?.Id ?? 0, CompanyId = 1, BranchId = null, Role = AssignmentRole.GymAdmin, IsActive = true });
+        if (hasConflictingRole) inviteeAssignments.Add(new Assignment { UserId = existingUser?.Id ?? 0, CompanyId = 1, BranchId = 5, Role = AssignmentRole.BranchManager, IsActive = true });
+        assignmentReadRepo.Setup(r => r.GetAllAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<Assignment, bool>>>(),
+                It.Is<Func<IQueryable<Assignment>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<Assignment, object>>?>(f => f != null),
+                null, false, default))
+            .ReturnsAsync(inviteeAssignments);
 
         var userReadRepo = new Mock<IReadRepository<User>>();
         userReadRepo.Setup(r => r.GetAsync(

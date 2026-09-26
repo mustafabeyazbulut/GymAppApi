@@ -33,7 +33,6 @@ public class CreateContentItemCommandHandler : IRequestHandler<CreateContentItem
             }
 
             var callerIsAuthorized = callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId) ||
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == request.BranchId));
             if (!callerIsAuthorized)

@@ -57,7 +57,8 @@ public class GetClassSessionsQueryHandlerTests
     private static readonly ITenantContext NoTenantContext = new AmbientTenantContext { CompanyId = null, BranchId = null, IsSuperAdmin = false };
     private static readonly ITenantContext GymAdminContext = new AmbientTenantContext { CompanyId = 1, BranchId = null, IsSuperAdmin = false };
     private static readonly ITenantContext BranchScopedContext = new AmbientTenantContext { CompanyId = 1, BranchId = 10, IsSuperAdmin = false };
-    private static readonly ITenantContext SuperAdminContext = new AmbientTenantContext { CompanyId = null, BranchId = null, IsSuperAdmin = true };
+    // Sistem Sahibi: rolü SuperAdmin ama platform bypass'ı yok (senaryo §10.6).
+    private static readonly ITenantContext SuperAdminContext = new AmbientTenantContext { CompanyId = null, BranchId = null, IsSuperAdmin = false, Role = AssignmentRole.SuperAdmin };
 
     private static ClassSession Session(int id, int companyId, int branchId) => new()
     {
@@ -206,15 +207,14 @@ public class GetClassSessionsQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AsSuperAdmin_ReturnsAllSessions()
+    public async Task Handle_AsSuperAdmin_ReturnsNothing()
     {
-        // SuperAdmin bypass'ının kaldırılması ayrı bir adım (senaryo §10.6) -
-        // bu adım mevcut davranışı korur.
+        // Senaryo §10.6: Sistem Sahibi gym verisini görmez.
         var (handler, _) = CreateHandler(SuperAdminContext, AllSessions());
 
         var result = await handler.Handle(Query(), CancellationToken.None);
 
-        Assert.Equal(4, result.Count);
+        Assert.Empty(result);
     }
 
     [Fact]

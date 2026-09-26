@@ -9,10 +9,9 @@ public class CreateBranchCommand : IRequest<CreateBranchCommandResult>
     public string Address { get; set; } = null!;
 
     // Set by the controller from the caller's own JWT sub claim, never
-    // trusted from the body - the [Authorize(Policy = "GymAdminOrSuperAdmin")]
-    // policy only proves the caller holds SOME such role somewhere, not one
-    // scoped to THIS request's CompanyId. The handler re-checks that a
-    // GymAdmin caller is scoped to this exact company (SuperAdmin bypasses
-    // the check).
+    // trusted from the body - the [Authorize(Policy = "GymAdminOnly")] policy
+    // only proves the caller's active role is GymAdmin, not that it is scoped
+    // to THIS request's CompanyId; the handler re-checks that. Sistem Sahibi
+    // şube açamaz (senaryo §10.6).
     public int RequestedByUserId { get; set; }
 }

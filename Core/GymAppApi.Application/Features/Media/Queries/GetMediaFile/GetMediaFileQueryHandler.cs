@@ -67,7 +67,6 @@ public class GetMediaFileQueryHandler : IRequestHandler<GetMediaFileQuery, GetMe
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == requestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var isStaffForContent = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             ((a.Role == AssignmentRole.GymAdmin || a.Role == AssignmentRole.BranchManager || a.Role == AssignmentRole.Trainer) &&
              a.CompanyId == contentItem.CompanyId &&
              (a.BranchId == null || contentItem.BranchId == null || a.BranchId == contentItem.BranchId)));
@@ -106,7 +105,6 @@ public class GetMediaFileQueryHandler : IRequestHandler<GetMediaFileQuery, GetMe
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == requestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == progressNote.CompanyId) ||
             (a.Role == AssignmentRole.BranchManager && a.BranchId == progressNote.BranchId) ||
             (a.Role == AssignmentRole.Trainer && a.BranchId == progressNote.BranchId));

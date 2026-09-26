@@ -27,7 +27,6 @@ public class DeleteDoorCommandHandler : IRequestHandler<DeleteDoorCommand>
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == door.CompanyId) ||
             (a.Role == AssignmentRole.BranchManager && a.BranchId == door.Zone!.BranchId));
         if (!callerIsAuthorized)

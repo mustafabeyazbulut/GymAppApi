@@ -26,7 +26,6 @@ public class GetContentItemsQueryHandler : IRequestHandler<GetContentItemsQuery,
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
 
-        var isSuperAdmin = callerAssignments.Any(a => a.Role == AssignmentRole.SuperAdmin);
         // Personel kapsamı, çağıranın herhangi bir (ör. ilk) ataması değil
         // AKTİF firmadaki ataması üzerinden belirlenir (ambient tenant
         // context, X-Active-Company-Id) - çok firmalı personel yanlış firmanın
@@ -37,17 +36,15 @@ public class GetContentItemsQueryHandler : IRequestHandler<GetContentItemsQuery,
             a.CompanyId == activeCompanyId &&
             (a.Role == AssignmentRole.GymAdmin || a.Role == AssignmentRole.BranchManager || a.Role == AssignmentRole.Trainer));
 
-        if (isSuperAdmin || isStaffInActiveCompany)
+        if (isStaffInActiveCompany)
         {
             // Staff (Trainer dahil) içerikleri IsActive filtresiz görür -
-            // spec'in "staff tümünü görür" kuralı. SuperAdmin tüm firmaları;
-            // GymAdmin aktif firmanın tüm şubelerini; şube kapsamlı personel
+            // spec'in "staff tümünü görür" kuralı. GymAdmin aktif firmanın tüm şubelerini; şube kapsamlı personel
             // (BranchManager/Trainer) sadece kendi şubesini + şubesiz firma
             // içeriklerini (senaryo §10.8).
             var staffItems = await _unitOfWork.GetReadRepository<ContentItem>().GetAllAsync(
-                c => isSuperAdmin ||
-                     (c.CompanyId == activeCompanyId &&
-                      (activeBranchId == null || c.BranchId == null || c.BranchId == activeBranchId)),
+                c => c.CompanyId == activeCompanyId &&
+                     (activeBranchId == null || c.BranchId == null || c.BranchId == activeBranchId),
                 include: q => q.IgnoreQueryFilters().Include(c => c.MediaFile),
                 orderBy: q => q.OrderByDescending(c => c.CreatedAt),
                 cancellationToken: cancellationToken);

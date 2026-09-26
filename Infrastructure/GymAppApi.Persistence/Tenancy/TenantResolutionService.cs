@@ -47,11 +47,15 @@ public class TenantResolutionService : ITenantResolutionService
             return new ResolvedTenant(false, null, null);
         }
 
-        // 2) Header yok, SuperAdmin: platform geneli (bypass'ın kaldırılması
-        //    ayrı adım, senaryo §10.6).
+        // 2) Header yok, SuperAdmin: rolü SuperAdmin, ama tenant filtrelerini
+        //    kapatan platform bypass'ı YOK (IsSuperAdmin=false, senaryo §10.6) -
+        //    Sistem Sahibi gym verisini göremez. Firma yönetimi uç noktaları
+        //    (SuperAdminOnly) kendi okumalarında IgnoreQueryFilters kullanır.
+        //    ITenantContext.IsSuperAdmin artık sadece sistem işleri (ör.
+        //    hatırlatma job'ları) içindir.
         if (assignments.Any(a => a.Role == AssignmentRole.SuperAdmin))
         {
-            return new ResolvedTenant(true, null, null, Role: AssignmentRole.SuperAdmin);
+            return new ResolvedTenant(false, null, null, Role: AssignmentRole.SuperAdmin);
         }
 
         // 3) Header yok, personel ataması var - belirleyici seçim kuralı:

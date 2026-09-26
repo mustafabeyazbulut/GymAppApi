@@ -69,15 +69,16 @@ public class CreateBranchCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenCallerIsSuperAdmin_CreatesTheBranchRegardlessOfCompany()
+    public async Task Handle_WhenCallerIsSuperAdmin_ThrowsForbiddenException()
     {
+        // Senaryo §10.6: Sistem Sahibi gym'in günlük işlemlerine (şube açma
+        // dahil) karışmaz - firmanın içini Gym Admin kurar.
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = null, Role = AssignmentRole.SuperAdmin, IsActive = true } };
         var (uow, branchWriteRepo) = Wire(companyExists: true, callerAssignments);
         var handler = new CreateBranchCommandHandler(uow.Object, new BranchRules(uow.Object));
 
-        await handler.Handle(ValidCommand(), CancellationToken.None);
-
-        branchWriteRepo.Verify(r => r.AddAsync(It.IsAny<Branch>(), default), Times.Once);
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
+        branchWriteRepo.Verify(r => r.AddAsync(It.IsAny<Branch>(), default), Times.Never);
     }
 
     [Fact]

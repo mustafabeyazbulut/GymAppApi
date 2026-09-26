@@ -38,7 +38,6 @@ public class CreatePackageCommandHandler : IRequestHandler<CreatePackageCommand,
 
         // GymAdmin firmanın her şubesine, BranchManager sadece kendi şubesine paket tanımlar.
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId) ||
             (a.Role == AssignmentRole.BranchManager && a.BranchId == branch.Id));
         if (!callerIsAuthorized)

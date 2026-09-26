@@ -15,8 +15,8 @@ namespace GymAppApi.Application.Features.ClassScheduling.Queries.GetClassSession
 //   - Personel kapsamı: ambient tenant context (GymAdmin -> firmanın tüm
 //     şubeleri, BranchManager/Trainer -> sadece kendi şubesi).
 //   - Üye kapsamı: çağıranın kendi GEÇERLİ paketlerinin firma/şubesi.
-// İkisi de yoksa boş liste döner. SuperAdmin bypass'ı mevcut davranış olarak
-// korunuyor (kaldırılması ayrı bir adım, senaryo §10.6).
+// İkisi de yoksa boş liste döner. Sistem Sahibi'nin gym bağlamı yok (senaryo
+// §10.6) - personel/üye kapsamı olmadığı için boş liste alır.
 public class GetClassSessionsQueryHandler : IRequestHandler<GetClassSessionsQuery, IReadOnlyList<ClassSessionDto>>
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -30,12 +30,8 @@ public class GetClassSessionsQueryHandler : IRequestHandler<GetClassSessionsQuer
 
     public async Task<IReadOnlyList<ClassSessionDto>> Handle(GetClassSessionsQuery request, CancellationToken cancellationToken)
     {
-        var isSuperAdmin = _tenantContext.IsSuperAdmin;
-        var scopes = isSuperAdmin
-            ? new List<(int CompanyId, int? BranchId)>()
-            : await GetVisibleScopesAsync(request.RequestedByUserId, cancellationToken);
-
-        if (!isSuperAdmin && scopes.Count == 0)
+        var scopes = await GetVisibleScopesAsync(request.RequestedByUserId, cancellationToken);
+        if (scopes.Count == 0)
         {
             return Array.Empty<ClassSessionDto>();
         }
@@ -44,7 +40,7 @@ public class GetClassSessionsQueryHandler : IRequestHandler<GetClassSessionsQuer
         // olabildiği için) aşağıda bellek içinde yapılıyor.
         var companyIds = scopes.Select(s => s.CompanyId).Distinct().ToList();
         var sessions = await _unitOfWork.GetReadRepository<ClassSession>().GetAllAsync(
-            s => (isSuperAdmin || companyIds.Contains(s.CompanyId)) &&
+            s => companyIds.Contains(s.CompanyId) &&
                  (request.BranchId == null || s.BranchId == request.BranchId) &&
                  (request.From == null || s.Date >= request.From) &&
                  (request.To == null || s.Date <= request.To),
@@ -52,13 +48,10 @@ public class GetClassSessionsQueryHandler : IRequestHandler<GetClassSessionsQuer
             orderBy: q => q.OrderBy(s => s.Date).ThenBy(s => s.StartTime),
             cancellationToken: cancellationToken);
 
-        if (!isSuperAdmin)
-        {
-            sessions = sessions
-                .Where(s => scopes.Any(scope =>
-                    scope.CompanyId == s.CompanyId && (scope.BranchId == null || scope.BranchId == s.BranchId)))
-                .ToList();
-        }
+        sessions = sessions
+            .Where(s => scopes.Any(scope =>
+                scope.CompanyId == s.CompanyId && (scope.BranchId == null || scope.BranchId == s.BranchId)))
+            .ToList();
 
         if (sessions.Count == 0)
         {

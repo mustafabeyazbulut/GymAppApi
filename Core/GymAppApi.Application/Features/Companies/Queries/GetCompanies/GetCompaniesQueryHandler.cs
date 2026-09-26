@@ -15,16 +15,17 @@ public class GetCompaniesQueryHandler : IRequestHandler<GetCompaniesQuery, IRead
 
     public async Task<IReadOnlyList<CompanyListItemDto>> Handle(GetCompaniesQuery request, CancellationToken cancellationToken)
     {
+        // IgnoreQueryFilters: SuperAdminOnly uç nokta - Sistem Sahibi'nin tenant
+        // bağlamı yok (senaryo §10.6, platform bypass'ı kaldırıldı); firma yönetimi
+        // tüm firmaları açıkça görür.
         var companies = await _unitOfWork.GetReadRepository<Company>().GetAllAsync(
-            include: q => q.Include(c => c.Branches),
+            include: q => q.IgnoreQueryFilters().Include(c => c.Branches),
             cancellationToken: cancellationToken);
 
-        // Bu uc noktaya sadece SuperAdmin erisebiliyor (CompaniesController'daki
-        // SuperAdminOnly policy'si), bu yuzden Assignment'in tenant-scoping
-        // global filtresi (_tenantContext.IsSuperAdmin) burada devre disi kaliyor
-        // ve tum sirketlerin atamalari tek sorguda guvenle cekilebiliyor.
+        // Tüm firmaların personel atamaları tek sorguda (IgnoreQueryFilters, aynı gerekçe).
         var assignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             predicate: a => a.CompanyId != null && a.IsActive && a.Role != AssignmentRole.SuperAdmin,
+            include: q => q.IgnoreQueryFilters().Include(a => a.User),
             cancellationToken: cancellationToken);
         var assignmentsByCompany = assignments.ToLookup(a => a.CompanyId!.Value);
 

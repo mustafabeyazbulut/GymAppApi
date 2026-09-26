@@ -26,7 +26,6 @@ public class CreateClassSessionCommandHandler : IRequestHandler<CreateClassSessi
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId) ||
             (a.Role == AssignmentRole.BranchManager && a.BranchId == request.BranchId));
         if (!callerIsAuthorized)

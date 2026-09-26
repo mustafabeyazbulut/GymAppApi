@@ -63,19 +63,25 @@ builder.Services
         };
     });
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, GymAppApi.WebApi.Authorization.AssignmentRoleAuthorizationHandler>();
+// Politikalar isteğin AKTİF atamasının rolüne bakar (AssignmentRoleAuthorizationHandler).
+// Senaryo §10.6: Sistem Sahibi gym'in günlük işlemlerini yapamaz - SuperAdmin
+// sadece firma yönetimi politikalarında (SuperAdminOnly, GymAdminOrSuperAdmin
+// = InviteGymAdmin) yer alır.
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("GymAdminOrSuperAdmin", policy => policy.Requirements.Add(
         new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
             GymAppApi.Domain.Enums.AssignmentRole.GymAdmin, GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
+    options.AddPolicy("GymAdminOnly", policy => policy.Requirements.Add(
+        new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
+            GymAppApi.Domain.Enums.AssignmentRole.GymAdmin)));
     options.AddPolicy("SuperAdminOnly", policy => policy.Requirements.Add(
         new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
             GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
     options.AddPolicy("StaffManagement", policy => policy.Requirements.Add(
         new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
             GymAppApi.Domain.Enums.AssignmentRole.BranchManager,
-            GymAppApi.Domain.Enums.AssignmentRole.GymAdmin,
-            GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
+            GymAppApi.Domain.Enums.AssignmentRole.GymAdmin)));
 });
 
 // IP bazlı "auth" politikası + OTP/kod uçlarında telefon/tanımlayıcı bazlı

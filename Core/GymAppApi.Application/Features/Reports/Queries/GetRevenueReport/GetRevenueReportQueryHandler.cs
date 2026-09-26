@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GymAppApi.Application.Features.Reports.Queries.GetRevenueReport;
 
 // GetAnalyticsSummaryQueryHandler'ın aynı ambient ITenantContext deseni:
-// Super Admin tüm firmalar, Gym Admin kendi firmasının tüm şubeleri, Şube
+// Gym Admin kendi firmasının tüm şubeleri (Sistem Sahibi erişemez), Şube
 // Yöneticisi sadece kendi şubesi. PackageAssignmentPayment'ın kendi
 // BranchId alanı yok (sadece CompanyId) - şube daraltması bu yüzden
 // PackageAssignment.BranchId üzerinden (Include ile) yapılıyor.

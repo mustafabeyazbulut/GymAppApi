@@ -17,7 +17,8 @@ public class SetBranchActiveCommandHandlerTests
     {
         var branchReadRepo = new Mock<IReadRepository<Branch>>();
         branchReadRepo.Setup(r => r.GetAsync(
-                It.IsAny<System.Linq.Expressions.Expression<Func<Branch, bool>>>(), null, false, default))
+                It.IsAny<System.Linq.Expressions.Expression<Func<Branch, bool>>>(),
+                It.IsAny<Func<IQueryable<Branch>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<Branch, object>>?>(), false, default))
             .ReturnsAsync(branch);
         var branchWriteRepo = new Mock<IWriteRepository<Branch>>();
 
@@ -63,14 +64,16 @@ public class SetBranchActiveCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenCallerIsGymAdminOfADifferentCompany_ThrowsForbiddenException()
+    public async Task Handle_WhenCallerIsGymAdminOfADifferentCompany_ThrowsNotFoundException()
     {
+        // Şube filtresiz okunduğu için başka firmanın şubesinin varlığı 403 ile
+        // sızdırılmaz - çağıranın o firmada hiç ataması yoksa 404.
         var branch = ExistingBranch();
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 999, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var (uow, branchWriteRepo) = Wire(branch, callerAssignments);
         var handler = new SetBranchActiveCommandHandler(uow.Object);
 
-        await Assert.ThrowsAsync<ForbiddenException>(() =>
+        await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.Handle(new SetBranchActiveCommand { BranchId = 5, IsActive = false, RequestedByUserId = CallerId }, CancellationToken.None));
         branchWriteRepo.Verify(r => r.Update(It.IsAny<Branch>()), Times.Never);
     }

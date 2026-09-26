@@ -87,7 +87,10 @@ public class TenantResolutionServiceTests
         var service = new TenantResolutionService(context);
         var resolved = await service.ResolveForUserAsync(userId);
 
-        Assert.True(resolved.IsSuperAdmin);
+        // Senaryo §10.6: rolü SuperAdmin ama tenant filtrelerini kapatan
+        // platform bypass'ı yok.
+        Assert.False(resolved.IsSuperAdmin);
+        Assert.Equal(AssignmentRole.SuperAdmin, resolved.Role);
         Assert.Null(resolved.CompanyId);
     }
 
@@ -304,7 +307,7 @@ public class TenantResolutionServiceTests
 
         var resolved = await ResolveAsync(dbName, userId);
 
-        Assert.True(resolved.IsSuperAdmin);
+        Assert.False(resolved.IsSuperAdmin);
         Assert.Equal(AssignmentRole.SuperAdmin, resolved.Role);
     }
 

@@ -104,7 +104,8 @@ public class BranchesAuthorizationTests : IClassFixture<CustomWebApplicationFact
     }
 
     [Fact]
-    public async Task Create_AsSuperAdmin_Returns201ForAnyCompany()
+    // Senaryo §10.6: Sistem Sahibi şube açmaz - firmanın içini Gym Admin kurar.
+    public async Task Create_AsSuperAdmin_Returns403()
     {
         var (companyA, _, _, _, superAdminToken) = await SeedAsync();
         var client = _factory.CreateClient();
@@ -112,7 +113,7 @@ public class BranchesAuthorizationTests : IClassFixture<CustomWebApplicationFact
 
         var response = await client.PostAsJsonAsync("/api/branches", Body(companyA.Id));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -131,6 +132,27 @@ public class BranchesAuthorizationTests : IClassFixture<CustomWebApplicationFact
         var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
         scope.ServiceProvider.GetRequiredService<GymAppApi.Infrastructure.Tenancy.AmbientTenantContext>().IsSuperAdmin = true;
         Assert.False(db.Branches.Single(b => b.Id == created.Id).IsActive);
+    }
+
+    [Fact]
+    public async Task SetActive_AsGymAdminOfOwnCompany_CanReopenAClosedBranch()
+    {
+        // Senaryo §4.5: Gym Admin şube açar, düzenler, kapatır - kapattığı
+        // şubeyi yeniden açabilmeli (eskiden bunu sadece filtreyi atlayan
+        // SuperAdmin yapabiliyordu; §10.6 ile o yol da kapandı).
+        var (companyA, gymAdminAToken, _, _, _) = await SeedAsync();
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", gymAdminAToken);
+        var created = await (await client.PostAsJsonAsync("/api/branches", Body(companyA.Id))).Content.ReadFromJsonAsync<CreateBranchResultDto>();
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PatchAsJsonAsync($"/api/branches/{created!.Id}/active", new { isActive = false })).StatusCode);
+
+        var reopen = await client.PatchAsJsonAsync($"/api/branches/{created.Id}/active", new { isActive = true });
+
+        Assert.Equal(HttpStatusCode.NoContent, reopen.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
+        scope.ServiceProvider.GetRequiredService<GymAppApi.Infrastructure.Tenancy.AmbientTenantContext>().IsSuperAdmin = true;
+        Assert.True(db.Branches.Single(b => b.Id == created.Id).IsActive);
     }
 
     [Fact]

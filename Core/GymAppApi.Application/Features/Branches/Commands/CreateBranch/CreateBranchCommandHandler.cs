@@ -22,16 +22,14 @@ public class CreateBranchCommandHandler : IRequestHandler<CreateBranchCommand, C
     {
         await _branchRules.CompanyMustExistAsync(request.CompanyId, cancellationToken);
 
-        // Same pattern as CreateAssignmentCommandHandler: the [Authorize]
-        // policy only proves the caller holds SOME GymAdmin/SuperAdmin
-        // assignment somewhere - re-check it's scoped to THIS company. A new
+        // The [Authorize] policy only proves the caller's active role is
+        // GymAdmin - re-check it's scoped to THIS company. A new
         // company's GymAdmin creates their own first branch this way, once
         // they've confirmed their invitation - SuperAdmin no longer creates
         // it on their behalf (see CreateCompanyCommand).
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId));
         if (!callerIsAuthorized)
         {

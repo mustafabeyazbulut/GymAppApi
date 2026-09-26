@@ -10,9 +10,7 @@ namespace GymAppApi.Application.Features.Analytics.Queries.GetAnalyticsSummary;
 // bir veri modeli gerektirmez (bkz.
 // docs/superpowers/specs/2026-09-20-analytics-design.md). Kapsam tamamen
 // ambient ITenantContext'ten gelir:
-//   - Super Admin: CompanyId/BranchId filtresi yok (global query filter zaten
-//     IsSuperAdmin için bypass ediyor, bkz. GymAppApiDbContext) -> tüm
-//     şirketler.
+//   - Sistem Sahibi: bu uca erişemez (StaffManagement, senaryo §10.6).
 //   - Gym Admin: ambient BranchId null -> global query filter sadece
 //     CompanyId'ye göre daraltır, şube bazında ek bir kısıtlama YOK -> kendi
 //     şirketinin tüm şubeleri.

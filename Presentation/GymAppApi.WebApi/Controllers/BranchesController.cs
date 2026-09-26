@@ -29,7 +29,7 @@ public class BranchesController : ControllerBase
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetBranchDetailQuery(id), cancellationToken));
 
-    [Authorize(Policy = "GymAdminOrSuperAdmin")]
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpPost]
     public async Task<IActionResult> Create(CreateBranchCommand command, CancellationToken cancellationToken)
     {
@@ -38,7 +38,7 @@ public class BranchesController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    [Authorize(Policy = "GymAdminOrSuperAdmin")]
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpPatch("{id}/active")]
     public async Task<IActionResult> SetActive(int id, SetBranchActiveCommand command, CancellationToken cancellationToken)
     {
@@ -48,7 +48,7 @@ public class BranchesController : ControllerBase
         return NoContent();
     }
 
-    [Authorize(Policy = "GymAdminOrSuperAdmin")]
+    [Authorize(Policy = "GymAdminOnly")]
     [HttpPatch("{id}")]
     public async Task<IActionResult> Update(int id, UpdateBranchCommand command, CancellationToken cancellationToken)
     {

@@ -34,7 +34,6 @@ public class MarkReservationNoShowCommandHandler : IRequestHandler<MarkReservati
             var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
                 a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
             callerIsAuthorized = callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == reservation.CompanyId) ||
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == reservation.BranchId));
         }

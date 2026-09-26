@@ -6,6 +6,7 @@ using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Assignments.Commands.InviteGymAdmin;
 
@@ -30,8 +31,12 @@ public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminComman
         // validator ValidPhoneNumber ile geçerliliği zaten garanti ediyor.
         var phone = _phoneNumberNormalizer.NormalizeIfPhone(request.Phone);
 
+        // IgnoreQueryFilters (bu handler'daki tüm okumalar): Sistem Sahibi'nin
+        // tenant bağlamı yok (senaryo §10.6, platform bypass'ı kaldırıldı) - GymAdmin
+        // davet etmek firma yönetiminin parçası. Güvenli: yetki aşağıda açıkça
+        // kontrol ediliyor (SuperAdmin veya bu firmanın GymAdmin'i).
         var company = await _unitOfWork.GetReadRepository<Company>()
-            .GetAsync(c => c.Id == request.CompanyId, cancellationToken: cancellationToken);
+            .GetAsync(c => c.Id == request.CompanyId, include: q => q.IgnoreQueryFilters().Include(c => c.Branches), cancellationToken: cancellationToken);
         if (company is null)
         {
             throw new NotFoundException("CompanyNotFound", request.CompanyId);
@@ -59,9 +64,12 @@ public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminComman
             throw new NotFoundException("PhoneNotRegistered", phone);
         }
 
-        var alreadyGymAdminOfThisCompany = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
-            a => a.UserId == invitedUser.Id && a.CompanyId == request.CompanyId && a.BranchId == null &&
-                 a.Role == AssignmentRole.GymAdmin && a.IsActive, cancellationToken);
+        // AnyAsync'in IgnoreQueryFilters kaçışı yok - GetAllAsync + Count.
+        var inviteesAssignmentsInThisCompany = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
+            a => a.UserId == invitedUser.Id && a.CompanyId == request.CompanyId && a.IsActive,
+            include: q => q.IgnoreQueryFilters().Include(a => a.User),
+            cancellationToken: cancellationToken);
+        var alreadyGymAdminOfThisCompany = inviteesAssignmentsInThisCompany.Any(a => a.BranchId == null && a.Role == AssignmentRole.GymAdmin);
         if (alreadyGymAdminOfThisCompany)
         {
             throw new UserAlreadyAssignedException();
@@ -70,9 +78,7 @@ public class InviteGymAdminCommandHandler : IRequestHandler<InviteGymAdminComman
         // GymAdmin already covers every branch of the company; a pre-existing
         // BranchManager assignment there is redundant/conflicting and blocks
         // the invite - same rule enforced the other way in AddStaffMemberCommandHandler.
-        var inviteeIsAlreadyBranchManagerOfThisCompany = await _unitOfWork.GetReadRepository<Assignment>().AnyAsync(
-            a => a.UserId == invitedUser.Id && a.CompanyId == request.CompanyId &&
-                 a.Role == AssignmentRole.BranchManager && a.IsActive, cancellationToken);
+        var inviteeIsAlreadyBranchManagerOfThisCompany = inviteesAssignmentsInThisCompany.Any(a => a.Role == AssignmentRole.BranchManager);
         if (inviteeIsAlreadyBranchManagerOfThisCompany)
         {
             throw new ConflictingAssignmentRoleException();

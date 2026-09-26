@@ -5,6 +5,7 @@ using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Assignments.Commands.RemoveAssignment;
 
@@ -22,8 +23,13 @@ public class RemoveAssignmentCommandHandler : IRequestHandler<RemoveAssignmentCo
     public async Task Handle(RemoveAssignmentCommand request, CancellationToken cancellationToken)
     {
         var assignmentReadRepo = _unitOfWork.GetReadRepository<Assignment>();
+        // IgnoreQueryFilters: Sistem Sahibi'nin tenant bağlamı yok (senaryo §10.6,
+        // platform bypass'ı kaldırıldı) - firma yönetimi kapsamında bir GymAdmin
+        // atamasını görebilmesi için. Güvenli: yetki aşağıda açıkça kontrol ediliyor.
         var assignment = await assignmentReadRepo.GetAsync(
-            a => a.Id == request.AssignmentId && a.IsActive, cancellationToken: cancellationToken);
+            a => a.Id == request.AssignmentId && a.IsActive,
+            include: q => q.IgnoreQueryFilters().Include(a => a.User),
+            cancellationToken: cancellationToken);
         if (assignment is null)
         {
             throw new NotFoundException("AssignmentNotFound", request.AssignmentId);
@@ -32,17 +38,19 @@ public class RemoveAssignmentCommandHandler : IRequestHandler<RemoveAssignmentCo
         var callerAssignments = await assignmentReadRepo.GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
 
-        // Mirrors exactly who may ADD each role (Tasks 2-3, 5): a
-        // BranchManager may remove a Trainer from their own branch, but
-        // never a peer BranchManager or a GymAdmin; only GymAdmin(of this
-        // company)/SuperAdmin may remove a BranchManager or a peer GymAdmin.
+        // Mirrors exactly who may ADD each role: a BranchManager may remove a
+        // Trainer from their own branch, but never a peer BranchManager or a
+        // GymAdmin; only a GymAdmin of this company may remove a BranchManager.
+        // Sistem Sahibi gym personeline karışmaz (senaryo §10.6) - sadece
+        // firma yönetiminin parçası olarak GymAdmin atamasını kaldırabilir.
         var callerIsAuthorized = assignment.Role switch
         {
-            AssignmentRole.GymAdmin or AssignmentRole.BranchManager => callerAssignments.Any(a =>
+            AssignmentRole.GymAdmin => callerAssignments.Any(a =>
                 a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == assignment.CompanyId)),
+            AssignmentRole.BranchManager => callerAssignments.Any(a =>
+                a.Role == AssignmentRole.GymAdmin && a.CompanyId == assignment.CompanyId),
             AssignmentRole.Trainer => callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == assignment.CompanyId) ||
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId)),
             _ => false,

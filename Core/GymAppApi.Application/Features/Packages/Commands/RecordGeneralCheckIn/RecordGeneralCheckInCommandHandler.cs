@@ -7,8 +7,8 @@ using MediatR;
 
 namespace GymAppApi.Application.Features.Packages.Commands.RecordGeneralCheckIn;
 
-// Walk-in / no-reservation check-in - front desk only (GymAdmin/BranchManager/
-// SuperAdmin, no Trainer, no Member self-service), unlike the reservation-
+// Walk-in / no-reservation check-in - front desk only (GymAdmin/BranchManager;
+// no SuperAdmin, no Trainer, no Member self-service), unlike the reservation-
 // based check-in commands which the reservation's own Trainer may also do.
 public class RecordGeneralCheckInCommandHandler : IRequestHandler<RecordGeneralCheckInCommand>
 {
@@ -28,7 +28,6 @@ public class RecordGeneralCheckInCommandHandler : IRequestHandler<RecordGeneralC
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == assignment.CompanyId) ||
             (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId));
         if (!callerIsAuthorized)

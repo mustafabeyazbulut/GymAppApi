@@ -38,16 +38,14 @@ public class CreatePackageAssignmentCommandHandler : IRequestHandler<CreatePacka
         }
 
         // A company-wide package (BranchId == null) may only be assigned by a
-        // GymAdmin/SuperAdmin, same limit as creating one - a BranchManager may
+        // GymAdmin, same limit as creating one - a BranchManager may
         // only assign a package scoped to their own exact branch.
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = package.BranchId is null
             ? callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == package.CompanyId))
             : callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == package.CompanyId) ||
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == package.BranchId));
         if (!callerIsAuthorized)

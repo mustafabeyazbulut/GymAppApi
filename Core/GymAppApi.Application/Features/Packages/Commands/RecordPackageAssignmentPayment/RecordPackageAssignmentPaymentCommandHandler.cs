@@ -26,7 +26,6 @@ public class RecordPackageAssignmentPaymentCommandHandler : IRequestHandler<Reco
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == assignment.CompanyId) ||
             (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId));
         if (!callerIsAuthorized)

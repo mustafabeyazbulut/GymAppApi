@@ -21,12 +21,11 @@ public class SetPackageActiveCommandHandler : IRequestHandler<SetPackageActiveCo
             throw new NotFoundException("PackageNotFound", request.PackageId);
         }
 
-        // Same GymAdmin(of company)/SuperAdmin-only rule as SetBranchActiveCommandHandler -
+        // Same GymAdmin(of company)-only rule as SetBranchActiveCommandHandler -
         // a BranchManager may not retire/reactivate even their own branch's package.
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
             (a.Role == AssignmentRole.GymAdmin && a.CompanyId == package.CompanyId));
         if (!callerIsAuthorized)
         {

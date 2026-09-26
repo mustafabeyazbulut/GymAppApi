@@ -46,7 +46,6 @@ public class CancelClassEnrollmentCommandHandler : IRequestHandler<CancelClassEn
             var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
                 a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
             callerIsAuthorized = callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == enrollment.CompanyId) ||
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == enrollment.BranchId));
         }

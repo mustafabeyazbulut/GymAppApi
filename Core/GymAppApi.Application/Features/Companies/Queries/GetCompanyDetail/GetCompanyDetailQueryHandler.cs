@@ -17,9 +17,12 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
 
     public async Task<CompanyDetailDto> Handle(GetCompanyDetailQuery request, CancellationToken cancellationToken)
     {
+        // IgnoreQueryFilters (bu handler'daki tüm okumalar): SuperAdminOnly uç nokta -
+        // Sistem Sahibi'nin tenant bağlamı yok (senaryo §10.6, platform bypass'ı
+        // kaldırıldı); firma yönetimi firmayı açıkça görür.
         var company = await _unitOfWork.GetReadRepository<Company>().GetAsync(
             c => c.Id == request.CompanyId,
-            include: q => q.Include(c => c.Branches),
+            include: q => q.IgnoreQueryFilters().Include(c => c.Branches),
             cancellationToken: cancellationToken);
 
         if (company is null)
@@ -27,13 +30,9 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
             throw new NotFoundException("CompanyNotFound", request.CompanyId);
         }
 
-        // Bu uc noktaya sadece SuperAdmin erisebiliyor (CompaniesController'daki
-        // SuperAdminOnly policy'si), bu yuzden Assignment'in tenant-scoping
-        // global filtresi (_tenantContext.IsSuperAdmin) burada devre disi kaliyor
-        // ve bu sirkete ait tum atamalar guvenle cekilebiliyor.
         var assignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             predicate: a => a.CompanyId == request.CompanyId && a.IsActive,
-            include: q => q.Include(a => a.User!),
+            include: q => q.IgnoreQueryFilters().Include(a => a.User!),
             cancellationToken: cancellationToken);
 
         // Senaryo §3.2: firmanın üyesi = o firmada GEÇERLİ paketi olan tekil kullanıcı.

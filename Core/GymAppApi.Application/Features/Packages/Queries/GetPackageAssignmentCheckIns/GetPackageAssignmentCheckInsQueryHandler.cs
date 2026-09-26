@@ -36,7 +36,6 @@ public class GetPackageAssignmentCheckInsQueryHandler : IRequestHandler<GetPacka
             // durumunu) görebilmeli, aksi halde antrenör panelinde hiçbir
             // katılım verisi gösterilemez.
             var callerIsAuthorized = callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == assignment.CompanyId) ||
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId) ||
                 (a.Role == AssignmentRole.Trainer && a.BranchId == assignment.BranchId));

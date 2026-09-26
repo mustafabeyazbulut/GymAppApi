@@ -36,7 +36,6 @@ public class GetPackageAssignmentReservationsQueryHandler : IRequestHandler<GetP
             // görebilmeli - aksi halde bir antrenör kendi oluşturduğu bir
             // rezervasyonu bile geriye dönük listeleyip göremez.
             var callerIsAuthorized = callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == assignment.CompanyId) ||
                 (a.Role == AssignmentRole.BranchManager && a.BranchId == assignment.BranchId) ||
                 (a.Role == AssignmentRole.Trainer && a.BranchId == assignment.BranchId));

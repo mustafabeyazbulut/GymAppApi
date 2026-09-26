@@ -3,6 +3,7 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Branches.Commands.SetBranchActive;
 
@@ -14,27 +15,28 @@ public class SetBranchActiveCommandHandler : IRequestHandler<SetBranchActiveComm
 
     public async Task Handle(SetBranchActiveCommand request, CancellationToken cancellationToken)
     {
-        // Branch is ICompanyScoped, IDeactivatable: its global query filter hides an
-        // inactive branch from every non-SuperAdmin caller. This means a GymAdmin who
-        // deactivates their own branch will get NotFoundException here if they try to
-        // reactivate it themselves - only SuperAdmin (who bypasses the filter) can
-        // successfully call this to flip it back. Intentional, matches how Company
-        // deactivation already behaves, not a bug.
+        // IgnoreQueryFilters: Branch'in global filtresi pasif şubeyi gizler -
+        // filtreyle okunsaydı Gym Admin kapattığı şubeyi yeniden açamazdı
+        // (senaryo §4.5: şube açar, düzenler, kapatır). Eskiden bunu sadece
+        // filtreyi atlayan SuperAdmin yapabiliyordu; §10.6 ile o yol kapandı.
+        // Güvenli: yetki aşağıda açıkça kontrol ediliyor.
         var branch = await _unitOfWork.GetReadRepository<Branch>()
-            .GetAsync(b => b.Id == request.BranchId, cancellationToken: cancellationToken);
-        if (branch is null)
+            .GetAsync(b => b.Id == request.BranchId, include: q => q.IgnoreQueryFilters().Include(b => b.Company), cancellationToken: cancellationToken);
+
+        var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
+            a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
+
+        // Çağıranın bu firmada hiç ataması yoksa şube "yok" sayılır (404) - başka
+        // firmanın şubesinin varlığı sızdırılmaz.
+        if (branch is null || !callerAssignments.Any(a => a.CompanyId == branch.CompanyId))
         {
             throw new NotFoundException("BranchNotFound", request.BranchId);
         }
 
-        // Same re-check pattern as CreateBranchCommandHandler - opening or
-        // closing a branch is a GymAdmin(of this company)/SuperAdmin
-        // decision, not the branch's own BranchManager's call.
-        var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
-            a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
+        // Şube açmak/kapatmak bu firmanın Gym Admin'inin kararı; şubenin kendi
+        // Şube Yöneticisinin değil.
         var callerIsAuthorized = callerAssignments.Any(a =>
-            a.Role == AssignmentRole.SuperAdmin ||
-            (a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId));
+            a.Role == AssignmentRole.GymAdmin && a.CompanyId == branch.CompanyId);
         if (!callerIsAuthorized)
         {
             throw new ForbiddenException("ForbiddenSetBranchActive");

@@ -29,10 +29,10 @@ public class GetMyReservationsQueryHandler : IRequestHandler<GetMyReservationsQu
         // firmada çalışabilir; liste AKTİF atamanın (X-Active-Assignment-Id)
         // firması/şubesiyle sınırlanır - A1'de antrenör olarak bakan biri
         // A2'deki rezervasyonlarını görmez, rol değiştirince görür. Aktif
-        // personel bağlamı yoksa (ör. SuperAdmin) kapsam daraltılmaz; tek
-        // gerçek yetki kontrolü yine r.TrainerId == caller eşleşmesi.
-        var companyId = _tenantContext.IsSuperAdmin ? null : _tenantContext.CompanyId;
-        var branchId = _tenantContext.IsSuperAdmin ? null : _tenantContext.BranchId;
+        // personel bağlamı yoksa kapsam daraltılmaz; tek gerçek yetki kontrolü
+        // yine r.TrainerId == caller eşleşmesi.
+        var companyId = _tenantContext.CompanyId;
+        var branchId = _tenantContext.BranchId;
         var reservations = await _unitOfWork.GetReadRepository<Reservation>().GetAllAsync(
             r => r.TrainerId == request.TrainerUserId &&
                  (companyId == null || r.CompanyId == companyId) &&
