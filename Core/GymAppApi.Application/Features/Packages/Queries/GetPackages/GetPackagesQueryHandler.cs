@@ -1,6 +1,8 @@
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Entities;
+using GymAppApi.Domain.Enums;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Packages.Queries.GetPackages;
 
@@ -15,15 +17,27 @@ public class GetPackagesQueryHandler : IRequestHandler<GetPackagesQuery, IReadOn
         _tenantContext = tenantContext;
     }
 
+    // Paketleri yöneten roller (GymAdmin, BranchManager) pasif paketleri de
+    // görür (IsActive alanıyla) - aksi hâlde pasife aldıkları paketi bulup
+    // tekrar aktif yapamazlardı. Diğerleri sadece aktif paketleri görür.
+    internal static bool CanSeeInactive(ITenantContext tenantContext) =>
+        tenantContext.Role is AssignmentRole.GymAdmin or AssignmentRole.BranchManager;
+
     public async Task<IReadOnlyList<PackageDto>> Handle(GetPackagesQuery request, CancellationToken cancellationToken)
     {
-        // Global query filter sadece firmaya göre daraltıyor - şube kapsamlı
+        // Filtre pasifi gizlediği için IgnoreQueryFilters + firma kapsamı
+        // açıkça (ambient firma yoksa hiçbir şey dönmez). Şube kapsamlı
         // personel (ambient BranchId set) sadece kendi şubesinin paketlerini
         // görür (senaryo §10.8). Firma geneli paket yok (§10.5): eski şubesiz
         // kayıtlar varsa sadece firma kapsamlı personel (GymAdmin) görür.
+        var companyId = _tenantContext.CompanyId;
         var branchId = _tenantContext.BranchId;
+        var includeInactive = CanSeeInactive(_tenantContext);
         var packages = await _unitOfWork.GetReadRepository<Package>().GetAllAsync(
-            predicate: p => branchId == null || p.BranchId == branchId,
+            predicate: p => companyId != null && p.CompanyId == companyId &&
+                            (branchId == null || p.BranchId == branchId) &&
+                            (includeInactive || p.IsActive),
+            include: q => q.IgnoreQueryFilters().Include(p => p.Company),
             cancellationToken: cancellationToken);
 
         return packages.Select(ToDto).ToList();

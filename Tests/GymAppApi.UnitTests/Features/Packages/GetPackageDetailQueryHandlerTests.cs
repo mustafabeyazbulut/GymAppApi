@@ -15,11 +15,9 @@ public class GetPackageDetailQueryHandlerTests
 
     private static GetPackageDetailQueryHandler CreateHandler(Package? package, ITenantContext tenantContext)
     {
-        var readRepo = new Mock<IReadRepository<Package>>();
-        readRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Package, bool>>>(), null, false, default))
-            .ReturnsAsync(package);
         var uow = new Mock<IUnitOfWork>();
-        uow.Setup(u => u.GetReadRepository<Package>()).Returns(readRepo.Object);
+        uow.Setup(u => u.GetReadRepository<Package>())
+            .Returns(GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(package is null ? new List<Package>() : new List<Package> { package }).Object);
         return new GetPackageDetailQueryHandler(uow.Object, tenantContext);
     }
 
@@ -62,6 +60,36 @@ public class GetPackageDetailQueryHandlerTests
         // Senaryo §10.5: firma geneli paket yok - eski şubesiz kayıt şube
         // personeline "yok" sayılır.
         var handler = CreateHandler(PackageAt(branchId: null), BranchScopedContext);
+
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(new GetPackageDetailQuery(1), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_InactivePackage_IsVisibleToManagers()
+    {
+        var package = PackageAt(branchId: 10);
+        package.IsActive = false;
+        var handler = CreateHandler(package, new AmbientTenantContext { CompanyId = 1, BranchId = 10, Role = AssignmentRole.BranchManager });
+
+        var result = await handler.Handle(new GetPackageDetailQuery(1), CancellationToken.None);
+
+        Assert.False(result.IsActive);
+    }
+
+    [Fact]
+    public async Task Handle_InactivePackage_IsHiddenFromTrainers()
+    {
+        var package = PackageAt(branchId: 10);
+        package.IsActive = false;
+        var handler = CreateHandler(package, new AmbientTenantContext { CompanyId = 1, BranchId = 10, Role = AssignmentRole.Trainer });
+
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(new GetPackageDetailQuery(1), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_AnotherCompanysPackage_ThrowsNotFoundException()
+    {
+        var handler = CreateHandler(PackageAt(branchId: 10), new AmbientTenantContext { CompanyId = 2, Role = AssignmentRole.GymAdmin });
 
         await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(new GetPackageDetailQuery(1), CancellationToken.None));
     }
