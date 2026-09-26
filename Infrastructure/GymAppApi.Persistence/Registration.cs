@@ -80,6 +80,7 @@ public static class Registration
         services.AddScoped(typeof(IWriteRepository<>), typeof(WriteRepository<>));
         services.AddScoped<IUnitOfWork, GymAppApi.Persistence.UnitOfWork.UnitOfWork>();
         services.AddScoped<ITenantResolutionService, TenantResolutionService>();
+        services.AddScoped<GymAppApi.Application.Common.Security.ILoginAttemptStore, GymAppApi.Persistence.Security.LoginAttemptStore>();
 
         return services;
     }

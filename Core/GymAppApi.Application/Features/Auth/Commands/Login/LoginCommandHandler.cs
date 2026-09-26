@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Auth.Common;
 using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
@@ -8,13 +9,6 @@ namespace GymAppApi.Application.Features.Auth.Commands.Login;
 
 public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTokenResult>
 {
-    // Art arda bu kadar başarısız denemeden sonra hesap LockoutDuration kadar
-    // kilitlenir. Kilitliyken doğru şifre de reddedilir ve yanıt "kullanıcı
-    // yok / yanlış şifre" ile birebir aynıdır (InvalidCredentials) - hesabın
-    // varlığı veya kilit durumu sızdırılmaz.
-    public const int MaxFailedAttempts = 10;
-    public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
-
     // Lazily computed once via the injected hasher (never a hand-typed
     // string — must be a real, correctly-formatted hash) and reused for
     // every "user not found" case, so that path takes comparable time to a
@@ -29,11 +23,15 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTokenResult
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
+    private readonly ILoginAttemptStore _loginAttemptStore;
+    private readonly IClientIpHashProvider _clientIpHashProvider;
 
     public LoginCommandHandler(
         IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IJwtTokenService jwtTokenService,
-        IPhoneNumberNormalizer phoneNumberNormalizer)
+        IPhoneNumberNormalizer phoneNumberNormalizer, ILoginAttemptStore loginAttemptStore, IClientIpHashProvider clientIpHashProvider)
     {
+        _loginAttemptStore = loginAttemptStore;
+        _clientIpHashProvider = clientIpHashProvider;
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
@@ -60,32 +58,25 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTokenResult
             throw new InvalidCredentialsException();
         }
 
+        // Hesap+IP bazlı kilit (LoginLockoutPolicy): kilitliyken doğru şifre de
+        // reddedilir ve yanıt "kullanıcı yok / yanlış şifre" ile birebir aynıdır
+        // (InvalidCredentials) - hesabın varlığı veya kilit durumu sızdırılmaz.
+        // Login User satırına hiç yazmaz: sayaç ayrı tabloda atomik tutulur, böylece
+        // eşzamanlı ResetPassword'ün yeni hash'i bayat bir kopyayla ezilemez.
         var now = DateTime.UtcNow;
-        if (user.LockoutEndsAt > now)
+        var ipHash = _clientIpHashProvider.GetHashedClientIp();
+        if (await _loginAttemptStore.IsLockedAsync(user.Id, ipHash, now, cancellationToken))
         {
             throw new InvalidCredentialsException();
         }
 
-        var userWriteRepo = _unitOfWork.GetWriteRepository<User>();
         if (!passwordMatches)
         {
-            user.FailedLoginAttempts += 1;
-            if (user.FailedLoginAttempts >= MaxFailedAttempts)
-            {
-                user.LockoutEndsAt = now.Add(LockoutDuration);
-                user.FailedLoginAttempts = 0;
-            }
-            userWriteRepo.Update(user);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _loginAttemptStore.RecordFailureAsync(user.Id, ipHash, now, cancellationToken);
             throw new InvalidCredentialsException();
         }
 
-        if (user.FailedLoginAttempts != 0 || user.LockoutEndsAt is not null)
-        {
-            user.FailedLoginAttempts = 0;
-            user.LockoutEndsAt = null;
-            userWriteRepo.Update(user);
-        }
+        await _loginAttemptStore.ResetAsync(user.Id, ipHash, cancellationToken);
 
         var access = _jwtTokenService.GenerateAccessToken(new AccessTokenClaims(user.Id, user.FullName, user.Email, user.Phone));
         var rawRefreshToken = _jwtTokenService.GenerateRefreshTokenValue();

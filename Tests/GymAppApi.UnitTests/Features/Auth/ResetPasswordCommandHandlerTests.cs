@@ -50,7 +50,8 @@ public class ResetPasswordCommandHandlerTests
     public async Task Handle_WhenUserNotFound_ThrowsInvalidResetCodeException()
     {
         var (uow, _, _, _, _, _, _, hasher, phoneNormalizer) = Wire(user: null, otp: null);
-        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object);
+        var loginAttemptStore = new Mock<GymAppApi.Application.Common.Security.ILoginAttemptStore>();
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object, loginAttemptStore.Object);
 
         await Assert.ThrowsAsync<InvalidResetCodeException>(() =>
             handler.Handle(new ResetPasswordCommand { Identifier = "nope", Code = "123456", NewPassword = "YeniSifre123!" }, CancellationToken.None));
@@ -62,7 +63,9 @@ public class ResetPasswordCommandHandlerTests
         var otp = new OtpVerification { Id = 9, UserId = 1, Code = "111111", ExpiresAt = DateTime.UtcNow.AddMinutes(5), Purpose = OtpPurpose.PasswordReset, IsUsed = false, AttemptCount = 0 };
         var (uow, _, _, otpReadRepo, otpWriteRepo, _, _, hasher, phoneNormalizer) = Wire(Owner(), otp);
 
-        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object);
+        var loginAttemptStore = new Mock<GymAppApi.Application.Common.Security.ILoginAttemptStore>();
+
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object, loginAttemptStore.Object);
 
         await Assert.ThrowsAsync<InvalidResetCodeException>(() =>
             handler.Handle(new ResetPasswordCommand { Identifier = "ayse@test.com", Code = "999999", NewPassword = "YeniSifre123!" }, CancellationToken.None));
@@ -75,7 +78,8 @@ public class ResetPasswordCommandHandlerTests
     {
         var otp = new OtpVerification { Id = 9, UserId = 1, Code = "111111", ExpiresAt = DateTime.UtcNow.AddMinutes(5), Purpose = OtpPurpose.PasswordReset, IsUsed = false, AttemptCount = 5 };
         var (uow, _, _, _, _, _, _, hasher, phoneNormalizer) = Wire(Owner(), otp);
-        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object);
+        var loginAttemptStore = new Mock<GymAppApi.Application.Common.Security.ILoginAttemptStore>();
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object, loginAttemptStore.Object);
 
         await Assert.ThrowsAsync<InvalidResetCodeException>(() =>
             handler.Handle(new ResetPasswordCommand { Identifier = "ayse@test.com", Code = "111111", NewPassword = "YeniSifre123!" }, CancellationToken.None));
@@ -91,11 +95,28 @@ public class ResetPasswordCommandHandlerTests
             .ReturnsAsync(new List<RefreshToken> { activeToken });
         hasher.Setup(h => h.Hash("YeniSifre123!")).Returns("new-hash");
 
-        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object);
+        var loginAttemptStore = new Mock<GymAppApi.Application.Common.Security.ILoginAttemptStore>();
+
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object, loginAttemptStore.Object);
         await handler.Handle(new ResetPasswordCommand { Identifier = "ayse@test.com", Code = "111111", NewPassword = "YeniSifre123!" }, CancellationToken.None);
 
         userWriteRepo.Verify(r => r.Update(It.Is<User>(u => u.PasswordHash == "new-hash")), Times.Once);
         otpWriteRepo.Verify(r => r.Update(It.Is<OtpVerification>(o => o.IsUsed)), Times.Once);
         refreshWriteRepo.Verify(r => r.Update(It.Is<RefreshToken>(t => t.Id == 3 && t.RevokedAt != null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCodeCorrect_ClearsAllLoginLockoutsOfTheAccount()
+    {
+        // Başarılı şifre sıfırlama, hesabın tüm IP'lerdeki başarısız giriş
+        // sayaçlarını ve kilitlerini temizler - kilitlenen kullanıcının çıkış yolu.
+        var otp = new OtpVerification { Id = 10, UserId = 1, Code = "123456", Purpose = OtpPurpose.PasswordReset, IsUsed = false, ExpiresAt = DateTime.UtcNow.AddMinutes(5) };
+        var (uow, _, _, _, _, _, _, hasher, phoneNormalizer) = Wire(Owner(), otp);
+        var loginAttemptStore = new Mock<GymAppApi.Application.Common.Security.ILoginAttemptStore>();
+        var handler = new ResetPasswordCommandHandler(uow.Object, hasher.Object, phoneNormalizer.Object, loginAttemptStore.Object);
+
+        await handler.Handle(new ResetPasswordCommand { Identifier = "+905551112233", Code = "123456", NewPassword = "YeniSifre123!" }, CancellationToken.None);
+
+        loginAttemptStore.Verify(s => s.ClearAllForUserAsync(1, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

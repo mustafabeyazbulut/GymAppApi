@@ -19,6 +19,7 @@ public class GymAppApiDbContext : DbContext
         typeof(PendingAssignmentInvitation),
         typeof(PendingPackageAssignmentInvitation),
         typeof(MediaFile),
+        typeof(LoginFailure),
     };
 
     private readonly ITenantContext _tenantContext;
@@ -32,6 +33,7 @@ public class GymAppApiDbContext : DbContext
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<LoginFailure> LoginFailures => Set<LoginFailure>();
     public DbSet<Assignment> Assignments => Set<Assignment>();
     public DbSet<OtpVerification> OtpVerifications => Set<OtpVerification>();
     public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();

@@ -19,6 +19,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<GymAppApi.Application.Common.Security.IClientIpHashProvider, GymAppApi.WebApi.Security.HttpClientIpHashProvider>();
 builder.Services.AddHostedService<MembershipExpiryReminderHostedService>();
 builder.Services.AddHostedService<OutstandingBalanceReminderHostedService>();
 builder.Services.AddHostedService<SuperAdminPhoneSeedHostedService>();

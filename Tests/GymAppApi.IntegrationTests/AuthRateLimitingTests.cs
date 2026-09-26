@@ -10,27 +10,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace GymAppApi.IntegrationTests;
 
-// Küçük limitlerle ayağa kalkan ve istemci IP'sini test isteğinin
-// X-Test-Client-Ip header'ından alan factory - TestServer'da
-// Connection.RemoteIpAddress normalde boş, IP bölümlemesini test
-// edebilmek için gerçek bir IP'ye çevriliyor. Sadece testte kullanılan bir
-// startup filter; üretim pipeline'ında böyle bir header'a güvenilmez.
-public class RateLimitingWebApplicationFactory : CustomWebApplicationFactory
+// İstemci IP'sini test isteğinin X-Test-Client-Ip header'ından alan factory -
+// TestServer'da Connection.RemoteIpAddress normalde boş, IP bazlı davranışı
+// (rate limit bölümleme, hesap+IP kilidi) test edebilmek için gerçek bir IP'ye
+// çevriliyor. Sadece testte kullanılan bir startup filter; üretim
+// pipeline'ında böyle bir header'a güvenilmez.
+public class ClientIpWebApplicationFactory : CustomWebApplicationFactory
 {
     public const string TestClientIpHeader = "X-Test-Client-Ip";
-    public const int PermitPerIp = 3;
-    public const int PermitPerIdentifier = 2;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
-        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["RateLimiting:Auth:PermitPerIp"] = PermitPerIp.ToString(),
-            ["RateLimiting:Auth:IpWindowSeconds"] = "600",
-            ["RateLimiting:Auth:PermitPerIdentifier"] = PermitPerIdentifier.ToString(),
-            ["RateLimiting:Auth:IdentifierWindowSeconds"] = "600",
-        }));
         builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, TestClientIpStartupFilter>());
     }
 
@@ -51,6 +42,24 @@ public class RateLimitingWebApplicationFactory : CustomWebApplicationFactory
     }
 }
 
+// Küçük rate limit değerleriyle ayağa kalkan, IP enjekte eden factory.
+public class RateLimitingWebApplicationFactory : ClientIpWebApplicationFactory
+{
+    public const int PermitPerIp = 3;
+    public const int PermitPerIdentifier = 2;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["RateLimiting:Auth:PermitPerIp"] = PermitPerIp.ToString(),
+            ["RateLimiting:Auth:IpWindowSeconds"] = "600",
+            ["RateLimiting:Auth:PermitPerIdentifier"] = PermitPerIdentifier.ToString(),
+            ["RateLimiting:Auth:IdentifierWindowSeconds"] = "600",
+        }));
+    }
+}
 public class AuthRateLimitingTests : IClassFixture<RateLimitingWebApplicationFactory>
 {
     private readonly RateLimitingWebApplicationFactory _factory;
@@ -65,7 +74,7 @@ public class AuthRateLimitingTests : IClassFixture<RateLimitingWebApplicationFac
     private HttpClient ClientFrom(string ip, string? language = null)
     {
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(RateLimitingWebApplicationFactory.TestClientIpHeader, ip);
+        client.DefaultRequestHeaders.Add(ClientIpWebApplicationFactory.TestClientIpHeader, ip);
         if (language is not null)
         {
             client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue(language));

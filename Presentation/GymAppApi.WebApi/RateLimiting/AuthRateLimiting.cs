@@ -19,7 +19,10 @@ public class AuthRateLimitOptions
     // IP'lerden aynı hedefe yayılan istekleri kesen ek bir kalkan - alan
     // kuralının kendi hata yanıtlarını (401/429 TooManyVerificationRequests)
     // maskelememesi için ondan geniş tutuluyor.
-    public int PermitPerIdentifier { get; set; } = 10;
+    // Kilit eşiğinden (LoginLockoutPolicy: IP başına 10) bilerek geniş - aynı
+    // hesaba farklı IP'lerden yayılan denemeyi sınırlar, ama sahibinin kendi
+    // IP'sinden girişini tek başına kilitleyemez.
+    public int PermitPerIdentifier { get; set; } = 20;
     public int IdentifierWindowSeconds { get; set; } = 900;
 }
 

@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Auth.Commands.Login;
 using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
@@ -29,7 +30,6 @@ public class LoginCommandHandlerTests
         var uow = new Mock<IUnitOfWork>();
         uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<RefreshToken>()).Returns(refreshWriteRepo.Object);
-        uow.Setup(u => u.GetWriteRepository<User>()).Returns(new Mock<IWriteRepository<User>>().Object);
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
 
         var hasher = new Mock<IPasswordHasher>();
@@ -49,7 +49,7 @@ public class LoginCommandHandlerTests
     public async Task Handle_WhenUserNotFound_ThrowsInvalidCredentialsException()
     {
         var (uow, _, _, hasher, jwt, phoneNormalizer) = Wire(foundUser: null);
-        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object);
+        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object, Mock.Of<ILoginAttemptStore>(), ClientIp());
 
         await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
             handler.Handle(new LoginCommand { Identifier = "+905550000000", Password = "x" }, CancellationToken.None));
@@ -60,7 +60,7 @@ public class LoginCommandHandlerTests
     {
         var (uow, _, _, hasher, jwt, phoneNormalizer) = Wire(ExistingUser());
         hasher.Setup(h => h.Verify("stored-hash", "wrong")).Returns(false);
-        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object);
+        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object, Mock.Of<ILoginAttemptStore>(), ClientIp());
 
         await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
             handler.Handle(new LoginCommand { Identifier = "+905551112233", Password = "wrong" }, CancellationToken.None));
@@ -71,7 +71,7 @@ public class LoginCommandHandlerTests
     {
         var (uow, _, _, hasher, jwt, phoneNormalizer) = Wire(foundUser: null);
         hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("dummy-hash");
-        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object);
+        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object, Mock.Of<ILoginAttemptStore>(), ClientIp());
 
         await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
             handler.Handle(new LoginCommand { Identifier = "+905550000000", Password = "x" }, CancellationToken.None));
@@ -85,7 +85,7 @@ public class LoginCommandHandlerTests
         var (uow, _, refreshWriteRepo, hasher, jwt, phoneNormalizer) = Wire(ExistingUser());
         hasher.Setup(h => h.Verify("stored-hash", "Sifre123!")).Returns(true);
         hasher.Setup(h => h.Hash("raw-refresh-token")).Returns("hashed-refresh-token");
-        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object);
+        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object, Mock.Of<ILoginAttemptStore>(), ClientIp());
 
         var result = await handler.Handle(new LoginCommand { Identifier = "+905551112233", Password = "Sifre123!" }, CancellationToken.None);
 
@@ -100,7 +100,7 @@ public class LoginCommandHandlerTests
         var (uow, userReadRepo, _, hasher, jwt, phoneNormalizer) = Wire(ExistingUser());
         phoneNormalizer.Setup(p => p.NormalizeIfPhone("05551112233")).Returns("+905551112233");
         hasher.Setup(h => h.Verify("stored-hash", "Sifre123!")).Returns(true);
-        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object);
+        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object, Mock.Of<ILoginAttemptStore>(), ClientIp());
 
         await handler.Handle(new LoginCommand { Identifier = "05551112233", Password = "Sifre123!" }, CancellationToken.None);
 
@@ -108,87 +108,72 @@ public class LoginCommandHandlerTests
         userReadRepo.Verify(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<User, bool>>>(), null, false, default), Times.Once);
     }
 
-    // --- Hesap başına art arda başarısız giriş kilidi ---
+    // --- Hesap+IP bazlı başarısız giriş kilidi (ILoginAttemptStore) ---
 
-    private static (LoginCommandHandler handler, Mock<IPasswordHasher> hasher, Mock<IWriteRepository<User>> userWriteRepo, Mock<IJwtTokenService> jwt) CreateForLockout(User user, bool passwordMatches)
+    private const string IpHash = "ip-hash";
+
+    private static IClientIpHashProvider ClientIp()
+    {
+        var provider = new Mock<IClientIpHashProvider>();
+        provider.Setup(p => p.GetHashedClientIp()).Returns(IpHash);
+        return provider.Object;
+    }
+
+    private static (LoginCommandHandler handler, Mock<IPasswordHasher> hasher, Mock<ILoginAttemptStore> store, Mock<IJwtTokenService> jwt, Mock<IUnitOfWork> uow)
+        CreateForLockout(User? user, bool passwordMatches, bool locked = false)
     {
         var (uow, _, _, hasher, jwt, phoneNormalizer) = Wire(user);
-        var userWriteRepo = new Mock<IWriteRepository<User>>();
-        uow.Setup(u => u.GetWriteRepository<User>()).Returns(userWriteRepo.Object);
         hasher.Setup(h => h.Verify(It.IsAny<string>(), It.IsAny<string>())).Returns(passwordMatches);
-        return (new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object), hasher, userWriteRepo, jwt);
+        var store = new Mock<ILoginAttemptStore>();
+        store.Setup(s => s.IsLockedAsync(It.IsAny<int>(), IpHash, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(locked);
+        return (new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object, store.Object, ClientIp()), hasher, store, jwt, uow);
     }
 
     private static LoginCommand Command() => new() { Identifier = "+905551112233", Password = "x" };
 
     [Fact]
-    public async Task Handle_WhenPasswordIsWrong_IncrementsTheAccountsFailedAttemptCounter()
+    public async Task Handle_WhenPasswordIsWrong_RecordsAFailureForThisAccountAndIp_WithoutWritingTheUserRow()
     {
-        var user = ExistingUser();
-        user.FailedLoginAttempts = 3;
-        var (handler, _, userWriteRepo, _) = CreateForLockout(user, passwordMatches: false);
+        // Login User satırına hiç yazmaz - eşzamanlı ResetPassword'ün yeni
+        // hash'ini bayat bir kopyayla ezme riski yok.
+        var (handler, _, store, _, uow) = CreateForLockout(ExistingUser(), passwordMatches: false);
 
         await Assert.ThrowsAsync<InvalidCredentialsException>(() => handler.Handle(Command(), CancellationToken.None));
 
-        Assert.Equal(4, user.FailedLoginAttempts);
-        Assert.Null(user.LockoutEndsAt);
-        userWriteRepo.Verify(r => r.Update(user), Times.Once);
+        store.Verify(s => s.RecordFailureAsync(1, IpHash, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        uow.Verify(u => u.GetWriteRepository<User>(), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_WhenTheTenthConsecutiveAttemptFails_LocksTheAccountFor15Minutes()
+    public async Task Handle_WhenLockedForThisIp_RejectsEvenTheCorrectPassword_WithTheSameResponseAndStillVerifies()
     {
-        var user = ExistingUser();
-        user.FailedLoginAttempts = LoginCommandHandler.MaxFailedAttempts - 1;
-        var (handler, _, _, _) = CreateForLockout(user, passwordMatches: false);
-
-        await Assert.ThrowsAsync<InvalidCredentialsException>(() => handler.Handle(Command(), CancellationToken.None));
-
-        Assert.NotNull(user.LockoutEndsAt);
-        Assert.InRange(user.LockoutEndsAt!.Value, DateTime.UtcNow.AddMinutes(14), DateTime.UtcNow.AddMinutes(16));
-        Assert.Equal(0, user.FailedLoginAttempts);
-    }
-
-    [Fact]
-    public async Task Handle_WhenAccountIsLocked_RejectsEvenTheCorrectPassword_WithTheSameResponseAndStillVerifies()
-    {
-        // Kilitli hesap "kullanıcı yok / yanlış şifre" ile AYNI yanıtı alır
-        // (hesap varlığı sızdırılmaz) ve şifre doğrulaması yine yapılır
-        // (yanıt süresi farkıyla ayırt edilemesin).
-        var user = ExistingUser();
-        user.LockoutEndsAt = DateTime.UtcNow.AddMinutes(5);
-        var (handler, hasher, _, jwt) = CreateForLockout(user, passwordMatches: true);
+        var (handler, hasher, store, jwt, _) = CreateForLockout(ExistingUser(), passwordMatches: true, locked: true);
 
         await Assert.ThrowsAsync<InvalidCredentialsException>(() => handler.Handle(Command(), CancellationToken.None));
 
         hasher.Verify(h => h.Verify(It.IsAny<string>(), "x"), Times.Once);
         jwt.Verify(j => j.GenerateAccessToken(It.IsAny<AccessTokenClaims>()), Times.Never);
+        store.Verify(s => s.RecordFailureAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_WhenLockoutHasExpired_AndPasswordIsCorrect_LogsInAndClearsTheLockout()
+    public async Task Handle_WhenPasswordIsCorrect_ResetsTheCounterForThisIp()
     {
-        var user = ExistingUser();
-        user.LockoutEndsAt = DateTime.UtcNow.AddMinutes(-1);
-        user.FailedLoginAttempts = 0;
-        var (handler, _, _, _) = CreateForLockout(user, passwordMatches: true);
+        var (handler, _, store, _, _) = CreateForLockout(ExistingUser(), passwordMatches: true);
 
         var result = await handler.Handle(Command(), CancellationToken.None);
 
         Assert.Equal("access-token", result.AccessToken);
-        Assert.Null(user.LockoutEndsAt);
+        store.Verify(s => s.ResetAsync(1, IpHash, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Handle_WhenPasswordIsCorrect_ResetsThePreviousFailedAttempts()
+    public async Task Handle_WhenUserDoesNotExist_TouchesNoLockoutState()
     {
-        var user = ExistingUser();
-        user.FailedLoginAttempts = 7;
-        var (handler, _, userWriteRepo, _) = CreateForLockout(user, passwordMatches: true);
+        var (handler, _, store, _, _) = CreateForLockout(null, passwordMatches: false);
 
-        await handler.Handle(Command(), CancellationToken.None);
+        await Assert.ThrowsAsync<InvalidCredentialsException>(() => handler.Handle(Command(), CancellationToken.None));
 
-        Assert.Equal(0, user.FailedLoginAttempts);
-        userWriteRepo.Verify(r => r.Update(user), Times.Once);
+        store.VerifyNoOtherCalls();
     }
 }

@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Auth.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -13,10 +14,13 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand>
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPhoneNumberNormalizer _phoneNumberNormalizer;
+    private readonly ILoginAttemptStore _loginAttemptStore;
 
     public ResetPasswordCommandHandler(
-        IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IPhoneNumberNormalizer phoneNumberNormalizer)
+        IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IPhoneNumberNormalizer phoneNumberNormalizer,
+        ILoginAttemptStore loginAttemptStore)
     {
+        _loginAttemptStore = loginAttemptStore;
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _phoneNumberNormalizer = phoneNumberNormalizer;
@@ -68,5 +72,9 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand>
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Şifresini sıfırlayan kullanıcı, kilitlendiği IP dahil her yerden hemen
+        // yeni şifresiyle girebilsin - hesabın tüm giriş kilitleri temizlenir.
+        await _loginAttemptStore.ClearAllForUserAsync(user.Id, cancellationToken);
     }
 }

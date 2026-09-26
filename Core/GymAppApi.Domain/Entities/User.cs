@@ -33,11 +33,6 @@ public class User : EntityBase
     // Instagram's "temporarily disable" pattern. See
     // docs/superpowers/specs/2026-09-16-account-freeze-design.md.
     public bool IsAccountFrozen { get; set; }
-    // Hesap başına art arda başarısız giriş sayacı ve geçici kilit - IP
-    // değiştirerek tek bir hesaba sınırsız şifre denemesini engeller (bkz.
-    // LoginCommandHandler). Başarılı girişte sıfırlanır.
-    public int FailedLoginAttempts { get; set; }
-    public DateTime? LockoutEndsAt { get; set; }
 
     // Postgres xmin concurrency token (RefreshToken ile aynı desen, bkz.
     // RefreshTokenConfiguration). Bu kod tabanındaki AsNoTracking okuma ->
