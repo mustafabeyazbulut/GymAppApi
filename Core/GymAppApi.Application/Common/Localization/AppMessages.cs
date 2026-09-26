@@ -25,6 +25,9 @@ public static class AppMessages
         // Davetlerim (uygulama içi davet kabul/red).
         ["InvitationNotFound"] = ("Invitation {0} not found.", "Davet {0} bulunamadı."),
         ["InvitationExpired"] = ("This invitation has expired. Please ask for a new one.", "Bu davetin süresi dolmuş. Lütfen yeni bir davet isteyin."),
+        ["InvitationTargetInactive"] = (
+            "This invitation can no longer be accepted because its branch, company or package is no longer active.",
+            "Bu davet artık kabul edilemez; davetin şubesi, firması veya paketi aktif değil."),
         ["PhoneNotVerified"] = ("Please verify your phone number to continue.", "Devam etmek için lütfen telefon numaranızı doğrulayın."),
         ["InvitationRejectedTitle"] = ("Invitation declined", "Davet reddedildi"),
         ["InvitationRejectedBody"] = ("{0} declined the {2} invitation for {1}.", "{0}, {1} için {2} davetini reddetti."),

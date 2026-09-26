@@ -40,6 +40,9 @@ public static class AssignmentInvitationAcceptance
 
     private static async Task<Assignment> AcceptWithinTransactionAsync(IUnitOfWork unitOfWork, PendingAssignmentInvitation invitation, CancellationToken cancellationToken)
     {
+        // Davet sonrası kapatılmış şube/firma: 409, davet yanmaz.
+        await InvitationTargetGuard.EnsureActiveAsync(unitOfWork, invitation.CompanyId, invitation.BranchId, packageId: null, cancellationToken);
+
         // Atomik talep: eşzamanlı ikinci onay burada durur (InvitationWrites.ClaimAsync).
         invitation.IsUsed = true;
         await InvitationWrites.ClaimAsync(unitOfWork, invitation, invitation.Id, cancellationToken);

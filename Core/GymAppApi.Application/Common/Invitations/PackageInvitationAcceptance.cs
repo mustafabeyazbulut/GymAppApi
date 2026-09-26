@@ -35,6 +35,9 @@ public static class PackageInvitationAcceptance
     private static async Task<PackageAssignment> AcceptWithinTransactionAsync(
         IUnitOfWork unitOfWork, PendingPackageAssignmentInvitation invitation, DateTime now, CancellationToken cancellationToken)
     {
+        // Davet sonrası pasife alınmış paket ya da kapatılmış şube/firma: 409, davet yanmaz.
+        await InvitationTargetGuard.EnsureActiveAsync(unitOfWork, invitation.CompanyId, invitation.BranchId, invitation.PackageId, cancellationToken);
+
         // Atomik talep: eşzamanlı ikinci onay burada durur (InvitationWrites.ClaimAsync).
         invitation.IsUsed = true;
         await InvitationWrites.ClaimAsync(unitOfWork, invitation, invitation.Id, cancellationToken);

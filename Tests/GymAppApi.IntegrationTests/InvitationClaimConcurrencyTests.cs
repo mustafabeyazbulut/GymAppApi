@@ -28,6 +28,17 @@ public class InvitationClaimConcurrencyTests
                 .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)).Options,
             new FakeTenantContext { IsSuperAdmin = true });
 
+    // Davetin hedefi (firma 1, şube 10, paket 5) aktif - kabul bunu kontrol eder.
+    private static void SeedActiveTarget(GymAppApiDbContext db, bool withPackage)
+    {
+        db.Companies.Add(new Company { Id = 1, Name = "Firma", IsActive = true });
+        db.Branches.Add(new Branch { Id = 10, CompanyId = 1, Name = "Merkez", Address = "..." });
+        if (withPackage)
+        {
+            db.Packages.Add(new Package { Id = 5, CompanyId = 1, BranchId = 10, Name = "Paket", Type = PackageType.SessionBased, SessionCount = 10, Price = 1m });
+        }
+    }
+
     [Fact]
     public async Task AssignmentInvitation_WhenAConcurrentRequestClaimedItFirst_TheLoserCreatesNoAssignment()
     {
@@ -40,6 +51,7 @@ public class InvitationClaimConcurrencyTests
                 TargetUserId = 7, CompanyId = 1, BranchId = 10, Role = AssignmentRole.Trainer, RequestedByUserId = 2,
                 Code = "123456", ExpiresAt = DateTime.UtcNow.AddDays(1), ConcurrencyToken = 1,
             };
+            SeedActiveTarget(seed, withPackage: false);
             seed.PendingAssignmentInvitations.Add(invitation);
             await seed.SaveChangesAsync();
             invitationId = invitation.Id;
@@ -78,6 +90,7 @@ public class InvitationClaimConcurrencyTests
                 TargetUserId = 7, PackageId = 5, CompanyId = 1, BranchId = 10, RequestedByUserId = 2,
                 Code = "123456", ExpiresAt = DateTime.UtcNow.AddDays(1), ConcurrencyToken = 1,
             };
+            SeedActiveTarget(seed, withPackage: true);
             seed.PendingPackageAssignmentInvitations.Add(invitation);
             await seed.SaveChangesAsync();
             invitationId = invitation.Id;

@@ -29,6 +29,10 @@ public class ConfirmAssignmentInvitationCommandHandlerTests
         var assignmentWriteRepo = new Mock<IWriteRepository<Assignment>>();
 
         var uow = new Mock<IUnitOfWork>();
+        // Davetin hedefi (firma 3, şube 10) aktif - kabul bunu kontrol eder.
+        var activeCompany = new Company { Id = 3, Name = "Firma", IsActive = true };
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(new[] { activeCompany }).Object);
+        uow.Setup(u => u.GetReadRepository<Branch>()).Returns(GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(new[] { new Branch { Id = 10, CompanyId = 3, Company = activeCompany, Name = "Merkez", Address = "..." } }).Object);
         uow.Setup(u => u.GetReadRepository<PendingAssignmentInvitation>()).Returns(invitationReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<PendingAssignmentInvitation>()).Returns(invitationWriteRepo.Object);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(assignmentReadRepo.Object);

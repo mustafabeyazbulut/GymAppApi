@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.Invitations;
+using GymAppApi.Application.Features.Invitations.Exceptions;
 using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
@@ -16,9 +17,18 @@ public class InvitationAcceptanceTests
     private const int TargetUserId = 7;
 
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<Assignment>> assignmentWrite, Mock<IWriteRepository<PackageAssignment>> packageAssignmentWrite)
-        Wire(IEnumerable<Assignment>? assignments = null, IEnumerable<PackageAssignment>? packageAssignments = null, IEnumerable<Package>? packages = null)
+        Wire(IEnumerable<Assignment>? assignments = null, IEnumerable<PackageAssignment>? packageAssignments = null, IEnumerable<Package>? packages = null,
+            bool companyActive = true, bool branchActive = true)
     {
         var uow = new Mock<IUnitOfWork>();
+        // Davetin hedefi (firma 1, şubeler 10/11) varsayılan olarak aktif.
+        var company = new Company { Id = 1, Name = "Firma", IsActive = companyActive };
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(FakeReadRepository.For(new[] { company }).Object);
+        uow.Setup(u => u.GetReadRepository<Branch>()).Returns(FakeReadRepository.For(new[]
+        {
+            new Branch { Id = 10, CompanyId = 1, Company = company, Name = "B10", Address = "...", IsActive = branchActive },
+            new Branch { Id = 11, CompanyId = 1, Company = company, Name = "B11", Address = "...", IsActive = true },
+        }).Object);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(FakeReadRepository.For(assignments ?? new List<Assignment>()).Object);
         uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(FakeReadRepository.For(packageAssignments ?? new List<PackageAssignment>()).Object);
         uow.Setup(u => u.GetReadRepository<Package>()).Returns(FakeReadRepository.For(packages ?? new List<Package>()).Object);
@@ -161,5 +171,56 @@ public class InvitationAcceptanceTests
         await PackageInvitationAcceptance.AcceptAsync(uow.Object, PackageInvitation(), DateTime.UtcNow, CancellationToken.None);
 
         packageAssignmentWrite.Verify(r => r.AddAsync(It.IsAny<PackageAssignment>(), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task AcceptAssignment_ToAClosedBranch_ThrowsAndRollsBack()
+    {
+        var (uow, assignmentWrite, _) = Wire(branchActive: false);
+        var invitation = StaffInvitation(AssignmentRole.Trainer);
+
+        await Assert.ThrowsAsync<InvitationTargetInactiveException>(() => AssignmentInvitationAcceptance.AcceptAsync(uow.Object, invitation, CancellationToken.None));
+
+        assignmentWrite.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        uow.Verify(u => u.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+        uow.Verify(u => u.CommitTransactionAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AcceptAssignment_ToAnInactiveCompany_Throws()
+    {
+        var (uow, assignmentWrite, _) = Wire(companyActive: false);
+
+        await Assert.ThrowsAsync<InvitationTargetInactiveException>(() =>
+            AssignmentInvitationAcceptance.AcceptAsync(uow.Object, StaffInvitation(AssignmentRole.GymAdmin, branchId: null), CancellationToken.None));
+
+        assignmentWrite.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task AcceptPackage_WhenThePackageIsInactive_ThrowsAndRollsBack()
+    {
+        var package = SessionPackage();
+        package.IsActive = false;
+        var (uow, _, packageAssignmentWrite) = Wire(packages: new[] { package });
+
+        await Assert.ThrowsAsync<InvitationTargetInactiveException>(() =>
+            PackageInvitationAcceptance.AcceptAsync(uow.Object, PackageInvitation(), DateTime.UtcNow, CancellationToken.None));
+
+        packageAssignmentWrite.Verify(r => r.AddAsync(It.IsAny<PackageAssignment>(), default), Times.Never);
+        uow.Verify(u => u.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task AcceptPackage_WhenTheBranchOrCompanyIsInactive_Throws(bool companyActive, bool branchActive)
+    {
+        var (uow, _, packageAssignmentWrite) = Wire(packages: new[] { SessionPackage() }, companyActive: companyActive, branchActive: branchActive);
+
+        await Assert.ThrowsAsync<InvitationTargetInactiveException>(() =>
+            PackageInvitationAcceptance.AcceptAsync(uow.Object, PackageInvitation(), DateTime.UtcNow, CancellationToken.None));
+
+        packageAssignmentWrite.Verify(r => r.AddAsync(It.IsAny<PackageAssignment>(), default), Times.Never);
     }
 }
