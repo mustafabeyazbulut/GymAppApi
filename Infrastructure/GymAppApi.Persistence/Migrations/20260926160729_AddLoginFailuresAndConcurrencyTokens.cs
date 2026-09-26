@@ -7,18 +7,34 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GymAppApi.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class ReplaceUserLockoutWithLoginFailures : Migration
+    public partial class AddLoginFailuresAndConcurrencyTokens : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "FailedLoginAttempts",
-                table: "Users");
+            migrationBuilder.AddColumn<uint>(
+                name: "xmin",
+                table: "Users",
+                type: "xid",
+                rowVersion: true,
+                nullable: false,
+                defaultValue: 0u);
 
-            migrationBuilder.DropColumn(
-                name: "LockoutEndsAt",
-                table: "Users");
+            migrationBuilder.AddColumn<uint>(
+                name: "xmin",
+                table: "PendingPackageAssignmentInvitations",
+                type: "xid",
+                rowVersion: true,
+                nullable: false,
+                defaultValue: 0u);
+
+            migrationBuilder.AddColumn<uint>(
+                name: "xmin",
+                table: "PendingAssignmentInvitations",
+                type: "xid",
+                rowVersion: true,
+                nullable: false,
+                defaultValue: 0u);
 
             migrationBuilder.CreateTable(
                 name: "LoginFailures",
@@ -58,25 +74,17 @@ namespace GymAppApi.Persistence.Migrations
             migrationBuilder.DropTable(
                 name: "LoginFailures");
 
-            migrationBuilder.AddColumn<int>(
-                name: "FailedLoginAttempts",
-                table: "Users",
-                type: "integer",
-                nullable: false,
-                defaultValue: 0);
+            migrationBuilder.DropColumn(
+                name: "xmin",
+                table: "Users");
 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "LockoutEndsAt",
-                table: "Users",
-                type: "timestamp with time zone",
-                nullable: true);
+            migrationBuilder.DropColumn(
+                name: "xmin",
+                table: "PendingPackageAssignmentInvitations");
 
-            migrationBuilder.UpdateData(
-                table: "Users",
-                keyColumn: "Id",
-                keyValue: -1,
-                columns: new[] { "FailedLoginAttempts", "LockoutEndsAt" },
-                values: new object[] { 0, null });
+            migrationBuilder.DropColumn(
+                name: "xmin",
+                table: "PendingAssignmentInvitations");
         }
     }
 }

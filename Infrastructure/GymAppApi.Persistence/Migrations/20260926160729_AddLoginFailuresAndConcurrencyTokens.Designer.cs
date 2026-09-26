@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GymAppApi.Persistence.Migrations
 {
     [DbContext(typeof(GymAppApiDbContext))]
-    [Migration("20260926145213_AddUserLoginLockout")]
-    partial class AddUserLoginLockout
+    [Migration("20260926160729_AddLoginFailuresAndConcurrencyTokens")]
+    partial class AddLoginFailuresAndConcurrencyTokens
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -475,6 +475,46 @@ namespace GymAppApi.Persistence.Migrations
                     b.ToTable("Doors");
                 });
 
+            modelBuilder.Entity("GymAppApi.Domain.Entities.LoginFailure", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FailedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IpHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IpHash")
+                        .IsUnique();
+
+                    b.ToTable("LoginFailures");
+                });
+
             modelBuilder.Entity("GymAppApi.Domain.Entities.MediaFile", b =>
                 {
                     b.Property<int>("Id")
@@ -801,6 +841,12 @@ namespace GymAppApi.Persistence.Migrations
                     b.Property<int>("CompanyId")
                         .HasColumnType("integer");
 
+                    b.Property<uint>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -904,6 +950,12 @@ namespace GymAppApi.Persistence.Migrations
 
                     b.Property<int>("CompanyId")
                         .HasColumnType("integer");
+
+                    b.Property<uint>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1095,6 +1147,12 @@ namespace GymAppApi.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<uint>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1104,9 +1162,6 @@ namespace GymAppApi.Persistence.Migrations
 
                     b.Property<bool>("EmailVerified")
                         .HasColumnType("boolean");
-
-                    b.Property<int>("FailedLoginAttempts")
-                        .HasColumnType("integer");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -1118,9 +1173,6 @@ namespace GymAppApi.Persistence.Migrations
 
                     b.Property<bool>("IsAccountFrozen")
                         .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LockoutEndsAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -1159,10 +1211,10 @@ namespace GymAppApi.Persistence.Migrations
                         new
                         {
                             Id = -1,
+                            ConcurrencyToken = 0u,
                             CreatedAt = new DateTime(2026, 9, 15, 0, 0, 0, 0, DateTimeKind.Utc),
                             Email = "admin@gymapp.local",
                             EmailVerified = false,
-                            FailedLoginAttempts = 0,
                             FullName = "GymApp SuperAdmin",
                             Gender = 0,
                             IsAccountFrozen = false,
@@ -1392,6 +1444,17 @@ namespace GymAppApi.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("GymAppApi.Domain.Entities.LoginFailure", b =>
+                {
+                    b.HasOne("GymAppApi.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("GymAppApi.Domain.Entities.Notification", b =>
