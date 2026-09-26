@@ -81,6 +81,7 @@ public static class Registration
         services.AddScoped<IUnitOfWork, GymAppApi.Persistence.UnitOfWork.UnitOfWork>();
         services.AddScoped<ITenantResolutionService, TenantResolutionService>();
         services.AddScoped<GymAppApi.Application.Common.Security.ILoginAttemptStore, GymAppApi.Persistence.Security.LoginAttemptStore>();
+        services.AddScoped<GymAppApi.Application.Features.PlatformReports.IPlatformReportReader, GymAppApi.Persistence.Reports.PlatformReportReader>();
 
         return services;
     }

@@ -147,6 +147,9 @@ public static class AppMessages
             "Too many code requests were sent. Please try again later.",
             "Çok fazla kod isteği gönderildi. Lütfen daha sonra tekrar deneyin."),
 
+        // Platform raporları
+        ["InvalidReportPeriod"] = ("The report period must be one of: {0} days.", "Rapor dönemi şunlardan biri olmalıdır: {0} gün."),
+
         // Model binding (JSON okuma) hataları - bkz. WebApi InvalidModelStateResponses.
         ["InvalidRequestBody"] = ("The request body is invalid or could not be read.", "İstek gövdesi geçersiz veya okunamadı."),
         ["InvalidRequestField"] = ("The request contains an invalid value for '{0}'.", "İstekte '{0}' alanı için geçersiz bir değer var."),
