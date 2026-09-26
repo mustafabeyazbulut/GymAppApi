@@ -19,6 +19,12 @@ public static class AppMessages
         ["TooManyRequests"] = (
             "Too many attempts. Please wait a moment and try again.",
             "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin."),
+        // Şifre sıfırlama kodu (SMS gövdesi ve e-posta konusu/gövdesi) - alıcının
+        // PreferredLanguage'ına göre seçilir ({0} = kod).
+        ["PasswordResetEmailSubject"] = ("GymApp Password Reset", "GymApp Şifre Sıfırlama"),
+        ["PasswordResetCodeMessage"] = (
+            "Your GymApp password reset code: {0}. The code is valid for 10 minutes.",
+            "GymApp şifre sıfırlama kodunuz: {0}. Kod 10 dakika geçerlidir."),
         ["PasswordResetCodeSentIfAccountExists"] = (
             "If your account exists, a password reset code has been sent.",
             "Hesabınız varsa, şifre sıfırlama kodu gönderildi."),

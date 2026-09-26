@@ -75,10 +75,17 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
         }, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var message = $"GymApp şifre sıfırlama kodunuz: {code}. Kod 10 dakika geçerlidir.";
-        if (!string.IsNullOrWhiteSpace(user.Email))
+        // Kod, kullanıcının GİRDİĞİ tanımlayıcının kanalına gider: e-posta
+        // girildiyse e-postaya, telefon girildiyse SMS'e. (Eskiden hesapta
+        // e-posta varsa telefonla istense bile e-postaya gidiyordu - telefonla
+        // isteyen kişi e-postasına erişemiyor olabilir.) Metin alıcının kendi
+        // dilinde (PreferredLanguage), isteği yapan cihazın dilinde değil.
+        var language = user.PreferredLanguage;
+        var message = AppMessages.Resolve("PasswordResetCodeMessage", language, code);
+        var identifierIsEmail = request.Identifier.Contains('@');
+        if (identifierIsEmail && !string.IsNullOrWhiteSpace(user.Email))
         {
-            await _emailSender.SendAsync(user.Email, "GymApp Şifre Sıfırlama", message, cancellationToken);
+            await _emailSender.SendAsync(user.Email, AppMessages.Resolve("PasswordResetEmailSubject", language), message, cancellationToken);
         }
         else
         {

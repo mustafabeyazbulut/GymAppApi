@@ -101,4 +101,52 @@ public class ForgotPasswordCommandHandlerTests
         otpWriteRepo.Verify(r => r.Update(It.Is<OtpVerification>(o => o.Id == 42 && o.IsUsed)), Times.Once);
         otpWriteRepo.Verify(r => r.AddAsync(It.Is<OtpVerification>(o => o.UserId == 3 && !o.IsUsed), default), Times.Once);
     }
+
+    [Fact]
+    public async Task Handle_WhenIdentifierIsPhone_SendsSms_EvenIfTheAccountHasAnEmail()
+    {
+        // Kod, kullanıcının GİRDİĞİ tanımlayıcının kanalına gider - telefonla
+        // isteyen kişi e-postasına erişemiyor olabilir.
+        var user = new User { Id = 4, FullName = "Ayşe", Phone = "+905551112233", Email = "ayse@test.com", PasswordHash = "x" };
+        var (uow, _, _, _, sms, email, phoneNormalizer) = Wire(user);
+        var handler = new ForgotPasswordCommandHandler(uow.Object, sms.Object, email.Object, phoneNormalizer.Object);
+
+        await handler.Handle(new ForgotPasswordCommand { Identifier = "+905551112233" }, CancellationToken.None);
+
+        sms.Verify(s => s.SendAsync("+905551112233", It.IsAny<string>(), default), Times.Once);
+        email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("tr", "Şifre", "şifre sıfırlama kodunuz")]
+    [InlineData("en", "Password", "password reset code")]
+    public async Task Handle_WhenIdentifierIsEmail_SendsEmailInTheRecipientsPreferredLanguage(string language, string subjectFragment, string bodyFragment)
+    {
+        var user = new User { Id = 5, FullName = "Ayşe", Phone = "+905551112233", Email = "ayse@test.com", PasswordHash = "x", PreferredLanguage = language };
+        var (uow, _, _, _, sms, email, phoneNormalizer) = Wire(user);
+        var handler = new ForgotPasswordCommandHandler(uow.Object, sms.Object, email.Object, phoneNormalizer.Object);
+
+        await handler.Handle(new ForgotPasswordCommand { Identifier = "ayse@test.com" }, CancellationToken.None);
+
+        email.Verify(e => e.SendAsync(
+            "ayse@test.com",
+            It.Is<string>(subject => subject.Contains(subjectFragment)),
+            It.Is<string>(body => body.Contains(bodyFragment)),
+            default), Times.Once);
+        sms.Verify(s => s.SendAsync(It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("tr", "şifre sıfırlama kodunuz")]
+    [InlineData("en", "password reset code")]
+    public async Task Handle_WhenIdentifierIsPhone_SendsSmsInTheRecipientsPreferredLanguage(string language, string bodyFragment)
+    {
+        var user = new User { Id = 6, FullName = "Mert", Phone = "+905559998877", PasswordHash = "x", PreferredLanguage = language };
+        var (uow, _, _, _, sms, _, phoneNormalizer) = Wire(user);
+        var handler = new ForgotPasswordCommandHandler(uow.Object, sms.Object, new Mock<IEmailSender>().Object, phoneNormalizer.Object);
+
+        await handler.Handle(new ForgotPasswordCommand { Identifier = "+905559998877" }, CancellationToken.None);
+
+        sms.Verify(s => s.SendAsync("+905559998877", It.Is<string>(body => body.Contains(bodyFragment)), default), Times.Once);
+    }
 }
