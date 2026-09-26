@@ -92,16 +92,19 @@ onayı). Kimse, kendi haberi olmadan bir gym'e bağlanamaz veya yetkilendirileme
 
 - Aktif paketini, kalan seans/gün hakkını ve bitiş tarihini görür.
 - Ödeme geçmişini ve kalan borcunu görür.
-- Paketi izin veriyorsa: antrenörle randevu (PT) alır, grup derslerine
-  rezervasyon yapar, iptal eder.
+- Paketinin kapsadığı hizmetlerde açılmış derslere (grup veya birebir)
+  "Katıl" der; ya da antrenörden serbest randevu talep eder; iptal eder.
+- Personelin kendisini eklediği ders davetlerini Davetlerim'den onaylar.
 - Paketinin izin verdiği süre kadar üyeliğini dondurur (`MaxFreezeDays`).
 - Giriş (check-in) geçmişini ve antrenörünün girdiği gelişim kayıtlarını görür.
 - Gym'in içerik kütüphanesinde paketinin erişim verdiği içerikleri izler.
 
 ### 4.3 Antrenör (bir gym'de)
 
-- Kendi ders ve randevu takvimini görür.
-- Randevusu olan üyenin girişini (check-in) yapar.
+- Kendi şubesinde, kendine atanmış ders açar (grup veya birebir).
+- Kendi derslerine üye davet eder (üye onaylayınca kesinleşir).
+- Kendi ders ve randevu takvimini görür; katılımcıların yoklamasını
+  (check-in) yapar.
 - Kendi öğrencileri için gelişim kaydı (ölçüm, teknik, not, foto/video) girer.
 - Sadece kendisiyle ilişkili üyelerin verisini görür.
 
@@ -112,7 +115,8 @@ onayı). Kimse, kendi haberi olmadan bir gym'e bağlanamaz veya yetkilendirileme
   aktif/pasif yapar.
 - Kayıtlı kullanıcılara paket tanımlar, ödeme kaydeder, paketi dondurur/iptal eder.
 - Şubesine antrenör ekler / çıkarır.
-- Ders programı oluşturur, kapıdan girişsiz gelenlere (walk-in) check-in yapar.
+- Şubesinde ders açar ve bir antrenöre atar; derslere üye davet eder.
+- Kapıdan girişsiz gelenlere (walk-in) check-in yapar.
 - Şubesinin raporlarını görür.
 
 ### 4.5 Gym Admin (bir firmada)
@@ -164,13 +168,41 @@ yetkisi verdiğinde görür.
 | Paket | Şube bazında tanımlanır. Seans sayısı ve/veya geçerlilik süresi, `MaxFreezeDays`, fiyat ve o şubenin hizmet listesinden seçilen **kapsadığı hizmetler**. |
 | Paket Tanımlama & Ödeme | Kullanıcıya paket tanımlama, taksitli/parçalı ödeme kaydı, fazla ödeme engeli. |
 | Dondurma | Toplam dondurma günü `MaxFreezeDays`'i aşamaz; bitiş tarihi ötelenir, seans düşmez. |
-| Randevu (PT) | Üye, paketindeki antrenörden tarih/saat seçerek randevu alır; çakışma engellenir. |
-| Grup Dersi | Kapasiteli ders programı; kapasite doluysa rezervasyon reddedilir; iptal süresi geçerse hak iade edilmez. |
-| Check-in | Randevulu giriş (antrenör) ve walk-in giriş (personel); seans bazlı pakette hak düşer. |
+| Ders | Personelin açtığı grup veya birebir ders; üye Katıl der ya da personel davet eder. Ayrıntı: Bölüm 5.3. |
+| Serbest Randevu | Üye, paketinin kapsadığı bir hizmette antrenör ve saat seçerek randevu talep eder; çakışma engellenir. Ders sistemiyle yan yana çalışır. |
+| Check-in | Ders/randevu yoklaması (antrenör veya personel) ve walk-in giriş (personel). Sadece geçerli pakete yapılır. |
 | Gelişim | Antrenörün girdiği ölçüm/teknik/not ve foto/video; üye sadece görür. |
 | İçerik Kütüphanesi | Gym'in video/foto içerikleri; erişim paket seviyesine göre. |
 | Kapı Erişimi | Bölge → kapı → erişim kuralları (paket, cinsiyet, rol). Donanım entegrasyonu donanım seçilince eklenir. |
 | Raporlar | Gelir, bekleyen bakiye, süresi yaklaşan üyelik, aktif üye, doluluk, antrenör metrikleri. |
+
+### 5.3 Ders ve Randevu Sistemi
+
+Sistem bir randevu takvimi gibi çalışır:
+
+- **Ders açma:** Antrenör (sadece kendi şubesinde, kendine), Şube Yöneticisi
+  (kendi şubesinde) veya Gym Admin (firmanın her şubesinde) bir ders açar ve
+  bir antrenöre atar. Ders bilgileri: şube, **hizmet** (şubenin hizmet
+  listesinden), antrenör, tarih/saat, süre, kapasite, iptal için son süre.
+- **Ders türü:** Grup dersi (kapasite > 1) veya birebir ders (kapasite 1).
+  Aynı yapıdır, sadece kapasite farklıdır.
+- **Katılım uygunluğu:** Üye bir derse ancak o şubede **geçerli** bir paketi
+  varsa ve paket o dersin **hizmetini kapsıyorsa** katılabilir. Kapasite
+  doluysa katılım reddedilir.
+- **Katılma yolları:**
+  1. Üye açık derslere bakar ve **Katıl** der; kayıt hemen kesinleşir.
+  2. Personel (dersi yönetebilen antrenör, Şube Yöneticisi, Gym Admin) bir
+     üyeyi derse **davet eder**; davet üyenin **Davetlerim** ekranına düşer,
+     üye **onaylayınca** kayıt kesinleşir. Onaylanmayan davet yer tutmaz.
+- **Hak düşümü:** Seans bazlı pakette hak **katılım kesinleşince** düşer.
+  Üye iptal süresinden önce iptal ederse hak iade edilir; süre geçtikten
+  sonra iptal eder veya gelmezse hak yanar.
+- **Serbest randevu:** Üyenin paketinin kapsadığı bir hizmette antrenör ve
+  saat seçerek randevu talep etmesi ayrıca çalışmaya devam eder (antrenör
+  çakışması engellenir). İki yol yan yana durur.
+- **Yoklama:** Antrenör veya personel dersteki/randevudaki katılımcıyı
+  "geldi" / "gelmedi" olarak işaretler; saati gelmemiş bir ders "gelmedi"
+  işaretlenemez.
 
 ## 6. Ana Akışlar
 
