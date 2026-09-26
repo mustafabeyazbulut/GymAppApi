@@ -19,6 +19,20 @@ public static class AppMessages
         ["TooManyRequests"] = (
             "Too many attempts. Please wait a moment and try again.",
             "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin."),
+        // Süresi yaklaşan üyelik hatırlatmaları - alıcının PreferredLanguage'ına göre.
+        ["MembershipExpiringTitle"] = ("Your membership is ending soon", "Üyeliğiniz yakında sona eriyor"),
+        ["MembershipExpiringTodayBody"] = (
+            "Your {0} package ends today. Contact your gym to renew it.",
+            "{0} paketiniz bugün sona eriyor. Yenilemek için salonunuzla iletişime geçebilirsiniz."),
+        ["MembershipExpiringInDaysBody"] = (
+            "Your {0} package ends in {1} day(s). Contact your gym to renew it.",
+            "{0} paketiniz {1} gün sonra sona eriyor. Yenilemek için salonunuzla iletişime geçebilirsiniz."),
+        ["StaffExpiringMembershipsTitle"] = ("Memberships ending soon", "Süresi yaklaşan üyelikler"),
+        ["StaffExpiringMembershipsBody"] = (
+            "{0} member(s) have a package ending soon: {1}",
+            "{0} üyenin paketi yakında sona eriyor: {1}"),
+        ["StaffExpiringMembershipsItem"] = ("{0} ({1}, {2} day(s))", "{0} ({1}, {2} gün)"),
+        ["StaffExpiringMembershipsMore"] = ("and {0} more", "ve {0} kişi daha"),
         // Şifre sıfırlama kodu (SMS gövdesi ve e-posta konusu/gövdesi) - alıcının
         // PreferredLanguage'ına göre seçilir ({0} = kod).
         ["PasswordResetEmailSubject"] = ("GymApp Password Reset", "GymApp Şifre Sıfırlama"),

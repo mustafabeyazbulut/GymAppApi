@@ -32,10 +32,14 @@ public class MembershipExpiryReminderServiceTests
         return mock.Object;
     }
 
-    private static PackageAssignment Assignment(int id, DateTime? endDate, DateTime? expiryReminderSentAt = null, PackageAssignmentStatus status = PackageAssignmentStatus.Active) => new()
+    private static PackageAssignment Assignment(int id, DateTime? endDate, DateTime? expiryReminderSentAt = null, PackageAssignmentStatus status = PackageAssignmentStatus.Active,
+        int companyId = 1, int? branchId = 10, string memberName = "Üye", string memberLanguage = "tr") => new()
     {
         Id = id,
         MemberUserId = 100 + id,
+        MemberUser = new User { Id = 100 + id, FullName = memberName, Phone = "+905550000000", PasswordHash = "x", PreferredLanguage = memberLanguage },
+        CompanyId = companyId,
+        BranchId = branchId,
         Status = status,
         EndDate = endDate,
         ExpiryReminderSentAt = expiryReminderSentAt,
@@ -44,14 +48,23 @@ public class MembershipExpiryReminderServiceTests
 
     private static (MembershipExpiryReminderService service, Mock<IWriteRepository<PackageAssignment>> assignmentWriteRepo, Mock<IPushNotificationSender> pushSender)
         CreateService(IReadOnlyList<PackageAssignment> assignments)
+        => CreateService(assignments, new List<Assignment>(), new List<User>(), new List<Notification>());
+
+    private static (MembershipExpiryReminderService service, Mock<IWriteRepository<PackageAssignment>> assignmentWriteRepo, Mock<IPushNotificationSender> pushSender)
+        CreateService(IReadOnlyList<PackageAssignment> assignments, IReadOnlyList<Assignment> staff, IReadOnlyList<User> users, List<Notification> sentNotifications)
     {
         var uow = new Mock<IUnitOfWork>();
         uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(FakeRepo(assignments));
+        uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(FakeRepo(staff));
+        uow.Setup(u => u.GetReadRepository<User>()).Returns(FakeRepo(users));
 
         var assignmentWriteRepo = new Mock<IWriteRepository<PackageAssignment>>();
         uow.Setup(u => u.GetWriteRepository<PackageAssignment>()).Returns(assignmentWriteRepo.Object);
 
         var notificationWriteRepo = new Mock<IWriteRepository<Notification>>();
+        notificationWriteRepo.Setup(r => r.AddAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()))
+            .Callback((Notification n, CancellationToken _) => sentNotifications.Add(n))
+            .Returns(Task.CompletedTask);
         uow.Setup(u => u.GetWriteRepository<Notification>()).Returns(notificationWriteRepo.Object);
 
         var deviceTokenReadRepo = new Mock<IReadRepository<DeviceToken>>();
@@ -162,5 +175,79 @@ public class MembershipExpiryReminderServiceTests
         // burada sadece doğru üyeye (MemberUserId=107) yönlendiğini kontrol ediyoruz,
         // pushSender'a hiç çağrı gitmediğini (test kullanıcısının cihazı yok) doğrulayarak.
         pushSender.Verify(s => s.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendDueRemindersAsync_NotifiesTheMemberInTheirOwnLanguage()
+    {
+        var now = DateTime.UtcNow;
+        var sent = new List<Notification>();
+        var (service, _, _) = CreateService(
+            new List<PackageAssignment> { Assignment(1, now.AddDays(2), memberLanguage: "en") },
+            new List<Assignment>(), new List<User>(), sent);
+
+        await service.SendDueRemindersAsync();
+
+        var toMember = Assert.Single(sent, n => n.UserId == 101);
+        Assert.Contains("ending soon", toMember.Title);
+        Assert.Contains("1 Aylık Üyelik", toMember.Body);
+    }
+
+    [Fact]
+    public async Task SendDueRemindersAsync_SendsOneSummaryToEachBranchManagerOfTheBranchAndEachGymAdminOfTheCompany()
+    {
+        // İki üyenin paketi şube 10'da bitmek üzere. Alıcılar: firmanın aktif
+        // Gym Admin'i (en) ve şube 10'un Şube Yöneticisi (tr) - her birine TEK
+        // özet bildirim. Başka şubenin Şube Yöneticisi, antrenör, pasif Gym
+        // Admin ve başka firmanın Gym Admin'i almaz.
+        var now = DateTime.UtcNow;
+        var sent = new List<Notification>();
+        var staff = new List<Assignment>
+        {
+            new() { Id = 1, UserId = 1, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true },
+            new() { Id = 2, UserId = 2, CompanyId = 1, BranchId = 10, Role = AssignmentRole.BranchManager, IsActive = true },
+            new() { Id = 3, UserId = 3, CompanyId = 1, BranchId = 11, Role = AssignmentRole.BranchManager, IsActive = true },
+            new() { Id = 4, UserId = 4, CompanyId = 1, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true },
+            new() { Id = 5, UserId = 5, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = false },
+            new() { Id = 6, UserId = 6, CompanyId = 2, Role = AssignmentRole.GymAdmin, IsActive = true },
+        };
+        var users = Enumerable.Range(1, 6)
+            .Select(id => new User { Id = id, FullName = $"Personel {id}", Phone = "+905550000000", PasswordHash = "x", PreferredLanguage = id == 1 ? "en" : "tr" })
+            .ToList();
+        var (service, _, _) = CreateService(
+            new List<PackageAssignment>
+            {
+                Assignment(1, now.AddDays(2), memberName: "Ayşe Yılmaz"),
+                Assignment(2, now.AddDays(1), memberName: "Mehmet Kaya"),
+            },
+            staff, users, sent);
+
+        await service.SendDueRemindersAsync();
+
+        var toGymAdmin = Assert.Single(sent, n => n.UserId == 1);
+        Assert.Contains("ending soon", toGymAdmin.Title);
+        Assert.Contains("Ayşe Yılmaz", toGymAdmin.Body);
+        Assert.Contains("Mehmet Kaya", toGymAdmin.Body);
+        var toBranchManager = Assert.Single(sent, n => n.UserId == 2);
+        Assert.Contains("Süresi yaklaşan", toBranchManager.Title);
+        Assert.Contains("Ayşe Yılmaz", toBranchManager.Body);
+        Assert.DoesNotContain(sent, n => n.UserId is 3 or 4 or 5 or 6);
+    }
+
+    [Fact]
+    public async Task SendDueRemindersAsync_StaffSummaryListsAtMostFiveMembers_AndCountsTheRest()
+    {
+        var now = DateTime.UtcNow;
+        var sent = new List<Notification>();
+        var staff = new List<Assignment> { new() { Id = 1, UserId = 1, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var users = new List<User> { new() { Id = 1, FullName = "Gym Admin", Phone = "+905550000000", PasswordHash = "x", PreferredLanguage = "tr" } };
+        var assignments = Enumerable.Range(1, 7).Select(i => Assignment(i, now.AddDays(2), memberName: $"Üye {i}")).ToList();
+        var (service, _, _) = CreateService(assignments, staff, users, sent);
+
+        await service.SendDueRemindersAsync();
+
+        var summary = Assert.Single(sent, n => n.UserId == 1);
+        Assert.Contains("7 üyenin", summary.Body);
+        Assert.Contains("ve 2 kişi daha", summary.Body);
     }
 }
