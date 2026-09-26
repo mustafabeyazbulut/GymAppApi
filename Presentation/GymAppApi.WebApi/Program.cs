@@ -34,7 +34,10 @@ builder.Services.AddHostedService<LoginFailureCleanupHostedService>();
 // System.Text.Json defaults to numeric enum (de)serialization.
 // ActiveCompanyRequiredFilter: pasif firmadaki personelin yazma uçları 403 CompanyInactive.
 builder.Services.AddControllers(options => options.Filters.Add<GymAppApi.WebApi.Authorization.ActiveCompanyRequiredFilter>())
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    // Model binding / JSON okuma hataları da projenin hata biçiminde ve isteğin dilinde.
+    .ConfigureApiBehaviorOptions(options =>
+        options.InvalidModelStateResponseFactory = GymAppApi.WebApi.Middleware.InvalidModelStateResponses.Create);
 
 builder.Services.AddCors(options =>
 {

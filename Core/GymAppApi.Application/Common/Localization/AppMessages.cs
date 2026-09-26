@@ -147,6 +147,10 @@ public static class AppMessages
             "Too many code requests were sent. Please try again later.",
             "Çok fazla kod isteği gönderildi. Lütfen daha sonra tekrar deneyin."),
 
+        // Model binding (JSON okuma) hataları - bkz. WebApi InvalidModelStateResponses.
+        ["InvalidRequestBody"] = ("The request body is invalid or could not be read.", "İstek gövdesi geçersiz veya okunamadı."),
+        ["InvalidRequestField"] = ("The request contains an invalid value for '{0}'.", "İstekte '{0}' alanı için geçersiz bir değer var."),
+
         // FluentValidation .WithMessage kodları
         ["UnsupportedLanguage"] = ("Language must be one of: {0}.", "Dil şunlardan biri olmalıdır: {0}."),
         ["RoleMustBeTrainerOrBranchManager"] = ("Role must be Trainer or BranchManager.", "Rol Trainer veya BranchManager olmalıdır."),

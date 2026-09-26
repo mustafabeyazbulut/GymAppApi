@@ -92,6 +92,39 @@ public class PersonalLogsTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Create_WithAnUnknownEnumValue_ReturnsTheProjectsLocalizedErrorBody()
+    {
+        // Canlı test bulgusu: geçersiz enum değeri ASP.NET'in varsayılan
+        // (İngilizce) ProblemDetails'ini dönüyordu.
+        var (client, _) = await NewUserClientAsync();
+        client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("tr"));
+
+        var response = await client.PostAsJsonAsync("/api/personal-logs", new { date = Today, kind = "Foo", title = "x" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("ValidationError", body.GetProperty("Code").GetString());
+        Assert.Equal(400, body.GetProperty("Status").GetInt32());
+        var error = Assert.Single(body.GetProperty("Errors").EnumerateArray()).GetString();
+        Assert.Contains("kind", error);
+        Assert.Contains("geçersiz", error);
+    }
+
+    [Fact]
+    public async Task Create_WithUnreadableJson_ReturnsAGenericLocalizedError()
+    {
+        var (client, _) = await NewUserClientAsync();
+
+        var response = await client.PostAsync("/api/personal-logs",
+            new StringContent("{ bozuk json", System.Text.Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("ValidationError", body.GetProperty("Code").GetString());
+        Assert.Single(body.GetProperty("Errors").EnumerateArray());
+    }
+
+    [Fact]
     public async Task Get_ReturnsOnlyOwnLogsInRange_NewestFirst()
     {
         var (client, _) = await NewUserClientAsync();
