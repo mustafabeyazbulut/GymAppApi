@@ -1,3 +1,4 @@
+using GymAppApi.Application.Common.Seeding;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +23,7 @@ public class SuperAdminSeedConfiguration : IEntityTypeConfiguration<User>
     // guarantee, not just an improbable one (a large positive placeholder
     // like 1_000_000 would eventually collide once the sequence counts
     // that high from real registrations).
-    public const int SeedUserId = -1;
+    public const int SeedUserId = SuperAdminPhoneSeeder.SeedUserId;
     public const int SeedAssignmentId = -1;
 
     public void Configure(EntityTypeBuilder<User> builder)
@@ -31,7 +32,10 @@ public class SuperAdminSeedConfiguration : IEntityTypeConfiguration<User>
         {
             Id = SeedUserId,
             FullName = "GymApp SuperAdmin",
-            Phone = "+900000000000",
+            // Bilerek değiştirilmiyor (model/migration aynı kalsın): gerçek numara
+            // açılışta "Seed:SuperAdminPhone" yapılandırmasından SuperAdminPhoneSeeder
+            // ile atanır. Değer sabitin değeriyle birebir aynı (+900000000000).
+            Phone = SuperAdminPhoneSeeder.PlaceholderPhone,
             Email = "admin@gymapp.local",
             PasswordHash = "AQAAAAIAAYagAAAAEH3IHnPC7S7v0YMoHMqzARS4fXkwWC4uv1EQA2nXq9kmTl09mYL41BXzA2EU6OuOZg==",
             PreferredLanguage = "tr",

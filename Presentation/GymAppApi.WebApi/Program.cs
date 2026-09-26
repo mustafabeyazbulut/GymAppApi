@@ -21,6 +21,7 @@ builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHostedService<MembershipExpiryReminderHostedService>();
 builder.Services.AddHostedService<OutstandingBalanceReminderHostedService>();
+builder.Services.AddHostedService<SuperAdminPhoneSeedHostedService>();
 
 // AddStaffMemberCommand.Role is the first request body to expose an enum to
 // clients - without this, "role":"Member" fails model binding since

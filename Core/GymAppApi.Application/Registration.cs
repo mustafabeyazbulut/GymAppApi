@@ -24,6 +24,7 @@ public static class Registration
 
         services.AddScoped<IMembershipExpiryReminderService, MembershipExpiryReminderService>();
         services.AddScoped<IOutstandingBalanceReminderService, OutstandingBalanceReminderService>();
+        services.AddScoped<GymAppApi.Application.Common.Seeding.SuperAdminPhoneSeeder>();
 
         return services;
     }
