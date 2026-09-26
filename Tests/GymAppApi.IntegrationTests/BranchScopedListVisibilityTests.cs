@@ -199,4 +199,66 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
 
         Assert.Equal(Sorted(seed.SessionA1Id), ids);
     }
+
+    // --- GET /api/branches, GET /api/branches/{id} ---
+
+    [Fact]
+    public async Task Branches_AsGymAdmin_ReturnsAllBranchesOfOwnCompany()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.GymAdminAToken), "/api/branches");
+
+        Assert.Equal(Sorted(seed.BranchA1Id, seed.BranchA2Id), ids);
+    }
+
+    [Fact]
+    public async Task Branches_AsBranchManager_ReturnsOnlyOwnBranch()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.BranchManagerA1Token), "/api/branches");
+
+        Assert.Equal(Sorted(seed.BranchA1Id), ids);
+    }
+
+    [Fact]
+    public async Task Branches_AsTrainer_ReturnsOnlyOwnBranch()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.TrainerA1Token), "/api/branches");
+
+        Assert.Equal(Sorted(seed.BranchA1Id), ids);
+    }
+
+    [Fact]
+    public async Task BranchDetail_AsBranchManager_ForAnotherBranch_Returns404()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.BranchManagerA1Token).GetAsync($"/api/branches/{seed.BranchA2Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BranchDetail_AsBranchManager_ForOwnBranch_Returns200()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.BranchManagerA1Token).GetAsync($"/api/branches/{seed.BranchA1Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BranchDetail_AsGymAdmin_ForAnyBranchOfOwnCompany_Returns200()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.GymAdminAToken).GetAsync($"/api/branches/{seed.BranchA2Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }
