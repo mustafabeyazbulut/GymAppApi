@@ -51,7 +51,8 @@ public class MembershipExpiryReminderServiceTests
         => CreateService(assignments, new List<Assignment>(), new List<User>(), new List<Notification>());
 
     private static (MembershipExpiryReminderService service, Mock<IWriteRepository<PackageAssignment>> assignmentWriteRepo, Mock<IPushNotificationSender> pushSender)
-        CreateService(IReadOnlyList<PackageAssignment> assignments, IReadOnlyList<Assignment> staff, IReadOnlyList<User> users, List<Notification> sentNotifications)
+        CreateService(IReadOnlyList<PackageAssignment> assignments, IReadOnlyList<Assignment> staff, IReadOnlyList<User> users, List<Notification> sentNotifications,
+            IReadOnlyList<DeviceToken>? deviceTokens = null, Mock<IPushNotificationSender>? pushSenderOverride = null)
     {
         var uow = new Mock<IUnitOfWork>();
         uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(FakeRepo(assignments));
@@ -67,16 +68,12 @@ public class MembershipExpiryReminderServiceTests
             .Returns(Task.CompletedTask);
         uow.Setup(u => u.GetWriteRepository<Notification>()).Returns(notificationWriteRepo.Object);
 
-        var deviceTokenReadRepo = new Mock<IReadRepository<DeviceToken>>();
-        deviceTokenReadRepo.Setup(r => r.GetAllAsync(
-                It.IsAny<Expression<Func<DeviceToken, bool>>>(), null, null, false, default))
-            .ReturnsAsync(new List<DeviceToken>());
-        uow.Setup(u => u.GetReadRepository<DeviceToken>()).Returns(deviceTokenReadRepo.Object);
+        uow.Setup(u => u.GetReadRepository<DeviceToken>()).Returns(FakeRepo(deviceTokens ?? new List<DeviceToken>()));
 
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
 
-        var pushSender = new Mock<IPushNotificationSender>();
-        var service = new MembershipExpiryReminderService(uow.Object, pushSender.Object);
+        var pushSender = pushSenderOverride ?? new Mock<IPushNotificationSender>();
+        var service = new MembershipExpiryReminderService(uow.Object, pushSender.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<MembershipExpiryReminderService>.Instance);
 
         return (service, assignmentWriteRepo, pushSender);
     }
@@ -249,5 +246,37 @@ public class MembershipExpiryReminderServiceTests
         var summary = Assert.Single(sent, n => n.UserId == 1);
         Assert.Contains("7 üyenin", summary.Body);
         Assert.Contains("ve 2 kişi daha", summary.Body);
+    }
+
+    [Fact]
+    public async Task SendDueRemindersAsync_WhenOneStaffRecipientFails_TheOthersAreStillNotified()
+    {
+        // Bir alıcının push hatası taramanın geri kalanını durdurmamalı -
+        // üyeler zaten "hatırlatıldı" işaretlendiği için durursa diğer
+        // personelin bildirimi bir daha asla gönderilmezdi.
+        var now = DateTime.UtcNow;
+        var sent = new List<Notification>();
+        var staff = new List<Assignment>
+        {
+            new() { Id = 1, UserId = 1, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true },
+            new() { Id = 2, UserId = 2, CompanyId = 1, BranchId = 10, Role = AssignmentRole.BranchManager, IsActive = true },
+        };
+        var users = new List<User>
+        {
+            new() { Id = 1, FullName = "Gym Admin", Phone = "+905550000000", PasswordHash = "x" },
+            new() { Id = 2, FullName = "Şube Yöneticisi", Phone = "+905550000000", PasswordHash = "x" },
+        };
+        var deviceTokens = new List<DeviceToken> { new() { Id = 1, UserId = 1, Token = "bozuk-cihaz" } };
+        var pushSender = new Mock<IPushNotificationSender>();
+        pushSender.Setup(s => s.SendAsync("bozuk-cihaz", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Push sağlayıcısı yanıt vermedi."));
+        var (service, _, _) = CreateService(
+            new List<PackageAssignment> { Assignment(1, now.AddDays(2), memberName: "Ayşe") },
+            staff, users, sent, deviceTokens, pushSender);
+
+        var sentCount = await service.SendDueRemindersAsync();
+
+        Assert.Equal(1, sentCount);
+        Assert.Contains(sent, n => n.UserId == 2);
     }
 }

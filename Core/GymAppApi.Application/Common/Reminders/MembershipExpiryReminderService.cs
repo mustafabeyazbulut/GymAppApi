@@ -4,6 +4,7 @@ using GymAppApi.Application.Common.Notifications;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace GymAppApi.Application.Common.Reminders;
 
@@ -21,11 +22,13 @@ public class MembershipExpiryReminderService : IMembershipExpiryReminderService
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPushNotificationSender _pushNotificationSender;
+    private readonly ILogger<MembershipExpiryReminderService> _logger;
 
-    public MembershipExpiryReminderService(IUnitOfWork unitOfWork, IPushNotificationSender pushNotificationSender)
+    public MembershipExpiryReminderService(IUnitOfWork unitOfWork, IPushNotificationSender pushNotificationSender, ILogger<MembershipExpiryReminderService> logger)
     {
         _unitOfWork = unitOfWork;
         _pushNotificationSender = pushNotificationSender;
+        _logger = logger;
     }
 
     public async Task<int> SendDueRemindersAsync(CancellationToken cancellationToken = default)
@@ -57,9 +60,7 @@ public class MembershipExpiryReminderService : IMembershipExpiryReminderService
             assignment.ExpiryReminderSentAt = now;
             _unitOfWork.GetWriteRepository<PackageAssignment>().Update(assignment);
 
-            await NotificationDispatcher.NotifyUserAsync(
-                _unitOfWork,
-                _pushNotificationSender,
+            await NotifySafelyAsync(
                 assignment.MemberUserId,
                 AppMessages.Resolve("MembershipExpiringTitle", language),
                 daysRemaining <= 0
@@ -127,13 +128,29 @@ public class MembershipExpiryReminderService : IMembershipExpiryReminderService
                 listed.Add(AppMessages.Resolve("StaffExpiringMembershipsMore", language, remaining));
             }
 
-            await NotificationDispatcher.NotifyUserAsync(
-                _unitOfWork,
-                _pushNotificationSender,
+            await NotifySafelyAsync(
                 recipientUserId,
                 AppMessages.Resolve("StaffExpiringMembershipsTitle", language),
                 AppMessages.Resolve("StaffExpiringMembershipsBody", language, assignments.Count, string.Join(", ", listed)),
                 cancellationToken);
+        }
+    }
+
+    // Her alıcı izole: bir alıcının hatası (ör. push sağlayıcısı yanıt vermedi)
+    // loglanır ve tarama diğer alıcılarla devam eder. "ExpiryReminderSentAt'i tüm
+    // bildirimler bitince işaretle" yerine bu seçildi: NotificationDispatcher
+    // uygulama içi bildirim satırını push'tan ÖNCE commit ettiği için yeniden
+    // deneme üyeye mükerrer bildirim gönderirdi; izolasyonla hatalı alıcının
+    // uygulama içi bildirimi yine de kalır, sadece push'u kaybolur.
+    private async Task NotifySafelyAsync(int userId, string title, string body, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await NotificationDispatcher.NotifyUserAsync(_unitOfWork, _pushNotificationSender, userId, title, body, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogError(exception, "Üyelik hatırlatma bildirimi gönderilemedi (kullanıcı {UserId}); tarama devam ediyor.", userId);
         }
     }
 
