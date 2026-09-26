@@ -54,6 +54,53 @@ public class SuperAdminPhoneSeedHostedServiceTests
         return uow;
     }
 
+    private static Mock<IUnitOfWork> UnitOfWorkThrowing(Exception exception)
+    {
+        var readRepo = new Mock<IReadRepository<User>>();
+        readRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<User, bool>>>(), null, true, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(exception);
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.GetReadRepository<User>()).Returns(readRepo.Object);
+        return uow;
+    }
+
+    public static TheoryData<Exception> InfrastructureFailures => new()
+    {
+        new TimeoutException("Zaman aşımı."),
+        new System.Net.Sockets.SocketException(),
+        new Npgsql.NpgsqlException("Bağlantı kurulamadı.", new System.Net.Sockets.SocketException()),
+    };
+
+    [Theory]
+    [MemberData(nameof(InfrastructureFailures))]
+    public async Task StartAsync_WhenAnInfrastructureFailureOccurs_DoesNotBlockStartup(Exception failure)
+    {
+        var service = Create(UnitOfWorkThrowing(failure), configuredPhone: "+905550001000", "Production");
+
+        await service.StartAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StartAsync_WhenAUniqueConstraintIsViolated_StopsStartup()
+    {
+        // Sunucu tarafı bir veri hatası (ör. telefon başka bir kullanıcıda
+        // kayıtlı - unique index ihlali) "DB'ye erişilemedi" diye yutulmamalı.
+        var uniqueViolation = new Microsoft.EntityFrameworkCore.DbUpdateException(
+            "Kayıt güncellenemedi.",
+            new Npgsql.PostgresException("duplicate key value violates unique constraint", "ERROR", "ERROR", "23505"));
+        var service = Create(UnitOfWorkThrowing(uniqueViolation), configuredPhone: "+905550001000", "Production");
+
+        await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(() => service.StartAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task StartAsync_WhenAnUnexpectedErrorOccurs_StopsStartup()
+    {
+        var service = Create(UnitOfWorkThrowing(new InvalidCastException("Beklenmeyen.")), configuredPhone: "+905550001000", "Production");
+
+        await Assert.ThrowsAsync<InvalidCastException>(() => service.StartAsync(CancellationToken.None));
+    }
+
     private static User PlaceholderSeedUser() => new()
     {
         Id = SuperAdminPhoneSeeder.SeedUserId, FullName = "SA", Phone = SuperAdminPhoneSeeder.PlaceholderPhone, PasswordHash = "x",

@@ -11,9 +11,10 @@ namespace GymAppApi.WebApi.BackgroundServices;
 //   - Değer yok ve placeholder duruyorsa: Development dışında açılış
 //     durur (SuperAdmin giriş yapamaz hâlde yayına çıkılmasın);
 //     Development'ta sadece uyarı loglanır.
-//   - DB'ye erişilemezse (taze/migration uygulanmamış DB, geçici kesinti):
+//   - DB'ye erişilemezse (bağlantı kurulamadı, zaman aşımı, geçici kesinti):
 //     sadece loglanır, API açılır - bu bir yapılandırma hatası değil ve
 //     tüm API'yi düşürmemeli. Seed bir sonraki açılışta tekrar denenir.
+//   - Diğer tüm hatalar (ör. unique index ihlali) açılışı durdurur.
 public class SuperAdminPhoneSeedHostedService : IHostedService
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -43,7 +44,7 @@ public class SuperAdminPhoneSeedHostedService : IHostedService
         {
             outcome = await seeder.ApplyAsync(_configuration[SuperAdminPhoneSeeder.ConfigurationKey], cancellationToken);
         }
-        catch (Exception ex) when (ex is not SeedConfigurationException and not OperationCanceledException)
+        catch (Exception ex) when (IsInfrastructureFailure(ex))
         {
             _logger.LogError(ex,
                 "Seed SuperAdmin telefonu kontrol edilemedi: veritabanına erişilemedi. API açılıyor; kontrol bir sonraki açılışta tekrar denenecek.");
@@ -68,4 +69,29 @@ public class SuperAdminPhoneSeedHostedService : IHostedService
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    // Sadece altyapı hataları yumuşatılır: bağlantı kurulamadı / zaman aşımı
+    // (taze DB, geçici kesinti). EF sağlayıcı hatalarını sarmaladığı için tüm
+    // iç istisna zinciri taranır. PostgresException (NpgsqlException'dan
+    // türer) sunucunun döndüğü bir veri/şema hatasıdır - ör. unique index
+    // ihlali - ve bir yapılandırma/veri sorunu olarak açılışı durdurmalıdır;
+    // sadece geçici (IsTransient) olanı yumuşatılır.
+    private static bool IsInfrastructureFailure(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            switch (current)
+            {
+                case Npgsql.PostgresException postgres:
+                    return postgres.IsTransient;
+                case TimeoutException or System.Net.Sockets.SocketException:
+                    return true;
+                case Npgsql.NpgsqlException:
+                    // Sunucudan yanıt alınamadan oluşan bağlantı düzeyi hata.
+                    return true;
+            }
+        }
+
+        return false;
+    }
 }
