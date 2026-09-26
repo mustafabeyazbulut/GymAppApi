@@ -57,15 +57,13 @@ public class GetPackageDetailQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AsBranchScopedStaff_ForCompanyWidePackage_ReturnsIt()
+    public async Task Handle_AsBranchScopedStaff_ForLegacyCompanyWidePackage_ThrowsNotFoundException()
     {
-        // Firma geneli paketler bu adımda görünmeye devam ediyor (kaldırılmaları
-        // ayrı bir adım, senaryo §10.5).
+        // Senaryo §10.5: firma geneli paket yok - eski şubesiz kayıt şube
+        // personeline "yok" sayılır.
         var handler = CreateHandler(PackageAt(branchId: null), BranchScopedContext);
 
-        var result = await handler.Handle(new GetPackageDetailQuery(1), CancellationToken.None);
-
-        Assert.Equal(1, result.Id);
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(new GetPackageDetailQuery(1), CancellationToken.None));
     }
 
     [Fact]

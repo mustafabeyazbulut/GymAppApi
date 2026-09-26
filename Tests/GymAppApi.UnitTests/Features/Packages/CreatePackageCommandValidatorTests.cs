@@ -10,11 +10,26 @@ public class CreatePackageCommandValidatorTests
     private static CreatePackageCommand ValidDurationCommand() => new()
     {
         CompanyId = 1,
+        BranchId = 10,
         Name = "Aylık Üyelik",
         Type = PackageType.Duration,
         DurationDays = 30,
         Price = 1000m,
     };
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    public void Validate_WhenBranchIdIsMissing_HasError(int? branchId)
+    {
+        // Senaryo §10.5: firma geneli (şubesiz) paket yok.
+        var command = ValidDurationCommand();
+        command.BranchId = branchId;
+
+        var result = _validator.Validate(command);
+
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreatePackageCommand.BranchId));
+    }
 
     [Fact]
     public void Validate_WhenDurationDaysIsZero_HasError()

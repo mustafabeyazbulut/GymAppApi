@@ -281,23 +281,24 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
     }
 
     [Fact]
-    public async Task Packages_AsBranchManager_ReturnsOwnBranchsAndCompanyWidePackagesOnly()
+    public async Task Packages_AsBranchManager_ReturnsOwnBranchsPackagesOnly()
     {
         var seed = await SeedAsync();
 
         var ids = await GetIdsAsync(ClientFor(seed.BranchManagerA1Token), "/api/packages");
 
-        Assert.Equal(Sorted(seed.PackageA1Id, seed.PackageACompanyWideId), ids);
+        // Eski şubesiz (firma geneli) paket şube personeline gösterilmez (§10.5).
+        Assert.Equal(Sorted(seed.PackageA1Id), ids);
     }
 
     [Fact]
-    public async Task Packages_AsTrainer_ReturnsOwnBranchsAndCompanyWidePackagesOnly()
+    public async Task Packages_AsTrainer_ReturnsOwnBranchsPackagesOnly()
     {
         var seed = await SeedAsync();
 
         var ids = await GetIdsAsync(ClientFor(seed.TrainerA1Token), "/api/packages");
 
-        Assert.Equal(Sorted(seed.PackageA1Id, seed.PackageACompanyWideId), ids);
+        Assert.Equal(Sorted(seed.PackageA1Id), ids);
     }
 
     [Fact]

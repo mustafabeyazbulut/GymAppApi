@@ -6,8 +6,10 @@ namespace GymAppApi.Application.Features.Packages.Commands.CreatePackage;
 public class CreatePackageCommand : IRequest<CreatePackageCommandResult>
 {
     public int CompanyId { get; set; }
-    // null = valid at every branch of the company - only a GymAdmin/SuperAdmin
-    // may create one of these; a BranchManager must supply their own branch.
+    // Zorunlu (senaryo §10.5: firma geneli paket yok). Nullable tipi sadece
+    // eksik alanın validator tarafından yerelleştirilmiş hatayla
+    // reddedilebilmesi için; Package.BranchId kolonu da eski kayıtlar için
+    // şimdilik nullable.
     public int? BranchId { get; set; }
 
     public string Name { get; set; } = null!;

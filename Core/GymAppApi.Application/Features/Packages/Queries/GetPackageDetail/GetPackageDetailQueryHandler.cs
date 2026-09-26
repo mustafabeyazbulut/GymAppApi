@@ -24,7 +24,7 @@ public class GetPackageDetailQueryHandler : IRequestHandler<GetPackageDetailQuer
         // GetPackagesQueryHandler'ın şube kuralı: şube kapsamlı personel için
         // başka şubenin paketi "yok" sayılır (403 değil 404, varlığı sızdırılmasın).
         var branchId = _tenantContext.BranchId;
-        if (package is null || (branchId != null && package.BranchId != null && package.BranchId != branchId))
+        if (package is null || (branchId != null && package.BranchId != branchId))
         {
             throw new NotFoundException("PackageNotFound", request.PackageId);
         }

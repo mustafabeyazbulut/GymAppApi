@@ -10,6 +10,8 @@ public class CreatePackageCommandValidator : AbstractValidator<CreatePackageComm
     public CreatePackageCommandValidator()
     {
         RuleFor(x => x.CompanyId).GreaterThan(0);
+        // Senaryo §10.5: firma geneli (şubesiz) paket yok - her paket bir şubeye ait.
+        RuleFor(x => x.BranchId).NotNull().GreaterThan(0);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
 

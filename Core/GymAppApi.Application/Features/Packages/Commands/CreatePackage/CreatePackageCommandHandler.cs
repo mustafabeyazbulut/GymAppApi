@@ -21,20 +21,26 @@ public class CreatePackageCommandHandler : IRequestHandler<CreatePackageCommand,
             throw new NotFoundException("CompanyNotFound", request.CompanyId);
         }
 
+        // Senaryo §10.5: her paket bir şubeye ait (validator şubesiz isteği zaten
+        // reddediyor) ve o şube bu firmaya ait olmalı - aksi hâlde bir GymAdmin
+        // başka bir firmanın şube Id'siyle paket oluşturabilirdi.
+        var branch = request.BranchId is int branchId
+            ? await _unitOfWork.GetReadRepository<Branch>().GetAsync(
+                b => b.Id == branchId && b.CompanyId == request.CompanyId, cancellationToken: cancellationToken)
+            : null;
+        if (branch is null)
+        {
+            throw new NotFoundException("BranchNotFound", request.BranchId ?? 0);
+        }
+
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
 
-        // A company-wide package (BranchId == null) is a GymAdmin/SuperAdmin-only
-        // decision, same as creating the company's own resources - a BranchManager
-        // may only create a package scoped to their own exact branch.
-        var callerIsAuthorized = request.BranchId is null
-            ? callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
-                (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId))
-            : callerAssignments.Any(a =>
-                a.Role == AssignmentRole.SuperAdmin ||
-                (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId) ||
-                (a.Role == AssignmentRole.BranchManager && a.BranchId == request.BranchId));
+        // GymAdmin firmanın her şubesine, BranchManager sadece kendi şubesine paket tanımlar.
+        var callerIsAuthorized = callerAssignments.Any(a =>
+            a.Role == AssignmentRole.SuperAdmin ||
+            (a.Role == AssignmentRole.GymAdmin && a.CompanyId == request.CompanyId) ||
+            (a.Role == AssignmentRole.BranchManager && a.BranchId == branch.Id));
         if (!callerIsAuthorized)
         {
             throw new ForbiddenException("ForbiddenCreatePackage");

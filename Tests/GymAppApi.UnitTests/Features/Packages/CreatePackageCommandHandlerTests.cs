@@ -12,6 +12,7 @@ public class CreatePackageCommandHandlerTests
     private const int CallerId = 42;
     private const int CompanyId = 1;
     private const int BranchIdInCompany = 10;
+    private const int BranchIdInOtherCompany = 20;
 
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<Package>> writeRepo) Wire(
         IReadOnlyList<Assignment> callerAssignments, Company? company = null)
@@ -30,6 +31,11 @@ public class CreatePackageCommandHandlerTests
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(assignmentReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<Package>()).Returns(writeRepo.Object);
         uow.Setup(u => u.GetReadRepository<Company>()).Returns(companyReadRepo.Object);
+        uow.Setup(u => u.GetReadRepository<Branch>()).Returns(GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(new[]
+        {
+            new Branch { Id = BranchIdInCompany, CompanyId = CompanyId, Name = "Merkez", Address = "..." },
+            new Branch { Id = BranchIdInOtherCompany, CompanyId = 2, Name = "Başka", Address = "..." },
+        }).Object);
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
         return (uow, writeRepo);
     }
@@ -74,17 +80,31 @@ public class CreatePackageCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenCallerIsGymAdminOfCompanyCreatingACompanyWidePackage_Succeeds()
+    public async Task Handle_WhenBranchIdIsMissing_ThrowsNotFoundException_AndCreatesNothing()
     {
+        // Senaryo §10.5: firma geneli paket yok - validator zaten reddediyor,
+        // handler da savunma olarak şubesiz paket oluşturmaz.
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var (uow, writeRepo) = Wire(callerAssignments);
         var command = ValidCommand();
         command.BranchId = null;
         var handler = new CreatePackageCommandHandler(uow.Object);
 
-        await handler.Handle(command, CancellationToken.None);
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(command, CancellationToken.None));
+        writeRepo.Verify(r => r.AddAsync(It.IsAny<Package>(), default), Times.Never);
+    }
 
-        writeRepo.Verify(r => r.AddAsync(It.Is<Package>(p => p.BranchId == null), default), Times.Once);
+    [Fact]
+    public async Task Handle_WhenBranchBelongsToAnotherCompany_ThrowsNotFoundException_AndCreatesNothing()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var (uow, writeRepo) = Wire(callerAssignments);
+        var command = ValidCommand();
+        command.BranchId = BranchIdInOtherCompany;
+        var handler = new CreatePackageCommandHandler(uow.Object);
+
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(command, CancellationToken.None));
+        writeRepo.Verify(r => r.AddAsync(It.IsAny<Package>(), default), Times.Never);
     }
 
     [Fact]
@@ -107,19 +127,6 @@ public class CreatePackageCommandHandlerTests
         var handler = new CreatePackageCommandHandler(uow.Object);
 
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
-        writeRepo.Verify(r => r.AddAsync(It.IsAny<Package>(), default), Times.Never);
-    }
-
-    [Fact]
-    public async Task Handle_WhenBranchManagerTriesToCreateACompanyWidePackage_ThrowsForbiddenException()
-    {
-        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, BranchId = BranchIdInCompany, Role = AssignmentRole.BranchManager, IsActive = true } };
-        var (uow, writeRepo) = Wire(callerAssignments);
-        var command = ValidCommand();
-        command.BranchId = null;
-        var handler = new CreatePackageCommandHandler(uow.Object);
-
-        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(command, CancellationToken.None));
         writeRepo.Verify(r => r.AddAsync(It.IsAny<Package>(), default), Times.Never);
     }
 

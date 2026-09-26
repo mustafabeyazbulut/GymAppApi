@@ -66,12 +66,14 @@ public class GetPackagesQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AsBranchScopedStaff_ReturnsOwnBranchsAndCompanyWidePackagesOnly()
+    public async Task Handle_AsBranchScopedStaff_ReturnsOwnBranchsPackagesOnly_NotLegacyCompanyWideOnes()
     {
         var handler = CreateHandler(new AmbientTenantContext { CompanyId = 1, BranchId = 10 });
 
         var result = await handler.Handle(new GetPackagesQuery(), CancellationToken.None);
 
-        Assert.Equal(new[] { 1, 2 }, result.Select(p => p.Id).OrderBy(id => id));
+        // Senaryo §10.5: firma geneli paket yok - eski şubesiz kayıt (Id 1)
+        // şube personeline gösterilmez.
+        Assert.Equal(new[] { 2 }, result.Select(p => p.Id));
     }
 }

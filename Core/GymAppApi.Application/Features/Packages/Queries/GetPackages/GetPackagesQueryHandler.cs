@@ -19,11 +19,11 @@ public class GetPackagesQueryHandler : IRequestHandler<GetPackagesQuery, IReadOn
     {
         // Global query filter sadece firmaya göre daraltıyor - şube kapsamlı
         // personel (ambient BranchId set) sadece kendi şubesinin paketlerini
-        // görür (senaryo §10.8). Firma geneli (BranchId null) paketler
-        // kaldırılana kadar (senaryo §10.5, ayrı adım) görünmeye devam eder.
+        // görür (senaryo §10.8). Firma geneli paket yok (§10.5): eski şubesiz
+        // kayıtlar varsa sadece firma kapsamlı personel (GymAdmin) görür.
         var branchId = _tenantContext.BranchId;
         var packages = await _unitOfWork.GetReadRepository<Package>().GetAllAsync(
-            predicate: p => branchId == null || p.BranchId == null || p.BranchId == branchId,
+            predicate: p => branchId == null || p.BranchId == branchId,
             cancellationToken: cancellationToken);
 
         return packages.Select(ToDto).ToList();
