@@ -20,9 +20,10 @@ public class PackagesController : ControllerBase
 
     private int CurrentUserId => int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
 
+    // activeOnly=true: atama ("Paket Tanımla") listesi için sadece aktif paketler.
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
-        => Ok(await _mediator.Send(new GetPackagesQuery(), cancellationToken));
+    public async Task<IActionResult> GetAll([FromQuery] bool activeOnly, CancellationToken cancellationToken)
+        => Ok(await _mediator.Send(new GetPackagesQuery { ActiveOnly = activeOnly }, cancellationToken));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)

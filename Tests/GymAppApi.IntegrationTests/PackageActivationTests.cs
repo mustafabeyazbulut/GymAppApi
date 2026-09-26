@@ -113,6 +113,30 @@ public class PackageActivationTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task ActiveOnlyList_ExcludesInactivePackages_EvenForManagers()
+    {
+        var seed = await SeedAsync();
+
+        var ids = (await ClientFor(seed.GymAdminToken).GetFromJsonAsync<JsonElement>("/api/packages?activeOnly=true"))
+            .EnumerateArray().Select(p => p.GetProperty("id").GetInt32()).ToList();
+
+        Assert.DoesNotContain(seed.InactiveB1PackageId, ids);
+        Assert.Contains(seed.ActiveB2PackageId, ids);
+    }
+
+    [Fact]
+    public async Task AssigningAnInactivePackage_Returns409PackageInactive()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.GymAdminToken).PostAsJsonAsync("/api/package-assignments",
+            new { packageId = seed.InactiveB1PackageId, memberPhone = "+905552229999" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("PackageInactive", (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("Code").GetString());
+    }
+
+    [Fact]
     public async Task BranchManager_CanToggleOwnBranchsPackage()
     {
         var seed = await SeedAsync();

@@ -26,7 +26,9 @@ public class CreatePackageAssignmentCommandHandlerTests
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(assignmentReadRepo.Object);
 
         var packageReadRepo = new Mock<IReadRepository<Package>>();
-        packageReadRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Package, bool>>>(), null, false, default))
+        packageReadRepo.Setup(r => r.GetAsync(
+                It.IsAny<System.Linq.Expressions.Expression<Func<Package, bool>>>(),
+                It.IsAny<Func<IQueryable<Package>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<Package, object>>?>(), false, default))
             .ReturnsAsync(package);
         uow.Setup(u => u.GetReadRepository<Package>()).Returns(packageReadRepo.Object);
 
@@ -100,6 +102,31 @@ public class CreatePackageAssignmentCommandHandlerTests
 
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingPackageAssignmentInvitation>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPackageIsInactive_ThrowsPackageInactiveException()
+    {
+        // Canlı test bulgusu: pasif paket atanabiliyordu.
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var existingUser = new User { Id = 7, FullName = "Member", Phone = "+905550003333", PasswordHash = "x" };
+        var package = BranchPackage();
+        package.IsActive = false;
+        var (uow, invitationWriteRepo) = Wire(callerAssignments, package, existingUser, alreadyAssigned: false);
+        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
+
+        await Assert.ThrowsAsync<PackageInactiveException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
+        invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingPackageAssignmentInvitation>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPackageBelongsToAnotherCompany_ThrowsNotFoundException()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 2, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var (uow, _) = Wire(callerAssignments, BranchPackage(), existingUser: null, alreadyAssigned: false);
+        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
+
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
     }
 
     [Fact]

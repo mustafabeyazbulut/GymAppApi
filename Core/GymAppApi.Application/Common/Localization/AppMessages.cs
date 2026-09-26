@@ -168,6 +168,7 @@ public static class AppMessages
 
         // Packages özelliği - isimlendirilmiş exception'lar
         ["PackageNotFreezable"] = ("This package cannot be frozen.", "Bu paket dondurulamaz."),
+        ["PackageInactive"] = ("This package is inactive and cannot be assigned.", "Bu paket pasif; üyeye tanımlanamaz."),
         ["FreezeLimitExceeded"] = (
             "The maximum freeze duration allowed for this package ({0} days) has already been used.",
             "Bu paket için izin verilen maksimum dondurma süresi ({0} gün) zaten kullanıldı."),

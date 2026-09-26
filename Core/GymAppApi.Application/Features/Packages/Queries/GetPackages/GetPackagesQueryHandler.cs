@@ -32,7 +32,7 @@ public class GetPackagesQueryHandler : IRequestHandler<GetPackagesQuery, IReadOn
         // kayıtlar varsa sadece firma kapsamlı personel (GymAdmin) görür.
         var companyId = _tenantContext.CompanyId;
         var branchId = _tenantContext.BranchId;
-        var includeInactive = CanSeeInactive(_tenantContext);
+        var includeInactive = !request.ActiveOnly && CanSeeInactive(_tenantContext);
         var packages = await _unitOfWork.GetReadRepository<Package>().GetAllAsync(
             predicate: p => companyId != null && p.CompanyId == companyId &&
                             (branchId == null || p.BranchId == branchId) &&

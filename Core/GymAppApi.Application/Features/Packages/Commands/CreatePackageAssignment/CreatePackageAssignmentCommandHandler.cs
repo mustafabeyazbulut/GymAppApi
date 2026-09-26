@@ -32,18 +32,24 @@ public class CreatePackageAssignmentCommandHandler : IRequestHandler<CreatePacka
         // validator ValidPhoneNumber ile geçerliliği zaten garanti ediyor.
         var phone = _phoneNumberNormalizer.NormalizeIfPhone(request.MemberPhone);
 
-        var package = await _unitOfWork.GetReadRepository<Package>()
-            .GetAsync(p => p.Id == request.PackageId, cancellationToken: cancellationToken);
-        if (package is null)
-        {
-            throw new NotFoundException("PackageNotFound", request.PackageId);
-        }
+        // IgnoreQueryFilters: filtre pasif paketi gizler ve "yok" (404) ile
+        // "pasif" (409 PackageInactive) ayırt edilemezdi. Başka firmanın paketi
+        // aşağıda açıkça 404 yapılıyor (SetBranchActive'in aynı deseni).
+        var package = await _unitOfWork.GetReadRepository<Package>().GetAsync(
+            p => p.Id == request.PackageId,
+            include: q => q.IgnoreQueryFilters().Include(p => p.Company),
+            cancellationToken: cancellationToken);
 
         // A company-wide package (BranchId == null) may only be assigned by a
         // GymAdmin, same limit as creating one - a BranchManager may
         // only assign a package scoped to their own exact branch.
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
+        if (package is null || !callerAssignments.Any(a => a.CompanyId == package.CompanyId))
+        {
+            throw new NotFoundException("PackageNotFound", request.PackageId);
+        }
+
         var callerIsAuthorized = package.BranchId is null
             ? callerAssignments.Any(a =>
                 (a.Role == AssignmentRole.GymAdmin && a.CompanyId == package.CompanyId))
@@ -53,6 +59,12 @@ public class CreatePackageAssignmentCommandHandler : IRequestHandler<CreatePacka
         if (!callerIsAuthorized)
         {
             throw new ForbiddenException("ForbiddenAssignPackage");
+        }
+
+        // Canlı test bulgusu: pasif paket atanabiliyordu.
+        if (!package.IsActive)
+        {
+            throw new PackageInactiveException();
         }
 
         var member = await _unitOfWork.GetReadRepository<User>()
