@@ -28,11 +28,12 @@ public class ClassSessionsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    // Herkes çağırabilir - gerçek yetkilendirme yok, sadece görüntüleme.
+    // Herkes çağırabilir - görünürlük kapsamı (personelin firması/şubesi +
+    // üyenin geçerli paketleri) handler'da uygulanıyor.
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? branchId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken cancellationToken)
-        => Ok(await _mediator.Send(new GetClassSessionsQuery { BranchId = branchId, From = from, To = to }, cancellationToken));
+        => Ok(await _mediator.Send(new GetClassSessionsQuery { BranchId = branchId, From = from, To = to, RequestedByUserId = CurrentUserId }, cancellationToken));
 
     [HttpPost("{id}/enroll")]
     public async Task<IActionResult> Enroll(int id, EnrollInClassSessionCommand command, CancellationToken cancellationToken)
