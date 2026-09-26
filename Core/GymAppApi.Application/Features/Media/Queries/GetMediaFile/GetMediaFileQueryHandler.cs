@@ -88,6 +88,13 @@ public class GetMediaFileQueryHandler : IRequestHandler<GetMediaFileQuery, GetMe
             return;
         }
 
+        // Pasife alınmış gym içeriği üyelere kapalı (liste de göstermiyor);
+        // medyasını sadece yukarıdaki personel açabilir.
+        if (!contentItem.IsActive)
+        {
+            throw new ForbiddenException("ForbiddenViewMedia");
+        }
+
         // Sadece GEÇERLİ paketler (PackageAssignmentValidity) - süresi dolmuş
         // ama Status'u hâlâ Active olan bir paket içerik erişimi vermez.
         var validPackageAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(

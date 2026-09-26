@@ -255,6 +255,32 @@ public class GetMediaFileQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_InactiveGymContent_IsNotDownloadableByAMemberWithAValidPackage()
+    {
+        // İnceleme bulgusu: geçerli paketi olan üye, pasife alınmış gym
+        // içeriğinin medyasını hâlâ indirebiliyordu.
+        var item = Item(PackageAccessTier.Standard);
+        item.IsActive = false;
+        var memberAssignments = new List<PackageAssignment> { MemberPackage(PackageAccessTier.Premium) };
+        var (uow, storage) = Wire(File(), item, new List<Assignment>(), memberAssignments);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => Download(uow, storage));
+    }
+
+    [Fact]
+    public async Task Handle_InactiveGymContent_IsStillDownloadableByStaff()
+    {
+        var item = Item(PackageAccessTier.Standard);
+        item.IsActive = false;
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var (uow, storage) = Wire(File(), item, callerAssignments, new List<PackageAssignment>());
+
+        var result = await Download(uow, storage);
+
+        Assert.Equal("video/mp4", result.ContentType);
+    }
+
+    [Fact]
     public async Task Handle_WhenCallerIsTrainerOfTheContentsBranch_ReturnsContent()
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true } };
