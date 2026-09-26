@@ -10,15 +10,31 @@ public class CreateContentItemCommandHandler : IRequestHandler<CreateContentItem
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMediaStorage _mediaStorage;
+    private readonly ITenantContext _tenantContext;
 
-    public CreateContentItemCommandHandler(IUnitOfWork unitOfWork, IMediaStorage mediaStorage)
+    public CreateContentItemCommandHandler(IUnitOfWork unitOfWork, IMediaStorage mediaStorage, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _mediaStorage = mediaStorage;
+        _tenantContext = tenantContext;
     }
 
     public async Task<CreateContentItemCommandResult> Handle(CreateContentItemCommand request, CancellationToken cancellationToken)
     {
+        // Aktif bağlamı Sistem Sahibi (header'sız SuperAdmin) olan çağıran genel
+        // (platform) içerik yükler: firma/şube yok. SuperAdmin bir personel
+        // atamasını seçtiyse (X-Active-Assignment-Id) aktif rolü o atamadır ve
+        // aşağıdaki normal gym içeriği kuralları geçerlidir.
+        if (_tenantContext.Role == AssignmentRole.SuperAdmin)
+        {
+            if (request.BranchId is not null)
+            {
+                throw new ForbiddenException("ForbiddenCreateContentItem");
+            }
+
+            return await SaveAsync(request, companyId: null, cancellationToken);
+        }
+
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
 
@@ -59,6 +75,11 @@ public class CreateContentItemCommandHandler : IRequestHandler<CreateContentItem
             companyId = gymAdminAssignment.CompanyId!.Value;
         }
 
+        return await SaveAsync(request, companyId, cancellationToken);
+    }
+
+    private async Task<CreateContentItemCommandResult> SaveAsync(CreateContentItemCommand request, int? companyId, CancellationToken cancellationToken)
+    {
         var storagePath = await _mediaStorage.SaveAsync(request.FileContent, request.FileContentType, cancellationToken);
         var mediaFile = new MediaFile
         {

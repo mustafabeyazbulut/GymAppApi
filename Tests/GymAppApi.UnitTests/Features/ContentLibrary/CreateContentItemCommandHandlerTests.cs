@@ -5,6 +5,7 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Features.ContentLibrary.Commands.CreateContentItem;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
+using GymAppApi.Infrastructure.Tenancy;
 using Moq;
 
 namespace GymAppApi.UnitTests.Features.ContentLibrary;
@@ -14,6 +15,9 @@ public class CreateContentItemCommandHandlerTests
     private const int CallerId = 42;
     private const int BranchId = 10;
     private const int CompanyId = 1;
+
+    private static readonly ITenantContext StaffContext = new AmbientTenantContext { CompanyId = CompanyId, Role = AssignmentRole.GymAdmin };
+    private static readonly ITenantContext SystemOwnerContext = new AmbientTenantContext { Role = AssignmentRole.SuperAdmin };
 
     private static (Mock<IUnitOfWork> UnitOfWork, Mock<IMediaStorage> MediaStorage) Wire(
         Branch? branch, IReadOnlyList<Assignment> callerAssignments)
@@ -59,7 +63,7 @@ public class CreateContentItemCommandHandlerTests
     public async Task Handle_WhenBranchDoesNotExist_ThrowsNotFoundException()
     {
         var (uow, mediaStorage) = Wire(branch: null, callerAssignments: new List<Assignment>());
-        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object);
+        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object, StaffContext);
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.Handle(Command(BranchId), CancellationToken.None));
@@ -74,7 +78,7 @@ public class CreateContentItemCommandHandlerTests
             new() { Id = 1, UserId = CallerId, CompanyId = CompanyId, Role = AssignmentRole.GymAdmin, IsActive = true },
         };
         var (uow, mediaStorage) = Wire(branch, callerAssignments);
-        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object);
+        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object, StaffContext);
 
         var result = await handler.Handle(Command(BranchId), CancellationToken.None);
 
@@ -91,7 +95,7 @@ public class CreateContentItemCommandHandlerTests
             new() { Id = 1, UserId = CallerId, CompanyId = CompanyId, BranchId = 999, Role = AssignmentRole.BranchManager, IsActive = true },
         };
         var (uow, mediaStorage) = Wire(branch, callerAssignments);
-        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object);
+        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object, StaffContext);
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(Command(BranchId), CancellationToken.None));
@@ -105,7 +109,7 @@ public class CreateContentItemCommandHandlerTests
             new() { Id = 1, UserId = CallerId, CompanyId = CompanyId, Role = AssignmentRole.GymAdmin, IsActive = true },
         };
         var (uow, mediaStorage) = Wire(branch: null, callerAssignments);
-        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object);
+        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object, StaffContext);
 
         var result = await handler.Handle(Command(branchId: null), CancellationToken.None);
 
@@ -120,9 +124,36 @@ public class CreateContentItemCommandHandlerTests
             new() { Id = 1, UserId = CallerId, CompanyId = CompanyId, BranchId = BranchId, Role = AssignmentRole.BranchManager, IsActive = true },
         };
         var (uow, mediaStorage) = Wire(branch: null, callerAssignments);
-        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object);
+        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object, StaffContext);
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(Command(branchId: null), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_WhenActiveRoleIsSystemOwner_CreatesPlatformContentWithoutCompany()
+    {
+        var (uow, mediaStorage) = Wire(branch: null, callerAssignments: new List<Assignment>());
+        ContentItem? saved = null;
+        var contentItemWriteRepo = new Mock<IWriteRepository<ContentItem>>();
+        contentItemWriteRepo.Setup(r => r.AddAsync(It.IsAny<ContentItem>(), default)).Callback<ContentItem, CancellationToken>((c, _) => saved = c);
+        uow.Setup(u => u.GetWriteRepository<ContentItem>()).Returns(contentItemWriteRepo.Object);
+        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object, SystemOwnerContext);
+
+        await handler.Handle(Command(branchId: null), CancellationToken.None);
+
+        Assert.NotNull(saved);
+        Assert.Null(saved!.CompanyId);
+        Assert.Null(saved.BranchId);
+    }
+
+    [Fact]
+    public async Task Handle_WhenSystemOwnerTargetsABranch_ThrowsForbidden()
+    {
+        var (uow, mediaStorage) = Wire(branch: null, callerAssignments: new List<Assignment>());
+        var handler = new CreateContentItemCommandHandler(uow.Object, mediaStorage.Object, SystemOwnerContext);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(Command(branchId: BranchId), CancellationToken.None));
+        mediaStorage.Verify(m => m.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), default), Times.Never);
     }
 }

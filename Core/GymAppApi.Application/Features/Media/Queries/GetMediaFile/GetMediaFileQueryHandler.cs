@@ -15,11 +15,13 @@ public class GetMediaFileQueryHandler : IRequestHandler<GetMediaFileQuery, GetMe
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMediaStorage _mediaStorage;
+    private readonly ITenantContext _tenantContext;
 
-    public GetMediaFileQueryHandler(IUnitOfWork unitOfWork, IMediaStorage mediaStorage)
+    public GetMediaFileQueryHandler(IUnitOfWork unitOfWork, IMediaStorage mediaStorage, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _mediaStorage = mediaStorage;
+        _tenantContext = tenantContext;
     }
 
     public async Task<GetMediaFileResult> Handle(GetMediaFileQuery request, CancellationToken cancellationToken)
@@ -59,6 +61,17 @@ public class GetMediaFileQueryHandler : IRequestHandler<GetMediaFileQuery, GetMe
 
     private async Task EnsureCanViewContentItemAsync(ContentItem contentItem, int requestedByUserId, CancellationToken cancellationToken)
     {
+        // Genel (platform) içerik giriş yapmış herkese açık - paket aranmaz.
+        // Pasif genel içeriği sadece onu yöneten Sistem Sahibi açabilir.
+        if (contentItem.CompanyId is null)
+        {
+            if (!contentItem.IsActive && _tenantContext.Role != AssignmentRole.SuperAdmin)
+            {
+                throw new ForbiddenException("ForbiddenViewMedia");
+            }
+            return;
+        }
+
         // Şube kuralı GetContentItemsQueryHandler ile aynı (senaryo §10.8):
         // şubesiz (BranchId null) içerik firmanın tümüne açık; şubeye ait
         // içerik sadece o şubenin personeline / o şubede geçerli paketi olan

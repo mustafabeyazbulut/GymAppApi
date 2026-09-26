@@ -8,9 +8,12 @@ namespace GymAppApi.Domain.Entities;
 // docs/superpowers/specs/2026-09-20-content-library-design.md). Üye, sadece
 // kendi aktif PackageAssignment'larının Package.AccessTier'ına eşit veya
 // altındaki içerikleri görebilir.
-public class ContentItem : EntityBase, ICompanyScoped, IDeactivatable
+//
+// CompanyId = null: Sistem Sahibi'nin yüklediği genel (platform) içerik -
+// giriş yapmış herkese görünür, paket/erişim seviyesi aranmaz.
+public class ContentItem : EntityBase, IOptionalCompanyScoped, IDeactivatable
 {
-    public int CompanyId { get; set; }
+    public int? CompanyId { get; set; }
     public Company? Company { get; set; }
 
     // null = firmanın tüm şubelerinde görünür; set = sadece o şubede.

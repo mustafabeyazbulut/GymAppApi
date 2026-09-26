@@ -3,7 +3,11 @@ namespace GymAppApi.Application.Features.ContentLibrary.Queries.GetContentItems;
 public class ContentItemDto
 {
     public int Id { get; set; }
-    public int CompanyId { get; set; }
+    // null = genel (platform) içerik.
+    public int? CompanyId { get; set; }
+
+    // "Platform" (Sistem Sahibi'nin genel içeriği) | "Gym" (firmanın içeriği).
+    public string Source { get; set; } = null!;
     public int? BranchId { get; set; }
     public string Title { get; set; } = null!;
     public string? Description { get; set; }

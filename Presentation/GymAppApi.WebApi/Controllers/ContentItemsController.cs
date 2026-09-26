@@ -20,7 +20,7 @@ public class ContentItemsController : ControllerBase
 
     private int CurrentUserId => int.Parse(User.FindFirst(JwtRegisteredClaimNames.Sub)!.Value);
 
-    [Authorize(Policy = "StaffManagement")]
+    [Authorize(Policy = "ContentManagement")]
     [HttpPost]
     [RequestSizeLimit(200_000_000)]
     public async Task<IActionResult> Create(
@@ -52,7 +52,7 @@ public class ContentItemsController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetContentItemsQuery { RequestedByUserId = CurrentUserId }, cancellationToken));
 
-    [Authorize(Policy = "StaffManagement")]
+    [Authorize(Policy = "ContentManagement")]
     [HttpPatch("{id}/active")]
     public async Task<IActionResult> SetActive(int id, SetContentItemActiveCommand command, CancellationToken cancellationToken)
     {

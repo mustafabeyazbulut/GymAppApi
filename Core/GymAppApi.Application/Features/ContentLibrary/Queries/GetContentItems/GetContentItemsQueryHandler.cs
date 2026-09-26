@@ -21,7 +21,32 @@ public class GetContentItemsQueryHandler : IRequestHandler<GetContentItemsQuery,
         _tenantContext = tenantContext;
     }
 
+    public const string PlatformSource = "Platform";
+    public const string GymSource = "Gym";
+
+    // Genel (platform) içerik ve firmanın içeriği tek listede, yeniden eskiye.
     public async Task<IReadOnlyList<ContentItemDto>> Handle(GetContentItemsQuery request, CancellationToken cancellationToken)
+    {
+        var platformItems = await GetPlatformItemsAsync(cancellationToken);
+        var gymItems = await GetGymItemsAsync(request, cancellationToken);
+        return platformItems.Concat(gymItems).OrderByDescending(i => i.CreatedAt).ThenByDescending(i => i.Id).ToList();
+    }
+
+    // Genel içerik giriş yapmış herkese görünür (paket/erişim seviyesi
+    // aranmaz). Global filtre CompanyId null satırları gizlediği için
+    // bilinçli olarak IgnoreQueryFilters + CompanyId == null ile okunur.
+    // Pasif genel içeriği sadece onu yöneten Sistem Sahibi görür.
+    private async Task<IEnumerable<ContentItemDto>> GetPlatformItemsAsync(CancellationToken cancellationToken)
+    {
+        var isSystemOwner = _tenantContext.Role == AssignmentRole.SuperAdmin;
+        var items = await _unitOfWork.GetReadRepository<ContentItem>().GetAllAsync(
+            c => c.CompanyId == null && (isSystemOwner || c.IsActive),
+            include: q => q.IgnoreQueryFilters().Include(c => c.MediaFile),
+            cancellationToken: cancellationToken);
+        return items.Select(c => ToDto(c, hasAccess: true));
+    }
+
+    private async Task<IReadOnlyList<ContentItemDto>> GetGymItemsAsync(GetContentItemsQuery request, CancellationToken cancellationToken)
     {
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == request.RequestedByUserId && a.IsActive, cancellationToken: cancellationToken);
@@ -70,7 +95,7 @@ public class GetContentItemsQueryHandler : IRequestHandler<GetContentItemsQuery,
 
         var companyIds = validPackageAssignments.Select(p => p.CompanyId).Distinct().ToList();
         var candidateItems = await _unitOfWork.GetReadRepository<ContentItem>().GetAllAsync(
-            c => c.IsActive && companyIds.Contains(c.CompanyId),
+            c => c.IsActive && c.CompanyId != null && companyIds.Contains(c.CompanyId.Value),
             include: q => q.IgnoreQueryFilters().Include(c => c.MediaFile),
             orderBy: q => q.OrderByDescending(c => c.CreatedAt),
             cancellationToken: cancellationToken);
@@ -100,6 +125,7 @@ public class GetContentItemsQueryHandler : IRequestHandler<GetContentItemsQuery,
     {
         Id = c.Id,
         CompanyId = c.CompanyId,
+        Source = c.CompanyId is null ? PlatformSource : GymSource,
         BranchId = c.BranchId,
         Title = c.Title,
         Description = c.Description,

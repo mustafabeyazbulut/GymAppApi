@@ -76,7 +76,7 @@ public class GetMediaFileQueryHandlerTests
     public async Task Handle_WhenMediaFileDoesNotExist_ThrowsNotFoundException()
     {
         var (uow, storage) = Wire(mediaFile: null, contentItem: null, callerAssignments: new List<Assignment>(), memberAssignments: new List<PackageAssignment>());
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None));
@@ -86,7 +86,7 @@ public class GetMediaFileQueryHandlerTests
     public async Task Handle_WhenNeitherContentItemNorProgressNoteReferenceTheFile_ThrowsNotFoundException()
     {
         var (uow, storage) = Wire(File(), contentItem: null, callerAssignments: new List<Assignment>(), memberAssignments: new List<PackageAssignment>());
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None));
@@ -108,7 +108,7 @@ public class GetMediaFileQueryHandlerTests
         var (uow, storage) = Wire(
             File(), contentItem: null, callerAssignments: new List<Assignment>(), memberAssignments: new List<PackageAssignment>(),
             progressNote: Note());
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         var result = await handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = 7 }, CancellationToken.None);
 
@@ -122,7 +122,7 @@ public class GetMediaFileQueryHandlerTests
         var (uow, storage) = Wire(
             File(), contentItem: null, callerAssignments, memberAssignments: new List<PackageAssignment>(),
             progressNote: Note());
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         var result = await handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None);
 
@@ -135,7 +135,7 @@ public class GetMediaFileQueryHandlerTests
         var (uow, storage) = Wire(
             File(), contentItem: null, callerAssignments: new List<Assignment>(), memberAssignments: new List<PackageAssignment>(),
             progressNote: Note());
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None));
@@ -146,7 +146,7 @@ public class GetMediaFileQueryHandlerTests
     {
         var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, Role = AssignmentRole.GymAdmin, IsActive = true } };
         var (uow, storage) = Wire(File(), Item(PackageAccessTier.Premium), callerAssignments, new List<PackageAssignment>());
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         var result = await handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None);
 
@@ -162,7 +162,7 @@ public class GetMediaFileQueryHandlerTests
             new() { MemberUserId = CallerId, CompanyId = CompanyId, PackageId = 1, Package = package, Status = PackageAssignmentStatus.Active },
         };
         var (uow, storage) = Wire(File(), Item(PackageAccessTier.Premium), new List<Assignment>(), memberAssignments);
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         var result = await handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None);
 
@@ -178,7 +178,7 @@ public class GetMediaFileQueryHandlerTests
             new() { MemberUserId = CallerId, CompanyId = CompanyId, PackageId = 1, Package = package, Status = PackageAssignmentStatus.Active },
         };
         var (uow, storage) = Wire(File(), Item(PackageAccessTier.Premium), new List<Assignment>(), memberAssignments);
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None));
@@ -188,7 +188,7 @@ public class GetMediaFileQueryHandlerTests
     public async Task Handle_WhenCallerIsUnrelated_ThrowsForbiddenException()
     {
         var (uow, storage) = Wire(File(), Item(PackageAccessTier.Standard), new List<Assignment>(), new List<PackageAssignment>());
-        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object);
+        var handler = new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext());
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None));
@@ -202,7 +202,7 @@ public class GetMediaFileQueryHandlerTests
     };
 
     private static Task<GetMediaFileResult> Download(Mock<IUnitOfWork> uow, Mock<IMediaStorage> storage) =>
-        new GetMediaFileQueryHandler(uow.Object, storage.Object)
+        new GetMediaFileQueryHandler(uow.Object, storage.Object, new GymAppApi.Infrastructure.Tenancy.AmbientTenantContext())
             .Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None);
 
     [Fact]

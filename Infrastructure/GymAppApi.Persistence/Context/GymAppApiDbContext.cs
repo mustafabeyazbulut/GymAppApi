@@ -90,6 +90,12 @@ public class GymAppApiDbContext : DbContext
                     .MakeGenericMethod(clrType);
                 method.Invoke(this, new object[] { modelBuilder });
             }
+            else if (typeof(IOptionalCompanyScoped).IsAssignableFrom(clrType) && typeof(IDeactivatable).IsAssignableFrom(clrType))
+            {
+                var method = GetType().GetMethod(nameof(SetOptionalCompanyScopedDeactivatableFilter), BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .MakeGenericMethod(clrType);
+                method.Invoke(this, new object[] { modelBuilder });
+            }
             else if (typeof(ITenantScoped).IsAssignableFrom(clrType))
             {
                 var method = GetType().GetMethod(nameof(SetNullableTenantFilter), BindingFlags.NonPublic | BindingFlags.Instance)!
@@ -100,7 +106,7 @@ public class GymAppApiDbContext : DbContext
             {
                 throw new InvalidOperationException(
                     $"Entity type '{clrType.Name}' does not implement any tenant-scoping marker interface " +
-                    "(ICompanyScoped, ITenantScoped, or IDeactivatable on Company) and is not listed in " +
+                    "(ICompanyScoped, IOptionalCompanyScoped + IDeactivatable, ITenantScoped, or IDeactivatable on Company) and is not listed in " +
                     $"{nameof(IntentionallyUnscopedEntityTypes)}. If this entity is genuinely tenant-scoped, " +
                     "implement the appropriate marker interface. If it is deliberately platform-global " +
                     $"(like User), add it to {nameof(IntentionallyUnscopedEntityTypes)} explicitly.");
@@ -125,6 +131,15 @@ public class GymAppApiDbContext : DbContext
 
     private void SetCompanyScopedDeactivatableFilter<TEntity>(ModelBuilder modelBuilder)
         where TEntity : class, ICompanyScoped, IDeactivatable
+    {
+        modelBuilder.Entity<TEntity>().HasQueryFilter(e =>
+            _tenantContext.IsSuperAdmin ||
+            (_tenantContext.CompanyId != null && e.CompanyId == _tenantContext.CompanyId && e.IsActive));
+    }
+
+    // Platform satırları (CompanyId null) burada gizli kalır - bkz. IOptionalCompanyScoped.
+    private void SetOptionalCompanyScopedDeactivatableFilter<TEntity>(ModelBuilder modelBuilder)
+        where TEntity : class, IOptionalCompanyScoped, IDeactivatable
     {
         modelBuilder.Entity<TEntity>().HasQueryFilter(e =>
             _tenantContext.IsSuperAdmin ||

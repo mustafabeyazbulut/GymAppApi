@@ -88,6 +88,13 @@ builder.Services.AddAuthorization(options =>
         new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
             GymAppApi.Domain.Enums.AssignmentRole.BranchManager,
             GymAppApi.Domain.Enums.AssignmentRole.GymAdmin)));
+    // İçerik yükleme/aktif-pasif: personel gym içeriğini, Sistem Sahibi
+    // (header'sız SuperAdmin) genel içeriği yönetir - ayrım handler'da.
+    options.AddPolicy("ContentManagement", policy => policy.Requirements.Add(
+        new GymAppApi.WebApi.Authorization.AssignmentRoleRequirement(
+            GymAppApi.Domain.Enums.AssignmentRole.BranchManager,
+            GymAppApi.Domain.Enums.AssignmentRole.GymAdmin,
+            GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
 });
 
 // IP bazlı "auth" politikası + OTP/kod uçlarında telefon/tanımlayıcı bazlı
