@@ -16,6 +16,9 @@ public static class AppMessages
     {
         // Genel / ortak
         ["UnexpectedError"] = ("An unexpected error occurred.", "Beklenmeyen bir hata oluştu."),
+        ["TooManyRequests"] = (
+            "Too many attempts. Please wait a moment and try again.",
+            "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin."),
         ["PasswordResetCodeSentIfAccountExists"] = (
             "If your account exists, a password reset code has been sent.",
             "Hesabınız varsa, şifre sıfırlama kodu gönderildi."),

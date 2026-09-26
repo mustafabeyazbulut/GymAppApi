@@ -19,6 +19,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using GymAppApi.WebApi.RateLimiting;
 
 namespace GymAppApi.WebApi.Controllers;
 
@@ -28,7 +29,10 @@ namespace GymAppApi.WebApi.Controllers;
 // full-file replacement, do not drop it.
 [ApiController]
 [Route("api/auth")]
-[EnableRateLimiting("auth")]
+[EnableRateLimiting(AuthRateLimiting.PolicyName)]
+// OTP/kod komutlarında (IRateLimitedByIdentifier) ayrıca telefon/tanımlayıcı
+// bazlı sınır; diğer aksiyonlarda filtre hiçbir şey yapmaz.
+[ServiceFilter(typeof(IdentifierRateLimitFilter))]
 public class AuthController : ControllerBase
 {
     private readonly IMediator _mediator;

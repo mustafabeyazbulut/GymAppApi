@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using FluentValidation;
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Localization;
@@ -32,15 +31,9 @@ public class ExceptionMiddleware
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         // Code: istemcinin ihtiyaç duyarsa kendi başına da kullanabileceği,
-        // dilden bağımsız kararlı bir tanımlayıcı.
-        // CultureInfo.CurrentUICulture DEĞİL: bu middleware, RequestLocalizationMiddleware'i
-        // SARMALIYOR (pipeline'da ondan önce geliyor), bu yüzden içerideki
-        // middleware'in ambient kültürü değiştirmesi buradaki catch bloğuna
-        // (ayrı bir ExecutionContext dalı) yansımıyor - .NET'in normal async/
-        // ExecutionContext davranışı. HttpContext.Features üzerinden okumak
-        // middleware sırasından bağımsız, güvenilir tek yol.
-        var language = context.Features.Get<Microsoft.AspNetCore.Localization.IRequestCultureFeature>()
-            ?.RequestCulture.UICulture.TwoLetterISOLanguageName ?? "en";
+        // dilden bağımsız kararlı bir tanımlayıcı. Dil ve gövde biçimi
+        // ErrorResponses'ta (rate limiter'ın 429'u ile ortak).
+        var language = ErrorResponses.ResolveLanguage(context);
 
         var (statusCode, errors, code) = exception switch
         {
@@ -66,11 +59,6 @@ public class ExceptionMiddleware
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = statusCode;
 
-        await context.Response.WriteAsync(JsonSerializer.Serialize(new
-        {
-            Status = statusCode,
-            Errors = errors,
-            Code = code
-        }));
+        await context.Response.WriteAsync(ErrorResponses.Serialize(ErrorResponses.Body(statusCode, errors, code)));
     }
 }

@@ -7,6 +7,7 @@ using GymAppApi.Infrastructure;
 using GymAppApi.Persistence;
 using GymAppApi.WebApi.BackgroundServices;
 using GymAppApi.WebApi.Middleware;
+using GymAppApi.WebApi.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -76,16 +77,10 @@ builder.Services.AddAuthorization(options =>
             GymAppApi.Domain.Enums.AssignmentRole.SuperAdmin)));
 });
 
-builder.Services.AddRateLimiter(options =>
-{
-    options.AddFixedWindowLimiter("auth", limiterOptions =>
-    {
-        limiterOptions.PermitLimit = 10;
-        limiterOptions.Window = TimeSpan.FromMinutes(1);
-        limiterOptions.QueueLimit = 0;
-    });
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-});
+// IP bazlı "auth" politikası + OTP/kod uçlarında telefon/tanımlayıcı bazlı
+// ek sınır; 429 yanıtı yerelleştirilmiş gövde ve Retry-After ile döner (bkz.
+// RateLimiting/AuthRateLimiting.cs).
+builder.Services.AddAuthRateLimiting(builder.Configuration);
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

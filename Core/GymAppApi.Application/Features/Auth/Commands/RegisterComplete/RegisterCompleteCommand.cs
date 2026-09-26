@@ -1,3 +1,4 @@
+using GymAppApi.Application.Common.RateLimiting;
 using GymAppApi.Application.Features.Auth.Common;
 using MediatR;
 
@@ -8,7 +9,7 @@ namespace GymAppApi.Application.Features.Auth.Commands.RegisterComplete;
 // persist its AttemptCount increment independently of the success path's
 // atomic User+RefreshToken+pending-cleanup segment, which the handler opens
 // its own transaction around instead.
-public class RegisterCompleteCommand : IRequest<AuthTokenResult>
+public class RegisterCompleteCommand : IRequest<AuthTokenResult>, IRateLimitedByIdentifier
 {
     public string FullName { get; set; } = null!;
     public string Phone { get; set; } = null!;
@@ -16,4 +17,6 @@ public class RegisterCompleteCommand : IRequest<AuthTokenResult>
     public string? Email { get; set; }
     public string? EmailCode { get; set; }
     public string Password { get; set; } = null!;
+
+    string? IRateLimitedByIdentifier.RateLimitIdentifier => Phone;
 }
