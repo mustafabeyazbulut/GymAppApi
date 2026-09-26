@@ -7,12 +7,24 @@ namespace GymAppApi.Application.Features.Packages.Queries.GetPackages;
 public class GetPackagesQueryHandler : IRequestHandler<GetPackagesQuery, IReadOnlyList<PackageDto>>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITenantContext _tenantContext;
 
-    public GetPackagesQueryHandler(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+    public GetPackagesQueryHandler(IUnitOfWork unitOfWork, ITenantContext tenantContext)
+    {
+        _unitOfWork = unitOfWork;
+        _tenantContext = tenantContext;
+    }
 
     public async Task<IReadOnlyList<PackageDto>> Handle(GetPackagesQuery request, CancellationToken cancellationToken)
     {
-        var packages = await _unitOfWork.GetReadRepository<Package>().GetAllAsync(cancellationToken: cancellationToken);
+        // Global query filter sadece firmaya göre daraltıyor - şube kapsamlı
+        // personel (ambient BranchId set) sadece kendi şubesinin paketlerini
+        // görür (senaryo §10.8). Firma geneli (BranchId null) paketler
+        // kaldırılana kadar (senaryo §10.5, ayrı adım) görünmeye devam eder.
+        var branchId = _tenantContext.BranchId;
+        var packages = await _unitOfWork.GetReadRepository<Package>().GetAllAsync(
+            predicate: p => branchId == null || p.BranchId == null || p.BranchId == branchId,
+            cancellationToken: cancellationToken);
 
         return packages.Select(ToDto).ToList();
     }

@@ -261,4 +261,56 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    // --- GET /api/packages, GET /api/packages/{id} ---
+
+    [Fact]
+    public async Task Packages_AsGymAdmin_ReturnsAllPackagesOfOwnCompany()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.GymAdminAToken), "/api/packages");
+
+        Assert.Equal(Sorted(seed.PackageA1Id, seed.PackageA2Id, seed.PackageACompanyWideId), ids);
+    }
+
+    [Fact]
+    public async Task Packages_AsBranchManager_ReturnsOwnBranchsAndCompanyWidePackagesOnly()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.BranchManagerA1Token), "/api/packages");
+
+        Assert.Equal(Sorted(seed.PackageA1Id, seed.PackageACompanyWideId), ids);
+    }
+
+    [Fact]
+    public async Task Packages_AsTrainer_ReturnsOwnBranchsAndCompanyWidePackagesOnly()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.TrainerA1Token), "/api/packages");
+
+        Assert.Equal(Sorted(seed.PackageA1Id, seed.PackageACompanyWideId), ids);
+    }
+
+    [Fact]
+    public async Task PackageDetail_AsBranchManager_ForAnotherBranchsPackage_Returns404()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.BranchManagerA1Token).GetAsync($"/api/packages/{seed.PackageA2Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PackageDetail_AsBranchManager_ForOwnBranchsPackage_Returns200()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.BranchManagerA1Token).GetAsync($"/api/packages/{seed.PackageA1Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }
