@@ -32,5 +32,8 @@ public interface ILoginAttemptStore
 // anahtarsız bir hash IPv4 uzayı küçük olduğu için kolayca geri çevrilebilirdi).
 public interface IClientIpHashProvider
 {
-    string GetHashedClientIp();
+    // İstemci IP'si bilinmiyorsa (RemoteIpAddress null) null döner - çağıran
+    // hesap+IP kilidini uygulamamalı; aksi hâlde IP'si bilinmeyen tüm
+    // istemciler tek bir anahtarda birleşip birbirini kilitlerdi.
+    string? GetHashedClientIp();
 }

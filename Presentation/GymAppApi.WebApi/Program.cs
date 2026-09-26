@@ -22,6 +22,8 @@ builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 // Giriş kilidi için IP hash anahtarı (Security:IpHashKey, zorunlu - bkz. IpHashOptions).
 builder.Services.AddIpHashing();
+// Ters proxy arkasında gerçek istemci IP'si - sadece güvenilen proxy'lerden (bkz. ForwardedHeadersSetup).
+builder.Services.AddConfiguredForwardedHeaders();
 builder.Services.AddHostedService<MembershipExpiryReminderHostedService>();
 builder.Services.AddHostedService<OutstandingBalanceReminderHostedService>();
 builder.Services.AddHostedService<SuperAdminPhoneSeedHostedService>();
@@ -96,6 +98,9 @@ builder.Services.AddAuthRateLimiting(builder.Configuration);
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// En başta: sonraki her şey (rate limiter, giriş kilidi, loglama) gerçek istemci IP'sini görsün.
+app.UseConfiguredForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -167,6 +167,33 @@ public class LoginCommandHandlerTests
         store.Verify(s => s.ResetAsync(1, IpHash, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    // İstemci IP'si bilinmiyorsa (RemoteIpAddress null) tüm bu istemciler tek
+    // bir "bilinmeyen" anahtarda birleşip birbirini kilitlememeli: hesap+IP
+    // kilidi uygulanmaz, sadece tanımlayıcı bazlı rate limit geçerlidir.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Handle_WhenClientIpIsUnknown_SkipsTheAccountIpLockout(bool passwordMatches)
+    {
+        var (uow, _, _, hasher, jwt, phoneNormalizer) = Wire(ExistingUser());
+        hasher.Setup(h => h.Verify(It.IsAny<string>(), It.IsAny<string>())).Returns(passwordMatches);
+        var store = new Mock<ILoginAttemptStore>();
+        var unknownIp = new Mock<IClientIpHashProvider>();
+        unknownIp.Setup(p => p.GetHashedClientIp()).Returns((string?)null);
+        var handler = new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object, store.Object, unknownIp.Object);
+
+        if (passwordMatches)
+        {
+            Assert.Equal("access-token", (await handler.Handle(Command(), CancellationToken.None)).AccessToken);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<InvalidCredentialsException>(() => handler.Handle(Command(), CancellationToken.None));
+        }
+
+        store.VerifyNoOtherCalls();
+    }
+
     [Fact]
     public async Task Handle_WhenUserDoesNotExist_TouchesNoLockoutState()
     {

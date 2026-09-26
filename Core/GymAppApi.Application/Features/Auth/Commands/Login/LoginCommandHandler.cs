@@ -63,20 +63,28 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTokenResult
         // (InvalidCredentials) - hesabın varlığı veya kilit durumu sızdırılmaz.
         // Login User satırına hiç yazmaz: sayaç ayrı tabloda atomik tutulur, böylece
         // eşzamanlı ResetPassword'ün yeni hash'i bayat bir kopyayla ezilemez.
+        // İstemci IP'si bilinmiyorsa (ipHash null) kilit uygulanmaz - sadece
+        // tanımlayıcı bazlı rate limit geçerlidir (bkz. IClientIpHashProvider).
         var now = DateTime.UtcNow;
         var ipHash = _clientIpHashProvider.GetHashedClientIp();
-        if (await _loginAttemptStore.IsLockedAsync(user.Id, ipHash, now, cancellationToken))
+        if (ipHash is not null && await _loginAttemptStore.IsLockedAsync(user.Id, ipHash, now, cancellationToken))
         {
             throw new InvalidCredentialsException();
         }
 
         if (!passwordMatches)
         {
-            await _loginAttemptStore.RecordFailureAsync(user.Id, ipHash, now, cancellationToken);
+            if (ipHash is not null)
+            {
+                await _loginAttemptStore.RecordFailureAsync(user.Id, ipHash, now, cancellationToken);
+            }
             throw new InvalidCredentialsException();
         }
 
-        await _loginAttemptStore.ResetAsync(user.Id, ipHash, cancellationToken);
+        if (ipHash is not null)
+        {
+            await _loginAttemptStore.ResetAsync(user.Id, ipHash, cancellationToken);
+        }
 
         var access = _jwtTokenService.GenerateAccessToken(new AccessTokenClaims(user.Id, user.FullName, user.Email, user.Phone));
         var rawRefreshToken = _jwtTokenService.GenerateRefreshTokenValue();

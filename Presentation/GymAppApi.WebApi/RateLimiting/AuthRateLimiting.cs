@@ -46,8 +46,21 @@ public static class AuthRateLimiting
             // istemci IP'si kendi penceresine sahip.
             rateLimiterOptions.AddPolicy(PolicyName, httpContext =>
             {
+                var clientIp = ClientIpKey(httpContext);
+                if (clientIp is null)
+                {
+                    // IP'si bilinmeyen tüm istemciler tek bir "unknown"
+                    // bölümünde birleşip birbirini kilitlemesin: IP limiti
+                    // uygulanmaz, tanımlayıcı limiti (IdentifierRateLimitFilter)
+                    // geçerli kalır.
+                    httpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                        .CreateLogger(typeof(AuthRateLimiting).FullName!)
+                        .LogWarning("İstemci IP'si bilinmiyor - auth IP rate limit bu istek için uygulanmıyor.");
+                    return RateLimitPartition.GetNoLimiter(UnknownIpPartition);
+                }
+
                 var options = httpContext.RequestServices.GetRequiredService<IOptions<AuthRateLimitOptions>>().Value;
-                return RateLimitPartition.GetFixedWindowLimiter(ClientIpKey(httpContext), _ => new FixedWindowRateLimiterOptions
+                return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = options.PermitPerIp,
                     Window = TimeSpan.FromSeconds(options.IpWindowSeconds),
@@ -65,12 +78,13 @@ public static class AuthRateLimiting
         return services;
     }
 
-    // Not: uygulama bir ters proxy/yük dengeleyici arkasında yayınlanırsa
-    // gerçek istemci IP'si için UseForwardedHeaders (güvenilir proxy
-    // listesiyle) yapılandırılmalı - aksi hâlde tüm istekler proxy'nin tek
-    // IP'sinde toplanır.
-    public static string ClientIpKey(HttpContext httpContext) =>
-        httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    private const string UnknownIpPartition = "unknown-ip";
+
+    // Ters proxy arkasında gerçek istemci IP'si, sadece güvenilen proxy'lerden
+    // gelen X-Forwarded-For ile RemoteIpAddress'e yazılır (bkz.
+    // ForwardedHeadersSetup). IP bilinmiyorsa null.
+    public static string? ClientIpKey(HttpContext httpContext) =>
+        httpContext.Connection.RemoteIpAddress?.ToString();
 
     public static void AddRetryAfterHeader(HttpResponse response, TimeSpan? retryAfter)
     {
