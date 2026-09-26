@@ -8,6 +8,7 @@ using GymAppApi.Persistence;
 using GymAppApi.WebApi.BackgroundServices;
 using GymAppApi.WebApi.Middleware;
 using GymAppApi.WebApi.RateLimiting;
+using GymAppApi.WebApi.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -19,7 +20,8 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<GymAppApi.Application.Common.Security.IClientIpHashProvider, GymAppApi.WebApi.Security.HttpClientIpHashProvider>();
+// Giriş kilidi için IP hash anahtarı (Security:IpHashKey, zorunlu - bkz. IpHashOptions).
+builder.Services.AddIpHashing();
 builder.Services.AddHostedService<MembershipExpiryReminderHostedService>();
 builder.Services.AddHostedService<OutstandingBalanceReminderHostedService>();
 builder.Services.AddHostedService<SuperAdminPhoneSeedHostedService>();
