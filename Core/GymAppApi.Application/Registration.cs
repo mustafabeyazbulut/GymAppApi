@@ -19,6 +19,8 @@ public static class Registration
 
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
+        // İstek başına: TransactionBehavior ile dış servis dekoratörleri aynı kuyruğu paylaşır.
+        services.AddScoped<GymAppApi.Application.Common.Transactions.IAfterCommitActions, GymAppApi.Application.Common.Transactions.AfterCommitActions>();
 
         services.AddTransient<GymAppApi.Application.Features.Branches.Rules.BranchRules>();
 

@@ -28,9 +28,14 @@ public static class Registration
 
         services.AddSingleton<IPasswordHasher, PasswordHasherAdapter>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
-        services.AddSingleton<ISmsSender, LoggingSmsSender>();
-        services.AddSingleton<IEmailSender, LoggingEmailSender>();
-        services.AddSingleton<IPushNotificationSender, LoggingPushNotificationSender>();
+        // Gerçek göndericiler singleton; arayüzler istek başına commit-sonrası
+        // dekoratörlerle çözülür (transaction içindeki gönderim commit'e ertelenir).
+        services.AddSingleton<LoggingSmsSender>();
+        services.AddSingleton<LoggingEmailSender>();
+        services.AddSingleton<LoggingPushNotificationSender>();
+        services.AddScoped<ISmsSender, AfterCommitSmsSender>();
+        services.AddScoped<IEmailSender, AfterCommitEmailSender>();
+        services.AddScoped<IPushNotificationSender, AfterCommitPushNotificationSender>();
         services.AddSingleton<IPhoneNumberNormalizer, PhoneNumberNormalizer>();
 
         // Bos birakilirsa (appsettings'te ayarlanmamissa) calisma dizini
