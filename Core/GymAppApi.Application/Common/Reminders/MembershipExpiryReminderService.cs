@@ -136,23 +136,11 @@ public class MembershipExpiryReminderService : IMembershipExpiryReminderService
         }
     }
 
-    // Her alıcı izole: bir alıcının hatası (ör. push sağlayıcısı yanıt vermedi)
-    // loglanır ve tarama diğer alıcılarla devam eder. "ExpiryReminderSentAt'i tüm
-    // bildirimler bitince işaretle" yerine bu seçildi: NotificationDispatcher
-    // uygulama içi bildirim satırını push'tan ÖNCE commit ettiği için yeniden
-    // deneme üyeye mükerrer bildirim gönderirdi; izolasyonla hatalı alıcının
-    // uygulama içi bildirimi yine de kalır, sadece push'u kaybolur.
-    private async Task NotifySafelyAsync(int userId, string title, string body, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await NotificationDispatcher.NotifyUserAsync(_unitOfWork, _pushNotificationSender, userId, title, body, cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            _logger.LogError(exception, "Üyelik hatırlatma bildirimi gönderilemedi (kullanıcı {UserId}); tarama devam ediyor.", userId);
-        }
-    }
+    // Her alıcı izole (NotificationDispatcher.TryNotifyUserAsync). "ExpiryReminderSentAt'i
+    // tüm bildirimler bitince işaretle" yerine bu seçildi: uygulama içi bildirim
+    // push'tan ÖNCE commit edildiği için yeniden deneme üyeye mükerrer bildirim gönderirdi.
+    private Task NotifySafelyAsync(int userId, string title, string body, CancellationToken cancellationToken) =>
+        NotificationDispatcher.TryNotifyUserAsync(_unitOfWork, _pushNotificationSender, _logger, userId, title, body, cancellationToken);
 
     private static int DaysRemaining(PackageAssignment assignment, DateTime now) =>
         (int)Math.Ceiling((assignment.EndDate!.Value - now).TotalDays);

@@ -37,6 +37,7 @@ public class OutstandingBalanceReminderServiceTests
     {
         Id = id,
         MemberUserId = 100 + id,
+        MemberUser = new User { Id = 100 + id, FullName = "Üye", Phone = "+905550000000", PasswordHash = "x", PreferredLanguage = "tr" },
         Status = status,
         LastPaymentReminderSentAt = lastPaymentReminderSentAt,
         Package = new Package { Name = "1 Aylık Üyelik", Price = price },
@@ -51,7 +52,8 @@ public class OutstandingBalanceReminderServiceTests
     };
 
     private static (OutstandingBalanceReminderService service, Mock<IWriteRepository<PackageAssignment>> assignmentWriteRepo, Mock<IPushNotificationSender> pushSender)
-        CreateService(IReadOnlyList<PackageAssignment> assignments, IReadOnlyList<PackageAssignmentPayment>? payments = null)
+        CreateService(IReadOnlyList<PackageAssignment> assignments, IReadOnlyList<PackageAssignmentPayment>? payments = null,
+            List<Notification>? sentNotifications = null, IReadOnlyList<DeviceToken>? deviceTokens = null, Mock<IPushNotificationSender>? pushSenderOverride = null)
     {
         var uow = new Mock<IUnitOfWork>();
         uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(FakeRepo(assignments));
@@ -61,18 +63,16 @@ public class OutstandingBalanceReminderServiceTests
         uow.Setup(u => u.GetWriteRepository<PackageAssignment>()).Returns(assignmentWriteRepo.Object);
 
         var notificationWriteRepo = new Mock<IWriteRepository<Notification>>();
+        notificationWriteRepo.Setup(r => r.AddAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()))
+            .Callback((Notification n, CancellationToken _) => sentNotifications?.Add(n))
+            .Returns(Task.CompletedTask);
         uow.Setup(u => u.GetWriteRepository<Notification>()).Returns(notificationWriteRepo.Object);
-
-        var deviceTokenReadRepo = new Mock<IReadRepository<DeviceToken>>();
-        deviceTokenReadRepo.Setup(r => r.GetAllAsync(
-                It.IsAny<Expression<Func<DeviceToken, bool>>>(), null, null, false, default))
-            .ReturnsAsync(new List<DeviceToken>());
-        uow.Setup(u => u.GetReadRepository<DeviceToken>()).Returns(deviceTokenReadRepo.Object);
+        uow.Setup(u => u.GetReadRepository<DeviceToken>()).Returns(FakeRepo(deviceTokens ?? new List<DeviceToken>()));
 
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
 
-        var pushSender = new Mock<IPushNotificationSender>();
-        var service = new OutstandingBalanceReminderService(uow.Object, pushSender.Object);
+        var pushSender = pushSenderOverride ?? new Mock<IPushNotificationSender>();
+        var service = new OutstandingBalanceReminderService(uow.Object, pushSender.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<OutstandingBalanceReminderService>.Instance);
 
         return (service, assignmentWriteRepo, pushSender);
     }
@@ -174,5 +174,38 @@ public class OutstandingBalanceReminderServiceTests
         await service.SendDueRemindersAsync();
 
         assignmentWriteRepo.Verify(r => r.Update(It.Is<PackageAssignment>(a => a.Id == 1 && a.LastPaymentReminderSentAt != null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendDueRemindersAsync_WhenOneMembersNotificationFails_TheOthersAreStillReminded()
+    {
+        // Üye A'nın push'u patlar; üye B'nin hatırlatması yine gönderilir.
+        var sent = new List<Notification>();
+        var deviceTokens = new List<DeviceToken> { new() { Id = 1, UserId = 101, Token = "bozuk-cihaz" } };
+        var pushSender = new Mock<IPushNotificationSender>();
+        pushSender.Setup(s => s.SendAsync("bozuk-cihaz", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Push sağlayıcısı yanıt vermedi."));
+        var (service, _, _) = CreateService(
+            new List<PackageAssignment> { Assignment(1, price: 1000m), Assignment(2, price: 500m) },
+            sentNotifications: sent, deviceTokens: deviceTokens, pushSenderOverride: pushSender);
+
+        var sentCount = await service.SendDueRemindersAsync();
+
+        Assert.Equal(2, sentCount);
+        Assert.Contains(sent, n => n.UserId == 102);
+    }
+
+    [Fact]
+    public async Task SendDueRemindersAsync_NotifiesTheMemberInTheirOwnLanguage()
+    {
+        var sent = new List<Notification>();
+        var assignment = Assignment(1, price: 1000m);
+        assignment.MemberUser!.PreferredLanguage = "en";
+        var (service, _, _) = CreateService(new List<PackageAssignment> { assignment }, sentNotifications: sent);
+
+        await service.SendDueRemindersAsync();
+
+        var notification = Assert.Single(sent);
+        Assert.Contains("payment", notification.Title, StringComparison.OrdinalIgnoreCase);
     }
 }

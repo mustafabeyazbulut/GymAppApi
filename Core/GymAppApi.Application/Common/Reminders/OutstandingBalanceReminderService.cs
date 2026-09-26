@@ -2,7 +2,9 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.Notifications;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
+using GymAppApi.Application.Common.Localization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace GymAppApi.Application.Common.Reminders;
 
@@ -16,11 +18,13 @@ public class OutstandingBalanceReminderService : IOutstandingBalanceReminderServ
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPushNotificationSender _pushNotificationSender;
+    private readonly ILogger<OutstandingBalanceReminderService> _logger;
 
-    public OutstandingBalanceReminderService(IUnitOfWork unitOfWork, IPushNotificationSender pushNotificationSender)
+    public OutstandingBalanceReminderService(IUnitOfWork unitOfWork, IPushNotificationSender pushNotificationSender, ILogger<OutstandingBalanceReminderService> logger)
     {
         _unitOfWork = unitOfWork;
         _pushNotificationSender = pushNotificationSender;
+        _logger = logger;
     }
 
     public async Task<int> SendDueRemindersAsync(CancellationToken cancellationToken = default)
@@ -34,7 +38,7 @@ public class OutstandingBalanceReminderService : IOutstandingBalanceReminderServ
         var candidateAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
             pa => pa.Status != PackageAssignmentStatus.Cancelled &&
                   (pa.LastPaymentReminderSentAt == null || pa.LastPaymentReminderSentAt <= cooldownCutoff),
-            include: q => q.Include(pa => pa.Package),
+            include: q => q.Include(pa => pa.Package).Include(pa => pa.MemberUser),
             enableTracking: true,
             cancellationToken: cancellationToken);
 
@@ -61,12 +65,16 @@ public class OutstandingBalanceReminderService : IOutstandingBalanceReminderServ
             assignment.LastPaymentReminderSentAt = now;
             _unitOfWork.GetWriteRepository<PackageAssignment>().Update(assignment);
 
-            await NotificationDispatcher.NotifyUserAsync(
+            // Her alıcı izole: bir üyenin bildirim hatası taramayı durdurmaz.
+            // Metin üyenin kendi dilinde (PreferredLanguage).
+            var language = assignment.MemberUser?.PreferredLanguage ?? "en";
+            await NotificationDispatcher.TryNotifyUserAsync(
                 _unitOfWork,
                 _pushNotificationSender,
+                _logger,
                 assignment.MemberUserId,
-                "Bekleyen Ödemeniz Var",
-                $"{assignment.Package.Name} paketiniz için {remainingBalance:N0} ₺ bakiyeniz kalıyor. Ödemenizi salonunuzda tamamlayabilirsiniz.",
+                AppMessages.Resolve("OutstandingBalanceTitle", language),
+                AppMessages.Resolve("OutstandingBalanceBody", language, assignment.Package.Name, remainingBalance.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo(language == "tr" ? "tr-TR" : "en-US"))),
                 cancellationToken);
             sentCount++;
         }

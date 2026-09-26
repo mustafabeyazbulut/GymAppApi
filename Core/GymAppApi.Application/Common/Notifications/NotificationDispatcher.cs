@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace GymAppApi.Application.Common.Notifications;
 
@@ -31,6 +32,31 @@ public static class NotificationDispatcher
         foreach (var deviceToken in deviceTokens)
         {
             await pushNotificationSender.SendAsync(deviceToken.Token, title, body, cancellationToken);
+        }
+    }
+
+    // Toplu gönderimler (hatırlatma job'ları) için: bir alıcının hatası (ör. push
+    // sağlayıcısı yanıt vermedi) loglanır ve false döner; tarama diğer
+    // alıcılarla devam eder. Uygulama içi bildirim satırı push'tan ÖNCE commit
+    // edildiği için hatalı alıcının uygulama içi bildirimi yine de kalır.
+    public static async Task<bool> TryNotifyUserAsync(
+        IUnitOfWork unitOfWork,
+        IPushNotificationSender pushNotificationSender,
+        ILogger logger,
+        int userId,
+        string title,
+        string body,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await NotifyUserAsync(unitOfWork, pushNotificationSender, userId, title, body, cancellationToken);
+            return true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(exception, "Bildirim gönderilemedi (kullanıcı {UserId}); toplu gönderim devam ediyor.", userId);
+            return false;
         }
     }
 }

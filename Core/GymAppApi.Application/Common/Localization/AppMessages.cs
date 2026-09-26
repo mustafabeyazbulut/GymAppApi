@@ -31,6 +31,11 @@ public static class AppMessages
         ["RoleLabelGymAdmin"] = ("Gym Admin", "Gym Yöneticisi"),
         ["RoleLabelBranchManager"] = ("Branch Manager", "Şube Yöneticisi"),
         ["RoleLabelTrainer"] = ("Trainer", "Antrenör"),
+        // Bekleyen ödeme hatırlatması ({0} = paket, {1} = kalan tutar).
+        ["OutstandingBalanceTitle"] = ("You have an outstanding payment", "Bekleyen ödemeniz var"),
+        ["OutstandingBalanceBody"] = (
+            "You have a remaining balance of {1} TRY for your {0} package. You can complete the payment at your gym.",
+            "{0} paketiniz için {1} ₺ bakiyeniz kalıyor. Ödemenizi salonunuzda tamamlayabilirsiniz."),
         // Süresi yaklaşan üyelik hatırlatmaları - alıcının PreferredLanguage'ına göre.
         ["MembershipExpiringTitle"] = ("Your membership is ending soon", "Üyeliğiniz yakında sona eriyor"),
         ["MembershipExpiringTodayBody"] = (
