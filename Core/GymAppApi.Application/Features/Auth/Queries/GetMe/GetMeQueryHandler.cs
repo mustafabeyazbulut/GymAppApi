@@ -28,6 +28,7 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
             u => u.Id == request.UserId,
             include: q => q.IgnoreQueryFilters()
                 .Include(u => u.Assignments).ThenInclude(a => a.Company)
+                .Include(u => u.Assignments).ThenInclude(a => a.Branch)
                 .Include(u => u.PackageAssignments).ThenInclude(pa => pa.Company)
                 .Include(u => u.PackageAssignments).ThenInclude(pa => pa.Package),
             cancellationToken: cancellationToken);
@@ -49,9 +50,11 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
                 .Where(a => a.IsActive)
                 .Select(a => new MeAssignmentDto
                 {
+                    Id = a.Id,
                     CompanyId = a.CompanyId,
                     CompanyName = a.Company?.Name,
                     BranchId = a.BranchId,
+                    BranchName = a.Branch?.Name,
                     Role = a.Role.ToString(),
                 })
                 .ToList(),

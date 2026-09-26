@@ -14,12 +14,17 @@ public class MeResultDto
 
 public class MeAssignmentDto
 {
+    // Mobilin X-Active-Assignment-Id header'ında göndereceği değer.
+    public int Id { get; set; }
     // Nullable: a SuperAdmin assignment is platform-wide (Assignment.CompanyId
     // is null by design for that role) — coercing null to 0 would make a
     // SuperAdmin's own profile indistinguishable from a data-integrity bug.
     public int? CompanyId { get; set; }
     public string? CompanyName { get; set; }
-    public int? BranchId { get; set; } // no BranchName — mobile only needs to know a branch id exists, not its label, for the "do I have an active membership" check this DTO exists for
+    public int? BranchId { get; set; }
+    // Mobilde aktif rol seçicisinde şube etiketi için; GymAdmin (şubesiz) ve
+    // SuperAdmin atamalarında null.
+    public string? BranchName { get; set; }
     public string Role { get; set; } = null!;
 }
 

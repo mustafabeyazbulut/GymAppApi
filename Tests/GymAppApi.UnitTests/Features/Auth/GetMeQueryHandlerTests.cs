@@ -89,6 +89,36 @@ public class GetMeQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_MapsEachAssignmentsIdAndBranchName_ForTheActiveAssignmentSwitcher()
+    {
+        var company = new Company { Id = 3, Name = "Firma", IsActive = true };
+        var branch = new Branch { Id = 8, CompanyId = 3, Name = "Kadıköy", Address = "..." };
+        var user = new User
+        {
+            Id = 1, FullName = "Ayşe", Phone = "+905551112233", PasswordHash = "x",
+            Assignments = new List<Assignment>
+            {
+                new() { Id = 21, UserId = 1, CompanyId = 3, Company = company, BranchId = 8, Branch = branch, Role = AssignmentRole.Trainer, IsActive = true },
+                new() { Id = 22, UserId = 1, CompanyId = 3, Company = company, BranchId = null, Role = AssignmentRole.GymAdmin, IsActive = true },
+            },
+        };
+        var userReadRepo = new Mock<IReadRepository<User>>();
+        userReadRepo.Setup(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<User, bool>>>(), It.IsAny<Func<IQueryable<User>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<User, object>>?>(), false, default))
+            .ReturnsAsync(user);
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
+
+        var result = await new GetMeQueryHandler(uow.Object).Handle(new GetMeQuery { UserId = 1 }, CancellationToken.None);
+
+        var trainer = result.Assignments.Single(a => a.Role == "Trainer");
+        Assert.Equal(21, trainer.Id);
+        Assert.Equal("Kadıköy", trainer.BranchName);
+        var gymAdmin = result.Assignments.Single(a => a.Role == "GymAdmin");
+        Assert.Equal(22, gymAdmin.Id);
+        Assert.Null(gymAdmin.BranchName);
+    }
+
+    [Fact]
     public async Task Handle_MapsPackageAssignmentsExcludingCancelledOnes()
     {
         var company = new Company { Id = 3, Name = "MAT & MOVE Kadıköy", IsActive = true };
