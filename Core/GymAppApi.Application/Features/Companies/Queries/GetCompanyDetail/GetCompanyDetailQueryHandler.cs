@@ -68,6 +68,8 @@ public class GetCompanyDetailQueryHandler : IRequestHandler<GetCompanyDetailQuer
                 IsActive = b.IsActive,
                 ManagerName = branchManagerNameByBranchId.GetValueOrDefault(b.Id),
             }).ToList(),
+            BranchCount = company.Branches.Count(b => b.IsActive),
+            InactiveBranchCount = company.Branches.Count(b => !b.IsActive),
             GymAdmins = assignments
                 .Where(a => a.Role == AssignmentRole.GymAdmin)
                 .Select(a => new CompanyGymAdminDto

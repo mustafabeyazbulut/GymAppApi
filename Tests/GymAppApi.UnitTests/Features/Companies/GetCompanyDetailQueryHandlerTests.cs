@@ -68,6 +68,8 @@ public class GetCompanyDetailQueryHandlerTests
         Assert.Equal(1, gymAdmin.AssignmentId);
         Assert.Equal("Mehmet Kaya", gymAdmin.FullName);
         Assert.Equal("+905550001122", gymAdmin.Phone);
+        Assert.Equal(1, result.BranchCount);
+        Assert.Equal(0, result.InactiveBranchCount);
         Assert.Equal(1, result.GymAdminCount);
         Assert.Equal(1, result.BranchManagerCount);
         Assert.Equal(1, result.TrainerCount);

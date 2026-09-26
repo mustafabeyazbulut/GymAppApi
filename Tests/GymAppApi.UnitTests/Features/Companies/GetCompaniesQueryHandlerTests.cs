@@ -23,7 +23,12 @@ public class GetCompaniesQueryHandlerTests
             new()
             {
                 Id = 1, Name = "MAT & MOVE", IsActive = true,
-                Branches = new List<Branch> { new() { Id = 1, CompanyId = 1, Name = "Kadıköy", Address = "x" } },
+                Branches = new List<Branch>
+                {
+                    new() { Id = 1, CompanyId = 1, Name = "Kadıköy", Address = "x" },
+                    // Kapatılmış şube: BranchCount'a girmez, InactiveBranchCount'ta sayılır.
+                    new() { Id = 3, CompanyId = 1, Name = "Moda", Address = "x", IsActive = false },
+                },
             },
             new() { Id = 2, Name = "Deactivated Co", IsActive = false, Branches = new List<Branch>() },
         };
@@ -53,6 +58,7 @@ public class GetCompaniesQueryHandlerTests
 
         Assert.Equal(2, result.Count);
         Assert.Equal(1, result[0].BranchCount);
+        Assert.Equal(1, result[0].InactiveBranchCount);
         Assert.True(result[0].IsActive);
         Assert.Equal(1, result[0].GymAdminCount);
         Assert.Equal(1, result[0].BranchManagerCount);
