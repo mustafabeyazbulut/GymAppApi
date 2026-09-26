@@ -36,9 +36,19 @@ public class CreatePackageCommandHandlerTests
             new Branch { Id = BranchIdInCompany, CompanyId = CompanyId, Name = "Merkez", Address = "..." },
             new Branch { Id = BranchIdInOtherCompany, CompanyId = 2, Name = "Başka", Address = "..." },
         }).Object);
+        uow.Setup(u => u.GetReadRepository<Service>()).Returns(GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(new[]
+        {
+            new Service { Id = ServiceInBranch, CompanyId = CompanyId, BranchId = BranchIdInCompany, Name = "PT" },
+            new Service { Id = InactiveServiceInBranch, CompanyId = CompanyId, BranchId = BranchIdInCompany, Name = "Eski", IsActive = false },
+            new Service { Id = ServiceInOtherBranch, CompanyId = CompanyId, BranchId = 11, Name = "Yoga" },
+        }).Object);
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
         return (uow, writeRepo);
     }
+
+    private const int ServiceInBranch = 100;
+    private const int InactiveServiceInBranch = 101;
+    private const int ServiceInOtherBranch = 102;
 
     private static CreatePackageCommand ValidCommand() => new()
     {
@@ -48,8 +58,43 @@ public class CreatePackageCommandHandlerTests
         Type = PackageType.SessionBased,
         SessionCount = 10,
         Price = 1000m,
+        ServiceIds = new List<int> { ServiceInBranch },
         RequestedByUserId = CallerId,
     };
+
+    private static List<Assignment> GymAdmin() => new() { new() { UserId = CallerId, CompanyId = CompanyId, Role = AssignmentRole.GymAdmin, IsActive = true } };
+
+    [Fact]
+    public async Task Handle_LinksTheSelectedServices()
+    {
+        var (uow, writeRepo) = Wire(GymAdmin());
+
+        await new CreatePackageCommandHandler(uow.Object).Handle(ValidCommand(), CancellationToken.None);
+
+        writeRepo.Verify(r => r.AddAsync(It.Is<Package>(p => p.Services.Single().Id == ServiceInBranch), default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WithAServiceOfAnotherBranch_ThrowsNotFound()
+    {
+        var (uow, writeRepo) = Wire(GymAdmin());
+        var command = ValidCommand();
+        command.ServiceIds = new List<int> { ServiceInBranch, ServiceInOtherBranch };
+
+        await Assert.ThrowsAsync<NotFoundException>(() => new CreatePackageCommandHandler(uow.Object).Handle(command, CancellationToken.None));
+        writeRepo.Verify(r => r.AddAsync(It.IsAny<Package>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WithAnInactiveService_ThrowsConflict()
+    {
+        var (uow, _) = Wire(GymAdmin());
+        var command = ValidCommand();
+        command.ServiceIds = new List<int> { InactiveServiceInBranch };
+
+        var ex = await Assert.ThrowsAsync<ConflictException>(() => new CreatePackageCommandHandler(uow.Object).Handle(command, CancellationToken.None));
+        Assert.Equal("ServiceInactive", ex.Code);
+    }
 
     [Fact]
     public async Task Handle_WhenCompanyDoesNotExist_ThrowsNotFoundException()

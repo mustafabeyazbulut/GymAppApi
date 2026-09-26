@@ -21,6 +21,10 @@ public class CreatePackageCommand : IRequest<CreatePackageCommandResult>
     // null = dondurma süresi sınırsız.
     public int? MaxFreezeDays { get; set; }
 
+    // Zorunlu, en az bir: paketin kapsadığı hizmetler. Hepsi paketin şubesine
+    // ait ve aktif olmalı (handler'da kontrol).
+    public List<int>? ServiceIds { get; set; }
+
     // Set by the controller from the caller's own JWT sub claim.
     public int RequestedByUserId { get; set; }
 }

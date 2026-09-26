@@ -21,6 +21,7 @@ public class GymAppApiDbContext : DbContext
         typeof(MediaFile),
         typeof(LoginFailure),
         typeof(PersonalLog),
+        typeof(PackageService),
     };
 
     private readonly ITenantContext _tenantContext;

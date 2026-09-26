@@ -1,3 +1,5 @@
+using GymAppApi.Application.Features.Services;
+
 namespace GymAppApi.Application.Features.Packages.Queries.GetPackages;
 
 public class PackageDto
@@ -15,4 +17,6 @@ public class PackageDto
     public bool IsActive { get; set; }
     // null = dondurma süresi sınırsız.
     public int? MaxFreezeDays { get; set; }
+    // Paketin kapsadığı hizmetler.
+    public List<ServiceRefDto> Services { get; set; } = new();
 }

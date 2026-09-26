@@ -26,6 +26,9 @@ public class CreatePackageCommandValidator : AbstractValidator<CreatePackageComm
         RuleFor(x => x.SessionCount).NotNull().GreaterThan(0).When(x => x.Type == PackageType.SessionBased)
             .WithMessage(_ => Localized("SessionCountRequiredForSessionBasedPackage"));
 
+        // Senaryo §5.3: katılım uygunluğu hizmete göre - her paket en az bir hizmeti kapsar.
+        RuleFor(x => x.ServiceIds).NotEmpty().WithMessage(_ => Localized("PackageServicesRequired"));
+
         // null = sınırsız dondurma, 0 = paket dondurulamaz, N = toplam en fazla N gün.
         RuleFor(x => x.MaxFreezeDays).GreaterThanOrEqualTo(0).When(x => x.MaxFreezeDays != null)
             .WithMessage(_ => Localized("MaxFreezeDaysMustNotBeNegative"));

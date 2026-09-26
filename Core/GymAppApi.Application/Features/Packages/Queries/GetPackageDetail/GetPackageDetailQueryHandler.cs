@@ -26,7 +26,7 @@ public class GetPackageDetailQueryHandler : IRequestHandler<GetPackageDetailQuer
         // varlığı sızdırılmasın).
         var package = await _unitOfWork.GetReadRepository<Package>().GetAsync(
             p => p.Id == request.PackageId,
-            include: q => q.IgnoreQueryFilters().Include(p => p.Company),
+            include: q => q.IgnoreQueryFilters().Include(p => p.Services),
             cancellationToken: cancellationToken);
         var companyId = _tenantContext.CompanyId;
         var branchId = _tenantContext.BranchId;

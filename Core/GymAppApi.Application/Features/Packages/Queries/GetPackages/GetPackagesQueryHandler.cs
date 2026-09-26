@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Features.Services;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -37,7 +38,7 @@ public class GetPackagesQueryHandler : IRequestHandler<GetPackagesQuery, IReadOn
             predicate: p => companyId != null && p.CompanyId == companyId &&
                             (branchId == null || p.BranchId == branchId) &&
                             (includeInactive || p.IsActive),
-            include: q => q.IgnoreQueryFilters().Include(p => p.Company),
+            include: q => q.IgnoreQueryFilters().Include(p => p.Services),
             cancellationToken: cancellationToken);
 
         return packages.Select(ToDto).ToList();
@@ -57,5 +58,6 @@ public class GetPackagesQueryHandler : IRequestHandler<GetPackagesQuery, IReadOn
         AccessTier = p.AccessTier.ToString(),
         IsActive = p.IsActive,
         MaxFreezeDays = p.MaxFreezeDays,
+        Services = ServiceRefDto.ListFrom(p.Services),
     };
 }

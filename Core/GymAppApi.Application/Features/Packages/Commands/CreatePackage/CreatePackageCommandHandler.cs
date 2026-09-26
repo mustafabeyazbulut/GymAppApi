@@ -3,6 +3,7 @@ using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Packages.Commands.CreatePackage;
 
@@ -45,6 +46,25 @@ public class CreatePackageCommandHandler : IRequestHandler<CreatePackageCommand,
             throw new ForbiddenException("ForbiddenCreatePackage");
         }
 
+        // Hizmetler paketin şubesine ait ve aktif olmalı. Filtresiz okunur (pasif
+        // hizmet "yok" değil "pasif" hatası alsın); izlenen okuma çünkü pakete
+        // bağlanacaklar (izlenmeyen örnek bağlanırsa yeni satır sanılırdı).
+        var serviceIds = request.ServiceIds!.Distinct().ToList();
+        var services = await _unitOfWork.GetReadRepository<Service>().GetAllAsync(
+            s => serviceIds.Contains(s.Id) && s.BranchId == branch.Id,
+            include: q => q.IgnoreQueryFilters().Include(s => s.Branch),
+            enableTracking: true,
+            cancellationToken: cancellationToken);
+        var missing = serviceIds.FirstOrDefault(id => services.All(s => s.Id != id));
+        if (missing != 0)
+        {
+            throw new NotFoundException("ServiceNotFound", missing);
+        }
+        if (services.Any(s => !s.IsActive))
+        {
+            throw new ConflictException("ServiceInactive");
+        }
+
         var package = new Package
         {
             CompanyId = request.CompanyId,
@@ -56,6 +76,7 @@ public class CreatePackageCommandHandler : IRequestHandler<CreatePackageCommand,
             SessionCount = request.SessionCount,
             Price = request.Price,
             MaxFreezeDays = request.MaxFreezeDays,
+            Services = services.ToList(),
         };
 
         await _unitOfWork.GetWriteRepository<Package>().AddAsync(package, cancellationToken);

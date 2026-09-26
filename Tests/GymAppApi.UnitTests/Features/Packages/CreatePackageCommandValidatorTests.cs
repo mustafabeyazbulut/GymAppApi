@@ -15,7 +15,17 @@ public class CreatePackageCommandValidatorTests
         Type = PackageType.Duration,
         DurationDays = 30,
         Price = 1000m,
+        ServiceIds = new List<int> { 5 },
     };
+
+    [Fact]
+    public void Validate_WithoutServices_HasError()
+    {
+        var command = ValidDurationCommand();
+        command.ServiceIds = new List<int>();
+
+        Assert.False(_validator.Validate(command).IsValid);
+    }
 
     [Theory]
     [InlineData(null)]

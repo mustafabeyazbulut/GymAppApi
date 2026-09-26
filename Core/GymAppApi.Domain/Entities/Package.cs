@@ -34,6 +34,10 @@ public class Package : EntityBase, ICompanyScoped, IDeactivatable
     // dondurulabilir şekilde tanımlamasını engeller.
     public int? MaxFreezeDays { get; set; }
 
+    // Paketin kapsadığı hizmetler (en az bir; hepsi paketin şubesine ait) -
+    // derse/randevuya katılım uygunluğu bu listeye göre (senaryo §5.3).
+    public ICollection<Service> Services { get; set; } = new List<Service>();
+
     // null = bu paket hiçbir grup dersi/kapasiteli ders için geçerli değil
     // (ör. sadece 1:1 Reservation için kullanılan bir PT paketi). Set
     // edilmişse, bu paketten atanan bir PackageAssignment SADECE aynı

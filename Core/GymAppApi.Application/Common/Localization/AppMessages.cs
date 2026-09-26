@@ -150,6 +150,8 @@ public static class AppMessages
         // Hizmetler (Services)
         ["ServiceNotFound"] = ("Service {0} not found.", "Hizmet {0} bulunamadı."),
         ["ServiceNameTaken"] = ("A service with this name already exists in this branch.", "Bu şubede aynı adda bir hizmet zaten var."),
+        ["ServiceInactive"] = ("The selected service is inactive.", "Seçilen hizmet pasif."),
+        ["PackageServicesRequired"] = ("Select at least one service for the package.", "Paket için en az bir hizmet seçilmelidir."),
         ["ServiceNameRequired"] = ("Service name is required.", "Hizmet adı zorunludur."),
         ["ServiceNameTooLong"] = ("Service name can be at most 60 characters.", "Hizmet adı en fazla 60 karakter olabilir."),
         ["ForbiddenManageService"] = ("You are not authorized to manage services of this branch.", "Bu şubenin hizmetlerini yönetme yetkiniz yok."),

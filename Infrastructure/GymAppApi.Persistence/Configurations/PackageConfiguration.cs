@@ -27,5 +27,18 @@ public class PackageConfiguration : IEntityTypeConfiguration<Package>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => x.CompanyId);
+
+        // Package <-> Service çoka-çok (PackageServices tablosu). Paket
+        // silinirse bağlantılar gider; kullanılan bir hizmet silinemez (soft close).
+        builder.HasMany(x => x.Services)
+            .WithMany()
+            .UsingEntity<PackageService>(
+                join => join.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict),
+                join => join.HasOne<Package>().WithMany().HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Cascade),
+                join =>
+                {
+                    join.ToTable("PackageServices");
+                    join.HasKey(x => new { x.PackageId, x.ServiceId });
+                });
     }
 }

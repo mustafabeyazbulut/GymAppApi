@@ -55,4 +55,6 @@ public class MePackageAssignmentDto
     // ne kadar hakkı kaldığını görebilmesi için (bkz. Package.MaxFreezeDays).
     public int? MaxFreezeDays { get; set; }
     public int TotalFrozenDays { get; set; }
+    // Paketin kapsadığı hizmetler - mobil "Katıl"/randevu uygunluğunu buna göre gösterir.
+    public List<GymAppApi.Application.Features.Services.ServiceRefDto> Services { get; set; } = new();
 }

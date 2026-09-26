@@ -30,7 +30,7 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
                 .Include(u => u.Assignments).ThenInclude(a => a.Company)
                 .Include(u => u.Assignments).ThenInclude(a => a.Branch)
                 .Include(u => u.PackageAssignments).ThenInclude(pa => pa.Company)
-                .Include(u => u.PackageAssignments).ThenInclude(pa => pa.Package),
+                .Include(u => u.PackageAssignments).ThenInclude(pa => pa.Package).ThenInclude(p => p!.Services),
             cancellationToken: cancellationToken);
 
         if (user is null)
@@ -77,6 +77,7 @@ public class GetMeQueryHandler : IRequestHandler<GetMeQuery, MeResultDto>
                     RemainingSessions = pa.RemainingSessions,
                     MaxFreezeDays = pa.Package?.MaxFreezeDays,
                     TotalFrozenDays = pa.TotalFrozenDays,
+                    Services = GymAppApi.Application.Features.Services.ServiceRefDto.ListFrom(pa.Package?.Services),
                 })
                 .ToList(),
         };
