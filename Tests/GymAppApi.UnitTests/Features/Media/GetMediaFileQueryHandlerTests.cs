@@ -45,10 +45,16 @@ public class GetMediaFileQueryHandlerTests
             .ReturnsAsync(callerAssignments);
 
         var packageAssignmentReadRepo = new Mock<IReadRepository<PackageAssignment>>();
+        // Gerçek predicate'i uygular - "geçerli paket" kuralı (süresi dolmuş,
+        // hakkı bitmiş vb.) handler'ın kendi predicate'inde.
         packageAssignmentReadRepo.Setup(r => r.GetAllAsync(
                 It.IsAny<Expression<Func<PackageAssignment, bool>>>(),
                 It.IsAny<Func<IQueryable<PackageAssignment>, IIncludableQueryable<PackageAssignment, object>>?>(), null, false, default))
-            .ReturnsAsync(memberAssignments);
+            .ReturnsAsync((Expression<Func<PackageAssignment, bool>> predicate,
+                Func<IQueryable<PackageAssignment>, IIncludableQueryable<PackageAssignment, object>>? include,
+                Func<IQueryable<PackageAssignment>, IOrderedQueryable<PackageAssignment>>? orderBy,
+                bool tracking,
+                CancellationToken ct) => memberAssignments.AsQueryable().Where(predicate).ToList());
 
         var mediaStorage = new Mock<IMediaStorage>();
         mediaStorage.Setup(m => m.OpenReadAsync(It.IsAny<string>(), default))
@@ -64,7 +70,7 @@ public class GetMediaFileQueryHandlerTests
     }
 
     private static MediaFile File() => new() { Id = MediaFileId, StoragePath = "abc", ContentType = "video/mp4" };
-    private static ContentItem Item(PackageAccessTier tier) => new() { Id = 1, CompanyId = CompanyId, MediaFileId = MediaFileId, Title = "x", RequiredAccessTier = tier };
+    private static ContentItem Item(PackageAccessTier tier, int? branchId = null) => new() { Id = 1, CompanyId = CompanyId, BranchId = branchId, MediaFileId = MediaFileId, Title = "x", RequiredAccessTier = tier };
 
     [Fact]
     public async Task Handle_WhenMediaFileDoesNotExist_ThrowsNotFoundException()
@@ -186,5 +192,76 @@ public class GetMediaFileQueryHandlerTests
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None));
+    }
+
+    private static PackageAssignment MemberPackage(PackageAccessTier tier, int? branchId = null, DateTime? endDate = null, int? remainingSessions = null) => new()
+    {
+        MemberUserId = CallerId, CompanyId = CompanyId, BranchId = branchId, PackageId = 1,
+        Package = new Package { Id = 1, AccessTier = tier }, Status = PackageAssignmentStatus.Active,
+        EndDate = endDate, RemainingSessions = remainingSessions,
+    };
+
+    private static Task<GetMediaFileResult> Download(Mock<IUnitOfWork> uow, Mock<IMediaStorage> storage) =>
+        new GetMediaFileQueryHandler(uow.Object, storage.Object)
+            .Handle(new GetMediaFileQuery { MediaFileId = MediaFileId, RequestedByUserId = CallerId }, CancellationToken.None);
+
+    [Fact]
+    public async Task Handle_WhenMembersPackageHasExpiredButIsStillActiveStatus_ThrowsForbiddenException()
+    {
+        var memberAssignments = new List<PackageAssignment> { MemberPackage(PackageAccessTier.Premium, endDate: DateTime.UtcNow.AddDays(-1)) };
+        var (uow, storage) = Wire(File(), Item(PackageAccessTier.Standard), new List<Assignment>(), memberAssignments);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => Download(uow, storage));
+    }
+
+    [Fact]
+    public async Task Handle_WhenMembersSessionPackageHasNoRemainingSessions_ThrowsForbiddenException()
+    {
+        var memberAssignments = new List<PackageAssignment> { MemberPackage(PackageAccessTier.Premium, remainingSessions: 0) };
+        var (uow, storage) = Wire(File(), Item(PackageAccessTier.Standard), new List<Assignment>(), memberAssignments);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => Download(uow, storage));
+    }
+
+    [Fact]
+    public async Task Handle_WhenMembersValidPackageIsForAnotherBranch_ThrowsForbiddenException()
+    {
+        var memberAssignments = new List<PackageAssignment> { MemberPackage(PackageAccessTier.Premium, branchId: 10) };
+        var (uow, storage) = Wire(File(), Item(PackageAccessTier.Standard, branchId: 11), new List<Assignment>(), memberAssignments);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => Download(uow, storage));
+    }
+
+    [Fact]
+    public async Task Handle_WhenMembersValidBranchPackage_AndBranchlessCompanyContent_ReturnsContent()
+    {
+        var memberAssignments = new List<PackageAssignment> { MemberPackage(PackageAccessTier.Standard, branchId: 10) };
+        var (uow, storage) = Wire(File(), Item(PackageAccessTier.Standard, branchId: null), new List<Assignment>(), memberAssignments);
+
+        var result = await Download(uow, storage);
+
+        Assert.Equal("video/mp4", result.ContentType);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsTrainerOfAnotherBranch_ThrowsForbiddenException()
+    {
+        // İçerik listesiyle aynı şube kuralı (senaryo §10.8): şube kapsamlı
+        // personel sadece kendi şubesinin ve şubesiz firma içeriğini indirir.
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true } };
+        var (uow, storage) = Wire(File(), Item(PackageAccessTier.Standard, branchId: 11), callerAssignments, new List<PackageAssignment>());
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => Download(uow, storage));
+    }
+
+    [Fact]
+    public async Task Handle_WhenCallerIsTrainerOfTheContentsBranch_ReturnsContent()
+    {
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = CompanyId, BranchId = 10, Role = AssignmentRole.Trainer, IsActive = true } };
+        var (uow, storage) = Wire(File(), Item(PackageAccessTier.Premium, branchId: 10), callerAssignments, new List<PackageAssignment>());
+
+        var result = await Download(uow, storage);
+
+        Assert.Equal("video/mp4", result.ContentType);
     }
 }

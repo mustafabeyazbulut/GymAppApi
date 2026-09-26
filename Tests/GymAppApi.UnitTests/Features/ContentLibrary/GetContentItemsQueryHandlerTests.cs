@@ -143,6 +143,58 @@ public class GetContentItemsQueryHandlerTests
         Assert.False(result.Single(x => x.Id == 2).HasAccess);
     }
 
+    private static PackageAssignment MemberPackage(int? branchId, DateTime? endDate = null, int? remainingSessions = null,
+        PackageAccessTier tier = PackageAccessTier.Standard) => new()
+    {
+        Id = 1, MemberUserId = CallerId, CompanyId = CompanyId, BranchId = branchId, PackageId = 1,
+        Package = new Package { Id = 1, AccessTier = tier }, Status = PackageAssignmentStatus.Active,
+        EndDate = endDate, RemainingSessions = remainingSessions,
+    };
+
+    [Fact]
+    public async Task Handle_WhenMembersPackageHasExpiredButIsStillActiveStatus_ReturnsEmptyList()
+    {
+        var handler = CreateHandler(NoTenantContext, new List<Assignment>(), MixedItems(),
+            new List<PackageAssignment> { MemberPackage(branchId: null, endDate: DateTime.UtcNow.AddDays(-1)) });
+
+        var result = await handler.Handle(new GetContentItemsQuery { RequestedByUserId = CallerId }, CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task Handle_WhenMembersSessionPackageHasNoRemainingSessions_ReturnsEmptyList()
+    {
+        var handler = CreateHandler(NoTenantContext, new List<Assignment>(), MixedItems(),
+            new List<PackageAssignment> { MemberPackage(branchId: null, remainingSessions: 0) });
+
+        var result = await handler.Handle(new GetContentItemsQuery { RequestedByUserId = CallerId }, CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task Handle_WhenMemberHasValidBranchPackage_SeesThatBranchAndBranchlessCompanyItemsOnly()
+    {
+        var handler = CreateHandler(NoTenantContext, new List<Assignment>(), MixedItems(),
+            new List<PackageAssignment> { MemberPackage(branchId: 10) });
+
+        var result = await handler.Handle(new GetContentItemsQuery { RequestedByUserId = CallerId }, CancellationToken.None);
+
+        Assert.Equal(new[] { 1, 3 }, result.Select(x => x.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task Handle_WhenMemberHasValidCompanyWidePackage_SeesAllBranchesOfThatCompany()
+    {
+        var handler = CreateHandler(NoTenantContext, new List<Assignment>(), MixedItems(),
+            new List<PackageAssignment> { MemberPackage(branchId: null) });
+
+        var result = await handler.Handle(new GetContentItemsQuery { RequestedByUserId = CallerId }, CancellationToken.None);
+
+        Assert.Equal(new[] { 1, 2, 3 }, result.Select(x => x.Id).OrderBy(id => id));
+    }
+
     [Fact]
     public async Task Handle_WhenCallerHasNoActivePackageAssignment_ReturnsEmptyList()
     {

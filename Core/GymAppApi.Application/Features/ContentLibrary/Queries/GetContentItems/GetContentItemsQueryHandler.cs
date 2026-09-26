@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -54,34 +55,48 @@ public class GetContentItemsQueryHandler : IRequestHandler<GetContentItemsQuery,
             return staffItems.Select(c => ToDto(c, hasAccess: true)).ToList();
         }
 
-        // Member: sadece kendi aktif PackageAssignment'ı olan firmaların
-        // AKTİF içerikleri - ama Premium içerik de listede görünür (kilitli
-        // olarak), gerçek indirme kontrolü GET /api/media/{id}'de yapılır.
-        var memberAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
-            p => p.MemberUserId == request.RequestedByUserId && p.Status == PackageAssignmentStatus.Active,
+        // Member: sadece kendi GEÇERLİ paketlerinin (PackageAssignmentValidity
+        // - süresi dolmuş ama Status'u Active kalmış paket sayılmaz) firma/
+        // şubesindeki AKTİF içerikler: paketin şubesine ait içerik + şubesiz
+        // firma içeriği (firma geneli pakette firmanın tümü). Premium içerik
+        // de listede görünür (kilitli olarak), gerçek indirme kontrolü aynı
+        // kuralla GET /api/media/{id}'de yapılır.
+        var validPackageAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
+            PackageAssignmentValidity.UsableOwnedBy(request.RequestedByUserId, DateTime.UtcNow),
             include: q => q.IgnoreQueryFilters().Include(p => p.Package),
             cancellationToken: cancellationToken);
 
-        if (memberAssignments.Count == 0)
+        if (validPackageAssignments.Count == 0)
         {
             return Array.Empty<ContentItemDto>();
         }
 
-        // Bir üyenin birden fazla firmada aktif üyeliği olabilir - her firma
-        // için ayrı en yüksek erişim seviyesi hesaplanır.
-        var maxTierByCompany = memberAssignments
-            .GroupBy(p => p.CompanyId)
-            .ToDictionary(g => g.Key, g => g.Max(p => p.Package!.AccessTier));
-
-        var memberItems = await _unitOfWork.GetReadRepository<ContentItem>().GetAllAsync(
-            c => c.IsActive && maxTierByCompany.Keys.Contains(c.CompanyId),
+        var companyIds = validPackageAssignments.Select(p => p.CompanyId).Distinct().ToList();
+        var candidateItems = await _unitOfWork.GetReadRepository<ContentItem>().GetAllAsync(
+            c => c.IsActive && companyIds.Contains(c.CompanyId),
             include: q => q.IgnoreQueryFilters().Include(c => c.MediaFile),
             orderBy: q => q.OrderByDescending(c => c.CreatedAt),
             cancellationToken: cancellationToken);
 
-        return memberItems
-            .Select(c => ToDto(c, hasAccess: c.RequiredAccessTier <= maxTierByCompany[c.CompanyId]))
-            .ToList();
+        // Bir üyenin birden fazla firma/şubede geçerli paketi olabilir - her
+        // içerik için, onu kapsayan paketlerin en yüksek erişim seviyesi esas.
+        var result = new List<ContentItemDto>();
+        foreach (var item in candidateItems)
+        {
+            var coveringPackages = validPackageAssignments
+                .Where(p => p.CompanyId == item.CompanyId &&
+                            (p.BranchId == null || item.BranchId == null || p.BranchId == item.BranchId))
+                .ToList();
+            if (coveringPackages.Count == 0)
+            {
+                continue;
+            }
+
+            var maxTier = coveringPackages.Max(p => p.Package!.AccessTier);
+            result.Add(ToDto(item, hasAccess: item.RequiredAccessTier <= maxTier));
+        }
+
+        return result;
     }
 
     private static ContentItemDto ToDto(ContentItem c, bool hasAccess) => new()

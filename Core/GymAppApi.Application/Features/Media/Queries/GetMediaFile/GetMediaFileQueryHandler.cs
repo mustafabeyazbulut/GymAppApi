@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -58,25 +59,34 @@ public class GetMediaFileQueryHandler : IRequestHandler<GetMediaFileQuery, GetMe
 
     private async Task EnsureCanViewContentItemAsync(ContentItem contentItem, int requestedByUserId, CancellationToken cancellationToken)
     {
+        // Şube kuralı GetContentItemsQueryHandler ile aynı (senaryo §10.8):
+        // şubesiz (BranchId null) içerik firmanın tümüne açık; şubeye ait
+        // içerik sadece o şubenin personeline / o şubede geçerli paketi olan
+        // üyeye (veya firma geneli pakete) açık. GymAdmin'in ataması şubesiz
+        // olduğu için firmanın tüm içeriğini görür.
         var callerAssignments = await _unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
             a => a.UserId == requestedByUserId && a.IsActive, cancellationToken: cancellationToken);
-        var isStaffOfCompany = callerAssignments.Any(a =>
+        var isStaffForContent = callerAssignments.Any(a =>
             a.Role == AssignmentRole.SuperAdmin ||
             ((a.Role == AssignmentRole.GymAdmin || a.Role == AssignmentRole.BranchManager || a.Role == AssignmentRole.Trainer) &&
-             a.CompanyId == contentItem.CompanyId));
-        if (isStaffOfCompany)
+             a.CompanyId == contentItem.CompanyId &&
+             (a.BranchId == null || contentItem.BranchId == null || a.BranchId == contentItem.BranchId)));
+        if (isStaffForContent)
         {
             return;
         }
 
-        var memberAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
-            p => p.MemberUserId == requestedByUserId &&
-                 p.CompanyId == contentItem.CompanyId &&
-                 p.Status == PackageAssignmentStatus.Active,
+        // Sadece GEÇERLİ paketler (PackageAssignmentValidity) - süresi dolmuş
+        // ama Status'u hâlâ Active olan bir paket içerik erişimi vermez.
+        var validPackageAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
+            PackageAssignmentValidity.UsableOwnedBy(requestedByUserId, DateTime.UtcNow),
             include: q => q.IgnoreQueryFilters().Include(p => p.Package),
             cancellationToken: cancellationToken);
 
-        var hasAccess = memberAssignments.Any(p => p.Package!.AccessTier >= contentItem.RequiredAccessTier);
+        var hasAccess = validPackageAssignments.Any(p =>
+            p.CompanyId == contentItem.CompanyId &&
+            (p.BranchId == null || contentItem.BranchId == null || p.BranchId == contentItem.BranchId) &&
+            p.Package!.AccessTier >= contentItem.RequiredAccessTier);
         if (!hasAccess)
         {
             throw new ForbiddenException("ForbiddenViewMedia");

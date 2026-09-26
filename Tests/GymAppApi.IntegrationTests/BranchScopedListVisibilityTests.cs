@@ -32,8 +32,10 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
         int AssignmentA1Id, int AssignmentA2Id,
         int SessionA1Id, int SessionA2Id, int SessionB1Id,
         int ContentA1Id, int ContentA2Id, int ContentACompanyWideId, int ContentB1Id,
+        int ContentA2MediaFileId, int ContentB1MediaFileId,
         string GymAdminAToken, string BranchManagerA1Token, string TrainerA1Token,
-        string MemberWithB1PackageToken, string MemberWithoutPackageToken, string MemberWithExpiredB1PackageToken);
+        string MemberWithB1PackageToken, string MemberWithoutPackageToken, string MemberWithExpiredB1PackageToken,
+        string MemberA1Token);
 
     private async Task<Seed> SeedAsync()
     {
@@ -92,14 +94,16 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
         var sessionB1 = Session(companyB, branchB1);
         db.ClassSessions.AddRange(sessionA1, sessionA2, sessionB1);
 
-        var media = new MediaFile { StoragePath = "test/video.mp4", ContentType = "video/mp4", SizeBytes = 1, UploadedByUserId = gymAdminA.Id };
-        db.MediaFiles.Add(media);
         await db.SaveChangesAsync();
 
+        // Her içeriğin kendi medya dosyası var - GET /api/media/{id} dosyadan
+        // içeriğe giderek yetki kontrolü yaptığı için paylaşılan bir dosya
+        // hangi içeriğin kuralının uygulandığını belirsizleştirirdi.
         ContentItem Content(Company company, Branch? branch, string title) => new()
         {
             CompanyId = company.Id, BranchId = branch?.Id, Title = title, RequiredAccessTier = PackageAccessTier.Standard,
-            MediaFileId = media.Id, CreatedByUserId = gymAdminA.Id,
+            MediaFile = new MediaFile { StoragePath = $"test/{Guid.NewGuid()}.mp4", ContentType = "video/mp4", SizeBytes = 1, UploadedByUserId = gymAdminA.Id },
+            CreatedByUserId = gymAdminA.Id,
         };
         var contentA1 = Content(companyA, branchA1, "A1 İçerik");
         var contentA2 = Content(companyA, branchA2, "A2 İçerik");
@@ -117,8 +121,10 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
             assignmentA1.Id, assignmentA2.Id,
             sessionA1.Id, sessionA2.Id, sessionB1.Id,
             contentA1.Id, contentA2.Id, contentACompanyWide.Id, contentB1.Id,
+            contentA2.MediaFileId, contentB1.MediaFileId,
             Token(gymAdminA), Token(branchManagerA1), Token(trainerA1),
-            Token(memberWithB1Package), Token(memberWithoutPackage), Token(memberWithExpiredB1Package));
+            Token(memberWithB1Package), Token(memberWithoutPackage), Token(memberWithExpiredB1Package),
+            Token(memberA1));
     }
 
     private HttpClient ClientFor(string token)
@@ -366,5 +372,57 @@ public class BranchScopedListVisibilityTests : IClassFixture<CustomWebApplicatio
         var ids = await GetIdsAsync(ClientFor(seed.TrainerA1Token), "/api/content-items");
 
         Assert.Equal(Sorted(seed.ContentA1Id, seed.ContentACompanyWideId), ids);
+    }
+
+    // --- Geçerli paket kuralı: GET /api/content-items (üye kolu) ve GET /api/media/{id} ---
+
+    [Fact]
+    public async Task ContentItems_AsMemberWithExpiredButStillActiveStatusPackage_ReturnsEmptyList()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.MemberWithExpiredB1PackageToken), "/api/content-items");
+
+        Assert.Empty(ids);
+    }
+
+    [Fact]
+    public async Task ContentItems_AsMemberWithValidBranchPackage_ReturnsThatBranchAndBranchlessItemsOnly()
+    {
+        var seed = await SeedAsync();
+
+        var ids = await GetIdsAsync(ClientFor(seed.MemberA1Token), "/api/content-items");
+
+        Assert.Equal(Sorted(seed.ContentA1Id, seed.ContentACompanyWideId), ids);
+    }
+
+    [Fact]
+    public async Task Media_AsMemberWithExpiredButStillActiveStatusPackage_Returns403()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.MemberWithExpiredB1PackageToken).GetAsync($"/api/media/{seed.ContentB1MediaFileId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Media_AsMemberWithValidPackageAtAnotherBranch_Returns403()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.MemberA1Token).GetAsync($"/api/media/{seed.ContentA2MediaFileId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Media_AsBranchManagerOfAnotherBranch_Returns403()
+    {
+        var seed = await SeedAsync();
+
+        var response = await ClientFor(seed.BranchManagerA1Token).GetAsync($"/api/media/{seed.ContentA2MediaFileId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 }
