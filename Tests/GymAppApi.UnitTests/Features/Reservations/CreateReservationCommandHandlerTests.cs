@@ -116,6 +116,20 @@ public class CreateReservationCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenAssignmentHasSessionsLeftButHasExpired_ThrowsPackageAssignmentNotEligibleForReservationException()
+    {
+        // Hakkı kalmış ama süresi dolmuş seans paketi - ortak "geçerli paket"
+        // tanımına göre artık kullanılamaz.
+        var assignment = EligibleAssignment();
+        assignment.EndDate = DateTime.UtcNow.AddDays(-1);
+        var (uow, writeRepo) = Wire(assignment, callerAssignments: new List<Assignment>());
+        var handler = new CreateReservationCommandHandler(uow.Object);
+
+        await Assert.ThrowsAsync<PackageAssignmentNotEligibleForReservationException>(() => handler.Handle(ValidCommand(MemberId), CancellationToken.None));
+        writeRepo.Verify(r => r.AddAsync(It.IsAny<Reservation>(), default), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_WhenAssignmentIsDurationBased_ThrowsPackageAssignmentNotEligibleForReservationException()
     {
         var assignment = EligibleAssignment();

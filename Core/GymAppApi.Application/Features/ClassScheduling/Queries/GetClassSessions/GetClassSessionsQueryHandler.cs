@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -104,16 +105,12 @@ public class GetClassSessionsQueryHandler : IRequestHandler<GetClassSessionsQuer
             scopes.Add((staffCompanyId, _tenantContext.BranchId));
         }
 
-        // Geçerli paket: Active + süresi dolmamış + (seans bazlıysa) hakkı
-        // kalmış. IgnoreQueryFilters: bir Member'ın ambient CompanyId'si yok,
-        // filtre kendi paketlerini ondan gizlerdi - sorgu zaten çağıranın
-        // kendi satırlarına (MemberUserId) sabitlendiği için sızıntı riski yok.
-        var now = DateTime.UtcNow;
+        // Ortak "geçerli paket" tanımı (PackageAssignmentValidity).
+        // IgnoreQueryFilters: bir Member'ın ambient CompanyId'si yok, filtre
+        // kendi paketlerini ondan gizlerdi - sorgu zaten çağıranın kendi
+        // satırlarına (MemberUserId) sabitlendiği için sızıntı riski yok.
         var validPackageAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
-            pa => pa.MemberUserId == userId &&
-                  pa.Status == PackageAssignmentStatus.Active &&
-                  (pa.EndDate == null || pa.EndDate > now) &&
-                  (pa.RemainingSessions == null || pa.RemainingSessions > 0),
+            PackageAssignmentValidity.UsableOwnedBy(userId, DateTime.UtcNow),
             include: q => q.IgnoreQueryFilters().Include(pa => pa.Package),
             cancellationToken: cancellationToken);
 

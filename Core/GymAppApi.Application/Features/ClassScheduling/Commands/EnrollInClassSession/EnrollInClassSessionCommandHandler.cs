@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Application.Features.ClassScheduling.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -48,13 +49,15 @@ public class EnrollInClassSessionCommandHandler : IRequestHandler<EnrollInClassS
             throw new NotFoundException("ClassSessionNotFound", request.ClassSessionId);
         }
 
+        // Ortak "geçerli paket" tanımı (PackageAssignmentValidity: aktif,
+        // süresi dolmamış, hakkı kalmış) + bu modüle özgü şartlar: paket
+        // kategorisi dersin kategorisiyle eşleşmeli ve seans bazlı pakette
+        // hak sayısı tanımlı olmalı.
         var now = DateTime.UtcNow;
-        var isEligible = assignment.Status == PackageAssignmentStatus.Active &&
+        var isEligible = PackageAssignmentValidity.IsUsable(assignment, now) &&
             assignment.Package is not null &&
             assignment.Package.Category == classSession.Category &&
-            (assignment.Package.Type == PackageType.Duration
-                ? assignment.EndDate == null || assignment.EndDate > now
-                : assignment.RemainingSessions is > 0);
+            (assignment.Package.Type == PackageType.Duration || assignment.RemainingSessions is > 0);
         if (!isEligible)
         {
             throw new PackageAssignmentNotEligibleForClassException();

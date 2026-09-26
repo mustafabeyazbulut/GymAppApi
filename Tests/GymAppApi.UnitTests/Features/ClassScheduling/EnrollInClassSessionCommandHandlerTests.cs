@@ -154,6 +154,20 @@ public class EnrollInClassSessionCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenSessionBasedAssignmentHasSessionsLeftButHasExpired_ThrowsPackageAssignmentNotEligibleForClassException()
+    {
+        // "60 gün içinde kullan" tipi seans paketi: hakkı kalmış ama süresi
+        // dolmuş - ortak "geçerli paket" tanımına göre artık kullanılamaz.
+        var assignment = SessionBasedAssignment(remainingSessions: 5);
+        assignment.EndDate = DateTime.UtcNow.AddDays(-1);
+        var (uow, enrollmentWriteRepo, _) = Wire(assignment, EligibleSession(), new List<ClassEnrollment>());
+        var handler = new EnrollInClassSessionCommandHandler(uow.Object);
+
+        await Assert.ThrowsAsync<PackageAssignmentNotEligibleForClassException>(() => handler.Handle(ValidCommand(MemberId), CancellationToken.None));
+        enrollmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<ClassEnrollment>(), default), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_WhenDurationAssignmentHasExpired_ThrowsPackageAssignmentNotEligibleForClassException()
     {
         var assignment = DurationAssignment(endDate: DateTime.UtcNow.AddDays(-1));

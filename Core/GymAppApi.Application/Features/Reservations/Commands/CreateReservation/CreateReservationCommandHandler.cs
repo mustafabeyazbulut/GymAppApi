@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Application.Features.Reservations.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -51,9 +52,10 @@ public class CreateReservationCommandHandler : IRequestHandler<CreateReservation
             throw new ForbiddenException("ForbiddenCreateReservation");
         }
 
-        // Eligible only for an active, session-based assignment with sessions
-        // left - RemainingSessions is null for Duration-type assignments.
-        if (assignment.Status != PackageAssignmentStatus.Active || assignment.RemainingSessions is null or <= 0)
+        // Ortak "geçerli paket" tanımı (PackageAssignmentValidity: aktif,
+        // süresi dolmamış, hakkı kalmış) + sadece seans bazlı paket
+        // (Duration tipinde RemainingSessions null).
+        if (!PackageAssignmentValidity.IsUsable(assignment, DateTime.UtcNow) || assignment.RemainingSessions is null)
         {
             throw new PackageAssignmentNotEligibleForReservationException();
         }
