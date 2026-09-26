@@ -135,6 +135,23 @@ public class AuthRateLimitingTests : IClassFixture<RateLimitingWebApplicationFac
     }
 
     [Fact]
+    public async Task PerIdentifierLimit_LoginToOneAccountFromRotatingIps_IsLimited()
+    {
+        // IP değiştirerek tek bir hesaba şifre denemesi - tanımlayıcı bazlı
+        // sınır IP'den bağımsız devreye girer.
+        var phone = UniquePhone();
+        for (var i = 0; i < RateLimitingWebApplicationFactory.PermitPerIdentifier; i++)
+        {
+            var attempt = await ClientFrom(UniqueIp()).PostAsJsonAsync("/api/auth/login", new { identifier = phone, password = "yanlis-sifre" });
+            Assert.NotEqual(HttpStatusCode.TooManyRequests, attempt.StatusCode);
+        }
+
+        var rejected = await ClientFrom(UniqueIp()).PostAsJsonAsync("/api/auth/login", new { identifier = phone, password = "yanlis-sifre" });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
+    }
+
+    [Fact]
     public async Task PerIdentifierLimit_DifferentPhones_DoNotLockEachOther()
     {
         var ip = UniqueIp();

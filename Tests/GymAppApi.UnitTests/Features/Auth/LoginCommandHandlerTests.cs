@@ -29,6 +29,7 @@ public class LoginCommandHandlerTests
         var uow = new Mock<IUnitOfWork>();
         uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<RefreshToken>()).Returns(refreshWriteRepo.Object);
+        uow.Setup(u => u.GetWriteRepository<User>()).Returns(new Mock<IWriteRepository<User>>().Object);
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
 
         var hasher = new Mock<IPasswordHasher>();
@@ -105,5 +106,89 @@ public class LoginCommandHandlerTests
 
         phoneNormalizer.Verify(p => p.NormalizeIfPhone("05551112233"), Times.Once);
         userReadRepo.Verify(r => r.GetAsync(It.IsAny<System.Linq.Expressions.Expression<Func<User, bool>>>(), null, false, default), Times.Once);
+    }
+
+    // --- Hesap başına art arda başarısız giriş kilidi ---
+
+    private static (LoginCommandHandler handler, Mock<IPasswordHasher> hasher, Mock<IWriteRepository<User>> userWriteRepo, Mock<IJwtTokenService> jwt) CreateForLockout(User user, bool passwordMatches)
+    {
+        var (uow, _, _, hasher, jwt, phoneNormalizer) = Wire(user);
+        var userWriteRepo = new Mock<IWriteRepository<User>>();
+        uow.Setup(u => u.GetWriteRepository<User>()).Returns(userWriteRepo.Object);
+        hasher.Setup(h => h.Verify(It.IsAny<string>(), It.IsAny<string>())).Returns(passwordMatches);
+        return (new LoginCommandHandler(uow.Object, hasher.Object, jwt.Object, phoneNormalizer.Object), hasher, userWriteRepo, jwt);
+    }
+
+    private static LoginCommand Command() => new() { Identifier = "+905551112233", Password = "x" };
+
+    [Fact]
+    public async Task Handle_WhenPasswordIsWrong_IncrementsTheAccountsFailedAttemptCounter()
+    {
+        var user = ExistingUser();
+        user.FailedLoginAttempts = 3;
+        var (handler, _, userWriteRepo, _) = CreateForLockout(user, passwordMatches: false);
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(() => handler.Handle(Command(), CancellationToken.None));
+
+        Assert.Equal(4, user.FailedLoginAttempts);
+        Assert.Null(user.LockoutEndsAt);
+        userWriteRepo.Verify(r => r.Update(user), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_WhenTheTenthConsecutiveAttemptFails_LocksTheAccountFor15Minutes()
+    {
+        var user = ExistingUser();
+        user.FailedLoginAttempts = LoginCommandHandler.MaxFailedAttempts - 1;
+        var (handler, _, _, _) = CreateForLockout(user, passwordMatches: false);
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(() => handler.Handle(Command(), CancellationToken.None));
+
+        Assert.NotNull(user.LockoutEndsAt);
+        Assert.InRange(user.LockoutEndsAt!.Value, DateTime.UtcNow.AddMinutes(14), DateTime.UtcNow.AddMinutes(16));
+        Assert.Equal(0, user.FailedLoginAttempts);
+    }
+
+    [Fact]
+    public async Task Handle_WhenAccountIsLocked_RejectsEvenTheCorrectPassword_WithTheSameResponseAndStillVerifies()
+    {
+        // Kilitli hesap "kullanıcı yok / yanlış şifre" ile AYNI yanıtı alır
+        // (hesap varlığı sızdırılmaz) ve şifre doğrulaması yine yapılır
+        // (yanıt süresi farkıyla ayırt edilemesin).
+        var user = ExistingUser();
+        user.LockoutEndsAt = DateTime.UtcNow.AddMinutes(5);
+        var (handler, hasher, _, jwt) = CreateForLockout(user, passwordMatches: true);
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(() => handler.Handle(Command(), CancellationToken.None));
+
+        hasher.Verify(h => h.Verify(It.IsAny<string>(), "x"), Times.Once);
+        jwt.Verify(j => j.GenerateAccessToken(It.IsAny<AccessTokenClaims>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenLockoutHasExpired_AndPasswordIsCorrect_LogsInAndClearsTheLockout()
+    {
+        var user = ExistingUser();
+        user.LockoutEndsAt = DateTime.UtcNow.AddMinutes(-1);
+        user.FailedLoginAttempts = 0;
+        var (handler, _, _, _) = CreateForLockout(user, passwordMatches: true);
+
+        var result = await handler.Handle(Command(), CancellationToken.None);
+
+        Assert.Equal("access-token", result.AccessToken);
+        Assert.Null(user.LockoutEndsAt);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPasswordIsCorrect_ResetsThePreviousFailedAttempts()
+    {
+        var user = ExistingUser();
+        user.FailedLoginAttempts = 7;
+        var (handler, _, userWriteRepo, _) = CreateForLockout(user, passwordMatches: true);
+
+        await handler.Handle(Command(), CancellationToken.None);
+
+        Assert.Equal(0, user.FailedLoginAttempts);
+        userWriteRepo.Verify(r => r.Update(user), Times.Once);
     }
 }
