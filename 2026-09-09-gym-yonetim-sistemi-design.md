@@ -243,3 +243,11 @@ yetkisi verdiğinde görür.
 3. Platform ücreti sistem dışında, manuel yönetilir.
 4. Hizmetler ve paket kapsamı her gym ve şube bazında farklı olabilir; gym
    kendi hizmet listesini tanımlar.
+5. Firma geneli (şubesiz) paket yoktur; her paket bir şubeye aittir.
+6. Sistem Sahibi gym'lerin günlük işlemlerini (paket, ders, check-in, ödeme,
+   personel vb.) yapamaz; sadece firma oluşturma/yönetme ve platform
+   raporları. Gerekirse o firmada Gym Admin olarak atanır.
+7. Eski modelden kalan Role=Member atama kayıtları tamamen silinir; Member
+   rolü atama sisteminden kaldırılır.
+8. Şube Yöneticisi ve Antrenör sadece atandıkları şubenin verisini görür;
+   hiçbir liste başka şubenin veya başka firmanın verisini döndürmez.
