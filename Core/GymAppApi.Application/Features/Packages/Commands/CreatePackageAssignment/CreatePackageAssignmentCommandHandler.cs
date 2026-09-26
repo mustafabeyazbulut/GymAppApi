@@ -1,11 +1,13 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Application.Common.Invitations;
 using GymAppApi.Application.Common.Notifications;
 using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymAppApi.Application.Features.Packages.Commands.CreatePackageAssignment;
 
@@ -60,9 +62,16 @@ public class CreatePackageAssignmentCommandHandler : IRequestHandler<CreatePacka
             throw new NotFoundException("PhoneNotRegistered", phone);
         }
 
-        var alreadyHasThisPackage = await _unitOfWork.GetReadRepository<PackageAssignment>().AnyAsync(
-            pa => pa.MemberUserId == member.Id && pa.PackageId == package.Id && pa.Status != PackageAssignmentStatus.Cancelled,
-            cancellationToken);
+        // Engel sadece bu pakette şu an GEÇERLİ bir atama (PackageAssignmentValidity).
+        // Süresi dolmuş, hakkı bitmiş veya iptal edilmiş eski atama yenilemeyi
+        // engellemez (senaryo Akış D.3: personel yeni paket tanımlarsa üyelik
+        // yeniden başlar). GetAllAsync + IgnoreQueryFilters: AnyAsync'in filtre
+        // kaçışı yok; üyenin satırlarına sabitlendiği için sızıntı riski yok.
+        var membersValidAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
+            PackageAssignmentValidity.UsableOwnedBy(member.Id, DateTime.UtcNow),
+            include: q => q.IgnoreQueryFilters().Include(pa => pa.Package),
+            cancellationToken: cancellationToken);
+        var alreadyHasThisPackage = membersValidAssignments.Any(pa => pa.PackageId == package.Id);
         if (alreadyHasThisPackage)
         {
             throw new MemberAlreadyHasThisPackageException();

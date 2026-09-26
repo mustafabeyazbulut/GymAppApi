@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Application.Common.Invitations;
 using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
@@ -50,12 +51,14 @@ public class ConfirmPackageAssignmentCommandHandler : IRequestHandler<ConfirmPac
         // fetch that "succeeds" with null). Safe because AnyAsync/the
         // downstream write are scoped by matching.PackageId/TargetUserId, not
         // by tenant.
-        var existingAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
-            pa => pa.MemberUserId == matching.TargetUserId && pa.PackageId == matching.PackageId &&
-                  pa.Status != PackageAssignmentStatus.Cancelled,
+        // Engel sadece bu pakette şu an GEÇERLİ bir atama (CreatePackageAssignment
+        // ile aynı kural) - süresi dolmuş/hakkı bitmiş/iptal eski atama yenilemeyi
+        // engellemez.
+        var membersValidAssignments = await _unitOfWork.GetReadRepository<PackageAssignment>().GetAllAsync(
+            PackageAssignmentValidity.UsableOwnedBy(matching.TargetUserId, now),
             include: q => q.IgnoreQueryFilters().Include(pa => pa.Package),
             cancellationToken: cancellationToken);
-        if (existingAssignments.Count > 0)
+        if (membersValidAssignments.Any(pa => pa.PackageId == matching.PackageId))
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             throw new MemberAlreadyHasThisPackageException();

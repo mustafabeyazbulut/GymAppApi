@@ -14,7 +14,8 @@ public class CreatePackageAssignmentCommandHandlerTests
     private const int PackageId = 5;
 
     private static (Mock<IUnitOfWork> uow, Mock<IWriteRepository<PendingPackageAssignmentInvitation>> invitationWriteRepo) Wire(
-        IReadOnlyList<Assignment> callerAssignments, Package? package, User? existingUser, bool alreadyAssigned)
+        IReadOnlyList<Assignment> callerAssignments, Package? package, User? existingUser, bool alreadyAssigned,
+        IReadOnlyList<PackageAssignment>? existingAssignments = null)
     {
         var uow = new Mock<IUnitOfWork>();
 
@@ -34,10 +35,13 @@ public class CreatePackageAssignmentCommandHandlerTests
             .ReturnsAsync(existingUser);
         uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
 
-        var packageAssignmentReadRepo = new Mock<IReadRepository<PackageAssignment>>();
-        packageAssignmentReadRepo.Setup(r => r.AnyAsync(It.IsAny<System.Linq.Expressions.Expression<Func<PackageAssignment, bool>>>(), default))
-            .ReturnsAsync(alreadyAssigned);
-        uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(packageAssignmentReadRepo.Object);
+        // alreadyAssigned: üyenin bu pakette şu an GEÇERLİ bir ataması var.
+        var assignments = (existingAssignments ?? new List<PackageAssignment>()).ToList();
+        if (alreadyAssigned && existingUser is not null)
+        {
+            assignments.Add(new PackageAssignment { Id = 900, MemberUserId = existingUser.Id, PackageId = PackageId, CompanyId = 1, Status = PackageAssignmentStatus.Active, EndDate = DateTime.UtcNow.AddDays(10) });
+        }
+        uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(assignments).Object);
 
         var invitationReadRepo = new Mock<IReadRepository<PendingPackageAssignmentInvitation>>();
         invitationReadRepo.Setup(r => r.GetAllAsync(
@@ -129,5 +133,30 @@ public class CreatePackageAssignmentCommandHandlerTests
 
         await Assert.ThrowsAsync<MemberAlreadyHasThisPackageException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
         invitationWriteRepo.Verify(r => r.AddAsync(It.IsAny<PendingPackageAssignmentInvitation>(), default), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(PackageAssignmentStatus.Active, -1, null)]   // süresi dolmuş (Status hâlâ Active)
+    [InlineData(PackageAssignmentStatus.Active, 10, 0)]      // seans hakkı bitmiş
+    [InlineData(PackageAssignmentStatus.Cancelled, 10, null)] // iptal edilmiş
+    public async Task Handle_WhenMembersPreviousAssignmentOfThisPackageIsNoLongerValid_AllowsRenewal(
+        PackageAssignmentStatus status, int endDateOffsetDays, int? remainingSessions)
+    {
+        // Senaryo Akış D.3: paket bitince personel yeni paket tanımlarsa üyelik
+        // yeniden başlar - engel sadece şu an GEÇERLİ olan atama.
+        var callerAssignments = new List<Assignment> { new() { UserId = CallerId, CompanyId = 1, Role = AssignmentRole.GymAdmin, IsActive = true } };
+        var existingUser = new User { Id = 7, FullName = "Member", Phone = "+905550003333", PasswordHash = "x" };
+        var previous = new PackageAssignment
+        {
+            Id = 1, MemberUserId = 7, PackageId = PackageId, CompanyId = 1, Status = status,
+            EndDate = DateTime.UtcNow.AddDays(endDateOffsetDays), RemainingSessions = remainingSessions,
+        };
+        var (uow, invitationWriteRepo) = Wire(callerAssignments, BranchPackage(), existingUser, alreadyAssigned: false,
+            existingAssignments: new List<PackageAssignment> { previous });
+        var handler = new CreatePackageAssignmentCommandHandler(uow.Object, Mock.Of<ISmsSender>(), Mock.Of<IPushNotificationSender>(), new GymAppApi.Infrastructure.Security.PhoneNumberNormalizer());
+
+        await handler.Handle(ValidCommand(), CancellationToken.None);
+
+        invitationWriteRepo.Verify(r => r.AddAsync(It.Is<PendingPackageAssignmentInvitation>(i => i.TargetUserId == 7 && i.PackageId == PackageId), default), Times.Once);
     }
 }

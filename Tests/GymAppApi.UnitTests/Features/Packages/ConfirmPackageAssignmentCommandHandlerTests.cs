@@ -26,11 +26,8 @@ public class ConfirmPackageAssignmentCommandHandlerTests
                 It.IsAny<Func<IQueryable<Package>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<Package, object>>?>(), false, default))
             .ReturnsAsync(package);
 
-        var assignmentReadRepo = new Mock<IReadRepository<PackageAssignment>>();
-        assignmentReadRepo.Setup(r => r.GetAllAsync(
-                It.IsAny<System.Linq.Expressions.Expression<Func<PackageAssignment, bool>>>(),
-                It.IsAny<Func<IQueryable<PackageAssignment>, Microsoft.EntityFrameworkCore.Query.IIncludableQueryable<PackageAssignment, object>>?>(), null, false, default))
-            .ReturnsAsync(existingAssignments ?? new List<PackageAssignment>());
+        // Gerçek predicate'i uygular - "şu an geçerli atama" kuralı handler'da.
+        var assignmentReadRepo = GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(existingAssignments ?? new List<PackageAssignment>());
         var assignmentWriteRepo = new Mock<IWriteRepository<PackageAssignment>>();
 
         var uow = new Mock<IUnitOfWork>();
@@ -117,5 +114,22 @@ public class ConfirmPackageAssignmentCommandHandlerTests
 
         Assert.True(invitation.IsUsed);
         assignmentWriteRepo.Verify(r => r.AddAsync(It.IsAny<PackageAssignment>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPreviousAssignmentOfThatPackageHasExpired_CreatesTheRenewal()
+    {
+        var invitation = LiveInvitation();
+        var expired = new PackageAssignment
+        {
+            Id = 1, MemberUserId = TargetUserId, PackageId = 5, CompanyId = 1, Status = PackageAssignmentStatus.Active,
+            EndDate = DateTime.UtcNow.AddDays(-1),
+        };
+        var (uow, _, assignmentWriteRepo) = Wire(new List<PendingPackageAssignmentInvitation> { invitation }, DurationPackage(), new List<PackageAssignment> { expired });
+        var handler = new ConfirmPackageAssignmentCommandHandler(uow.Object);
+
+        await handler.Handle(new ConfirmPackageAssignmentCommand { Code = "123456", UserId = TargetUserId }, CancellationToken.None);
+
+        assignmentWriteRepo.Verify(r => r.AddAsync(It.Is<PackageAssignment>(pa => pa.MemberUserId == TargetUserId && pa.PackageId == 5), default), Times.Once);
     }
 }
