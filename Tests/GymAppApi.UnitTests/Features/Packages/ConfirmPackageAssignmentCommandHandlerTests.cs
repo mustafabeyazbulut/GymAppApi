@@ -37,6 +37,8 @@ public class ConfirmPackageAssignmentCommandHandlerTests
         uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(assignmentReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<PackageAssignment>()).Returns(assignmentWriteRepo.Object);
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
+        uow.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<PackageAssignment>>>())).Returns((Func<Task<PackageAssignment>> operation) => operation());
+        uow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Mock.Of<IAsyncDisposable>());
 
         return (uow, invitationWriteRepo, assignmentWriteRepo);
     }

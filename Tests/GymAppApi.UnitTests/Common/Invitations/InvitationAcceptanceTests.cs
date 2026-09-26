@@ -29,6 +29,10 @@ public class InvitationAcceptanceTests
         uow.Setup(u => u.GetWriteRepository<PendingAssignmentInvitation>()).Returns(new Mock<IWriteRepository<PendingAssignmentInvitation>>().Object);
         uow.Setup(u => u.GetWriteRepository<PendingPackageAssignmentInvitation>()).Returns(new Mock<IWriteRepository<PendingPackageAssignmentInvitation>>().Object);
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
+        // Kabul tek transaction içinde (execution strategy delegate'i hemen çalıştırılır).
+        uow.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<Assignment>>>())).Returns((Func<Task<Assignment>> operation) => operation());
+        uow.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<PackageAssignment>>>())).Returns((Func<Task<PackageAssignment>> operation) => operation());
+        uow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Mock.Of<IAsyncDisposable>());
         return (uow, assignmentWrite, packageAssignmentWrite);
     }
 
@@ -48,6 +52,7 @@ public class InvitationAcceptanceTests
 
         Assert.True(invitation.IsUsed);
         Assert.Equal(AssignmentRole.Trainer, assignment.Role);
+        uow.Verify(u => u.CommitTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
         assignmentWrite.Verify(r => r.AddAsync(It.Is<Assignment>(a => a.UserId == TargetUserId && a.CompanyId == 1 && a.BranchId == 10 && a.IsActive), default), Times.Once);
     }
 
@@ -60,8 +65,11 @@ public class InvitationAcceptanceTests
 
         await Assert.ThrowsAsync<UserAlreadyAssignedException>(() => AssignmentInvitationAcceptance.AcceptAsync(uow.Object, invitation, CancellationToken.None));
 
-        Assert.True(invitation.IsUsed);
+        // Kural ihlalinde her şey geri alınır - davet yanmaz, kullanıcı durumunu
+        // düzeltip tekrar deneyebilir.
         assignmentWrite.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        uow.Verify(u => u.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+        uow.Verify(u => u.CommitTransactionAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]
@@ -76,6 +84,37 @@ public class InvitationAcceptanceTests
         await Assert.ThrowsAsync<ConflictingAssignmentRoleException>(() => AssignmentInvitationAcceptance.AcceptAsync(uow.Object, invitation, CancellationToken.None));
 
         assignmentWrite.Verify(r => r.AddAsync(It.IsAny<Assignment>(), default), Times.Never);
+        uow.Verify(u => u.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task AcceptAssignment_WhenCreatingTheAssignmentFails_RollsBackSoTheInvitationIsNotBurned()
+    {
+        // Beklenmeyen bir DB hatası: claim + atama aynı transaction'da olduğu için
+        // geri alınır, davet kullanılmamış kalır ve kullanıcı tekrar deneyebilir.
+        var (uow, assignmentWrite, _) = Wire();
+        assignmentWrite.Setup(r => r.AddAsync(It.IsAny<Assignment>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("DB hatası"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            AssignmentInvitationAcceptance.AcceptAsync(uow.Object, StaffInvitation(AssignmentRole.Trainer), CancellationToken.None));
+
+        uow.Verify(u => u.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+        uow.Verify(u => u.CommitTransactionAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AcceptPackage_WhenCreatingTheAssignmentFails_RollsBack()
+    {
+        var (uow, _, packageAssignmentWrite) = Wire(packages: new[] { SessionPackage() });
+        packageAssignmentWrite.Setup(r => r.AddAsync(It.IsAny<PackageAssignment>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("DB hatası"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            PackageInvitationAcceptance.AcceptAsync(uow.Object, PackageInvitation(), DateTime.UtcNow, CancellationToken.None));
+
+        uow.Verify(u => u.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+        uow.Verify(u => u.CommitTransactionAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static PendingPackageAssignmentInvitation PackageInvitation() => new()

@@ -10,16 +10,34 @@ namespace GymAppApi.Application.Common.Invitations;
 // Paket davetini kabul etmenin TEK uygulaması - hem SMS kodlu
 // ConfirmPackageAssignment hem uygulama içi davet kabulü bunu çağırır.
 // Çağıran daveti bulup sahipliğini/geçerliliğini doğrulamış olmalıdır.
+// Atomiklik: claim + paket ataması tek transaction içinde; her hata geri
+// alınır ve davet yanmaz (gerekçe için bkz. AssignmentInvitationAcceptance).
 public static class PackageInvitationAcceptance
 {
-    public static async Task<PackageAssignment> AcceptAsync(
+    public static Task<PackageAssignment> AcceptAsync(
+        IUnitOfWork unitOfWork, PendingPackageAssignmentInvitation invitation, DateTime now, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteWithRetryAsync(async () =>
+        {
+            await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var assignment = await AcceptWithinTransactionAsync(unitOfWork, invitation, now, cancellationToken);
+                await unitOfWork.CommitTransactionAsync(cancellationToken);
+                return assignment;
+            }
+            catch
+            {
+                await unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
+        });
+
+    private static async Task<PackageAssignment> AcceptWithinTransactionAsync(
         IUnitOfWork unitOfWork, PendingPackageAssignmentInvitation invitation, DateTime now, CancellationToken cancellationToken)
     {
-        // Davet her durumda tüketilir - hata olsa bile ikinci kez kullanılamaz.
-        // Atomik talep: eşzamanlı ikinci onay burada durur (bkz.
-        // AssignmentInvitationAcceptance.ClaimAsync).
+        // Atomik talep: eşzamanlı ikinci onay burada durur (InvitationWrites.ClaimAsync).
         invitation.IsUsed = true;
-        await AssignmentInvitationAcceptance.ClaimAsync(unitOfWork, invitation, invitation.Id, cancellationToken);
+        await InvitationWrites.ClaimAsync(unitOfWork, invitation, invitation.Id, cancellationToken);
 
         // IgnoreQueryFilters (bu metottaki tüm okumalar): kabul eden üyenin
         // genellikle hiçbir personel ataması yok, ambient CompanyId'si null -
@@ -34,7 +52,6 @@ public static class PackageInvitationAcceptance
             cancellationToken: cancellationToken);
         if (membersValidAssignments.Any(pa => pa.PackageId == invitation.PackageId))
         {
-            await unitOfWork.SaveChangesAsync(cancellationToken);
             throw new MemberAlreadyHasThisPackageException();
         }
 

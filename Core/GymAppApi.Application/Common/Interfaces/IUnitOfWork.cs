@@ -9,6 +9,11 @@ public interface IUnitOfWork
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
+    // İzlenen tüm varlıkları bırakır - optimistik concurrency çakışmasından sonra
+    // güncel satırları yeniden okuyup tekrar denemek için (bayat kopyalar
+    // izlenmeye devam ederse yeniden okuma aynı bayat örneği döndürürdü).
+    void ClearChangeTracker();
+
     Task<IAsyncDisposable> BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task CommitTransactionAsync(CancellationToken cancellationToken = default);
     Task RollbackTransactionAsync(CancellationToken cancellationToken = default);

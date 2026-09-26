@@ -22,7 +22,10 @@ namespace GymAppApi.IntegrationTests;
 public class InvitationClaimConcurrencyTests
 {
     private static GymAppApiDbContext CreateContext(string dbName) =>
-        new(new DbContextOptionsBuilder<GymAppApiDbContext>().UseInMemoryDatabase(dbName).Options,
+        // Kabul artık transaction içinde; InMemory transaction desteklemediği için
+        // uyarı CustomWebApplicationFactory'deki gibi yok sayılıyor.
+        new(new DbContextOptionsBuilder<GymAppApiDbContext>().UseInMemoryDatabase(dbName)
+                .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)).Options,
             new FakeTenantContext { IsSuperAdmin = true });
 
     [Fact]

@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Invitations;
 using GymAppApi.Application.Common.Localization;
 using GymAppApi.Application.Common.Notifications;
 using GymAppApi.Application.Features.Invitations.Common;
@@ -35,7 +36,8 @@ public class RejectInvitationCommandHandler : IRequestHandler<RejectInvitationCo
         {
             var invitation = await InvitationLookup.FindPackageInvitationAsync(_unitOfWork, request.InvitationId, request.UserId, now, cancellationToken);
             invitation.IsUsed = true;
-            _unitOfWork.GetWriteRepository<PendingPackageAssignmentInvitation>().Update(invitation);
+            // Eşzamanlı kabul/red yarışında kaybeden 404 alır (InvitationWrites).
+            await InvitationWrites.ClaimAsync(_unitOfWork, invitation, invitation.Id, cancellationToken);
             inviterUserId = invitation.RequestedByUserId;
             companyId = invitation.CompanyId;
             var package = await _unitOfWork.GetReadRepository<Package>().GetAsync(
@@ -46,7 +48,7 @@ public class RejectInvitationCommandHandler : IRequestHandler<RejectInvitationCo
         {
             var invitation = await InvitationLookup.FindAssignmentInvitationAsync(_unitOfWork, request.Type, request.InvitationId, request.UserId, now, cancellationToken);
             invitation.IsUsed = true;
-            _unitOfWork.GetWriteRepository<PendingAssignmentInvitation>().Update(invitation);
+            await InvitationWrites.ClaimAsync(_unitOfWork, invitation, invitation.Id, cancellationToken);
             inviterUserId = invitation.RequestedByUserId;
             companyId = invitation.CompanyId;
             roleLabelCode = $"RoleLabel{invitation.Role}";
@@ -55,8 +57,6 @@ public class RejectInvitationCommandHandler : IRequestHandler<RejectInvitationCo
         {
             throw new NotFoundException("InvitationNotFound", request.InvitationId);
         }
-
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var invitee = await _unitOfWork.GetReadRepository<User>().GetAsync(u => u.Id == request.UserId, cancellationToken: cancellationToken);
         var inviter = await _unitOfWork.GetReadRepository<User>().GetAsync(u => u.Id == inviterUserId, cancellationToken: cancellationToken);

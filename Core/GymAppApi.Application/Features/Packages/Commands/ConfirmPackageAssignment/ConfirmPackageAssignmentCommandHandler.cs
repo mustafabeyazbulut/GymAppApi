@@ -17,25 +17,30 @@ public class ConfirmPackageAssignmentCommandHandler : IRequestHandler<ConfirmPac
 
     public async Task<ConfirmPackageAssignmentCommandResult> Handle(ConfirmPackageAssignmentCommand request, CancellationToken cancellationToken)
     {
-        var invitationWriteRepo = _unitOfWork.GetWriteRepository<PendingPackageAssignmentInvitation>();
         var now = DateTime.UtcNow;
         // Davet 7 gün yaşar (uygulama içi kabul için), ama SMS KODU sadece
         // gönderildikten sonraki kısa pencerede geçerlidir.
         var codeIssuedAfter = now.AddMinutes(-PackageAssignmentInvitationService.CodeValidityMinutes);
 
-        var liveInvitations = await _unitOfWork.GetReadRepository<PendingPackageAssignmentInvitation>().GetAllAsync(
-            p => p.TargetUserId == request.UserId && !p.IsUsed && p.ExpiresAt > now && p.CreatedAt > codeIssuedAfter,
-            cancellationToken: cancellationToken);
+        Task<IReadOnlyList<PendingPackageAssignmentInvitation>> LoadLiveInvitationsAsync() =>
+            _unitOfWork.GetReadRepository<PendingPackageAssignmentInvitation>().GetAllAsync(
+                p => p.TargetUserId == request.UserId && !p.IsUsed && p.ExpiresAt > now && p.CreatedAt > codeIssuedAfter,
+                cancellationToken: cancellationToken);
+        var liveInvitations = await LoadLiveInvitationsAsync();
 
         var matching = liveInvitations.FirstOrDefault(p => p.Code == request.Code && p.AttemptCount < PackageAssignmentInvitationService.MaxAttempts);
         if (matching is null)
         {
-            foreach (var invitation in liveInvitations.Where(p => p.AttemptCount < PackageAssignmentInvitationService.MaxAttempts))
+            // Eşzamanlı yanlış tahminlerde artışlar kaybolmasın (InvitationWrites).
+            await InvitationWrites.BurnAttemptsAsync(_unitOfWork, LoadLiveInvitationsAsync, invitation =>
             {
+                if (invitation.AttemptCount >= PackageAssignmentInvitationService.MaxAttempts)
+                {
+                    return false;
+                }
                 invitation.AttemptCount += 1;
-                invitationWriteRepo.Update(invitation);
-            }
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+                return true;
+            }, cancellationToken);
             throw new InvalidPackageAssignmentInvitationCodeException();
         }
 

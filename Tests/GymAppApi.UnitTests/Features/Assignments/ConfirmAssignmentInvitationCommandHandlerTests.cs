@@ -34,6 +34,8 @@ public class ConfirmAssignmentInvitationCommandHandlerTests
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(assignmentReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<Assignment>()).Returns(assignmentWriteRepo.Object);
         uow.Setup(u => u.SaveChangesAsync(default)).ReturnsAsync(1);
+        uow.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<Assignment>>>())).Returns((Func<Task<Assignment>> operation) => operation());
+        uow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Mock.Of<IAsyncDisposable>());
 
         return (uow, invitationWriteRepo, assignmentWriteRepo);
     }

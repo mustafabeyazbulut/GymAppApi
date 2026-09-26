@@ -17,7 +17,6 @@ public class ConfirmAssignmentInvitationCommandHandler : IRequestHandler<Confirm
 
     public async Task<ConfirmAssignmentInvitationCommandResult> Handle(ConfirmAssignmentInvitationCommand request, CancellationToken cancellationToken)
     {
-        var invitationWriteRepo = _unitOfWork.GetWriteRepository<PendingAssignmentInvitation>();
         var now = DateTime.UtcNow;
         // Davet 7 gün yaşar (uygulama içi kabul için), ama SMS KODU sadece
         // gönderildikten sonraki kısa pencerede geçerlidir.
@@ -25,9 +24,11 @@ public class ConfirmAssignmentInvitationCommandHandler : IRequestHandler<Confirm
 
         // A user can have more than one live invitation at once (different
         // companies) - fetch all of them rather than assuming exactly one.
-        var liveInvitations = await _unitOfWork.GetReadRepository<PendingAssignmentInvitation>().GetAllAsync(
-            p => p.TargetUserId == request.UserId && !p.IsUsed && p.ExpiresAt > now && p.CreatedAt > codeIssuedAfter,
-            cancellationToken: cancellationToken);
+        Task<IReadOnlyList<PendingAssignmentInvitation>> LoadLiveInvitationsAsync() =>
+            _unitOfWork.GetReadRepository<PendingAssignmentInvitation>().GetAllAsync(
+                p => p.TargetUserId == request.UserId && !p.IsUsed && p.ExpiresAt > now && p.CreatedAt > codeIssuedAfter,
+                cancellationToken: cancellationToken);
+        var liveInvitations = await LoadLiveInvitationsAsync();
 
         var matching = liveInvitations.FirstOrDefault(p => p.Code == request.Code && p.AttemptCount < AssignmentInvitationService.MaxAttempts);
         if (matching is null)
@@ -36,12 +37,16 @@ public class ConfirmAssignmentInvitationCommandHandler : IRequestHandler<Confirm
             // guess burns an attempt against every one of their still-live
             // invitations rather than being free just because there happen
             // to be several (or none) to blame it on.
-            foreach (var invitation in liveInvitations.Where(p => p.AttemptCount < AssignmentInvitationService.MaxAttempts))
+            // Eşzamanlı yanlış tahminlerde artışlar kaybolmasın (InvitationWrites).
+            await InvitationWrites.BurnAttemptsAsync(_unitOfWork, LoadLiveInvitationsAsync, invitation =>
             {
+                if (invitation.AttemptCount >= AssignmentInvitationService.MaxAttempts)
+                {
+                    return false;
+                }
                 invitation.AttemptCount += 1;
-                invitationWriteRepo.Update(invitation);
-            }
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+                return true;
+            }, cancellationToken);
             throw new InvalidAssignmentInvitationCodeException();
         }
 
