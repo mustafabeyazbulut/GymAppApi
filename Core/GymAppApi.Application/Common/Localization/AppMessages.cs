@@ -196,6 +196,23 @@ public static class AppMessages
             "Bu paket ataması bu ders için uygun değil (ders kategorisiyle eşleşen, aktif ve hakkı kalmış bir paket olmalı)."),
         ["AlreadyEnrolledInClassSession"] = ("This package assignment is already enrolled in this class session.", "Bu paket ataması bu ders programına zaten kayıtlı."),
         ["ClassEnrollmentNotReserved"] = ("This class enrollment is no longer in 'Reserved' status.", "Bu ders kaydı artık 'Reserved' durumunda değil."),
+
+        // Kişisel takip (PersonalLogs)
+        ["PersonalLogNotFound"] = ("Personal log {0} not found.", "Kişisel kayıt {0} bulunamadı."),
+        ["PersonalLogInvalidKind"] = ("Kind must be Workout or Measurement.", "Kayıt türü Workout veya Measurement olmalıdır."),
+        ["PersonalLogDateInFuture"] = ("The date cannot be in the future.", "Tarih gelecekte olamaz."),
+        ["PersonalLogNotesTooLong"] = ("Notes can be at most 1000 characters.", "Notlar en fazla 1000 karakter olabilir."),
+        ["PersonalLogTitleRequired"] = ("A title is required for a workout.", "Antrenman için başlık zorunludur."),
+        ["PersonalLogTitleTooLong"] = ("The title can be at most 100 characters.", "Başlık en fazla 100 karakter olabilir."),
+        ["PersonalLogDurationOutOfRange"] = ("Duration must be between 1 and 600 minutes.", "Süre 1 ile 600 dakika arasında olmalıdır."),
+        ["PersonalLogMeasurementRequired"] = (
+            "At least one measurement (weight, body fat or waist) is required.",
+            "En az bir ölçüm değeri (kilo, yağ oranı veya bel çevresi) girilmelidir."),
+        ["PersonalLogWeightOutOfRange"] = ("Weight must be between 20 and 400 kg.", "Kilo 20 ile 400 kg arasında olmalıdır."),
+        ["PersonalLogBodyFatOutOfRange"] = ("Body fat must be between 1% and 75%.", "Yağ oranı %1 ile %75 arasında olmalıdır."),
+        ["PersonalLogWaistOutOfRange"] = ("Waist must be between 30 and 250 cm.", "Bel çevresi 30 ile 250 cm arasında olmalıdır."),
+        ["PersonalLogRangeInvalid"] = ("'from' cannot be after 'to'.", "Başlangıç tarihi bitiş tarihinden sonra olamaz."),
+        ["PersonalLogRangeTooLong"] = ("The date range can be at most {0} days.", "Tarih aralığı en fazla {0} gün olabilir."),
     };
 
     public static string Resolve(string code, string language, params object[] args)

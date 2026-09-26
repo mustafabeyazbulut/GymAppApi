@@ -20,6 +20,7 @@ public class GymAppApiDbContext : DbContext
         typeof(PendingPackageAssignmentInvitation),
         typeof(MediaFile),
         typeof(LoginFailure),
+        typeof(PersonalLog),
     };
 
     private readonly ITenantContext _tenantContext;
@@ -56,6 +57,7 @@ public class GymAppApiDbContext : DbContext
     public DbSet<Zone> Zones => Set<Zone>();
     public DbSet<Door> Doors => Set<Door>();
     public DbSet<ZoneAccessRule> ZoneAccessRules => Set<ZoneAccessRule>();
+    public DbSet<PersonalLog> PersonalLogs => Set<PersonalLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
