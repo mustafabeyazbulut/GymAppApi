@@ -16,5 +16,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(x => x.Phone).IsUnique();
         builder.HasIndex(x => x.Email).IsUnique().HasFilter("\"Email\" IS NOT NULL");
+
+        // xmin sistem kolonuna eşlenir, yeni DB kolonu yok (RefreshTokenConfiguration).
+        builder.Property(x => x.ConcurrencyToken).IsRowVersion();
     }
 }

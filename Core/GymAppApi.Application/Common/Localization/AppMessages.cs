@@ -16,6 +16,9 @@ public static class AppMessages
     {
         // Genel / ortak
         ["UnexpectedError"] = ("An unexpected error occurred.", "Beklenmeyen bir hata oluştu."),
+        ["ConcurrentUpdate"] = (
+            "This record was changed by another operation at the same time. Please refresh and try again.",
+            "Bu kayıt aynı anda başka bir işlemle değiştirildi. Lütfen yenileyip tekrar deneyin."),
         ["TooManyRequests"] = (
             "Too many attempts. Please wait a moment and try again.",
             "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin."),

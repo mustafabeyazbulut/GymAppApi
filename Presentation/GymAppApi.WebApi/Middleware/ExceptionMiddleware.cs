@@ -41,6 +41,12 @@ public class ExceptionMiddleware
                 (int)HttpStatusCode.UnprocessableEntity,
                 validationException.Errors.Select(e => e.ErrorMessage),
                 "ValidationError"),
+            // Eşzamanlı başka bir yazma satırı değiştirdi (xmin concurrency token) -
+            // istemci güncel veriyi yeniden okuyup tekrar deneyebilir.
+            Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException => (
+                (int)HttpStatusCode.Conflict,
+                new[] { AppMessages.Resolve("ConcurrentUpdate", language) }.AsEnumerable(),
+                "ConcurrentUpdate"),
             BaseException baseException => (
                 (int)baseException.StatusCode,
                 new[] { AppMessages.Resolve(baseException.Code, language, baseException.Args) }.AsEnumerable(),

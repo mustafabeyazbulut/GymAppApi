@@ -39,6 +39,13 @@ public class User : EntityBase
     public int FailedLoginAttempts { get; set; }
     public DateTime? LockoutEndsAt { get; set; }
 
+    // Postgres xmin concurrency token (RefreshToken ile aynı desen, bkz.
+    // RefreshTokenConfiguration). Bu kod tabanındaki AsNoTracking okuma ->
+    // Update() döngüsü tüm satırı yazdığı için, eşzamanlı başka bir yazma (ör.
+    // ResetPassword'ün yeni PasswordHash'i) bayat bir kopyayla sessizce geri
+    // alınabilirdi; artık kaybeden yazma DbUpdateConcurrencyException alır (API:
+    // 409 ConcurrentUpdate). Gerçek CLR özelliği olmak ZORUNDA.
+    public uint ConcurrencyToken { get; set; }
     public ICollection<Assignment> Assignments { get; set; } = new List<Assignment>();
     public ICollection<PackageAssignment> PackageAssignments { get; set; } = new List<PackageAssignment>();
 }
