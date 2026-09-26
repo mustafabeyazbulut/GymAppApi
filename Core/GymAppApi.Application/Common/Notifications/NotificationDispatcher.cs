@@ -39,6 +39,13 @@ public static class NotificationDispatcher
     // sağlayıcısı yanıt vermedi) loglanır ve false döner; tarama diğer
     // alıcılarla devam eder. Uygulama içi bildirim satırı push'tan ÖNCE commit
     // edildiği için hatalı alıcının uygulama içi bildirimi yine de kalır.
+    //
+    // Hata SaveChanges'ta olduysa (FK/unique ihlali, geçici DB hatası) change
+    // tracker'da kalan Added/Modified varlıklar temizlenir - tarama tek bir
+    // DbContext ile yürüdüğü için aksi hâlde sonraki TÜM alıcıların
+    // SaveChanges'ı aynı bozuk varlıklar yüzünden patlardı. Çağıran, alıcı
+    // başına yazacağı varlıkları temizlemeden SONRA yeniden okumalı
+    // (izlenmeyen bir varlığa yazmak sessizce kaybolur).
     public static async Task<bool> TryNotifyUserAsync(
         IUnitOfWork unitOfWork,
         IPushNotificationSender pushNotificationSender,
@@ -56,6 +63,7 @@ public static class NotificationDispatcher
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger.LogError(exception, "Bildirim gönderilemedi (kullanıcı {UserId}); toplu gönderim devam ediyor.", userId);
+            unitOfWork.ClearChangeTracker();
             return false;
         }
     }

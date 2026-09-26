@@ -29,6 +29,16 @@ public class MembershipExpiryReminderServiceTests
                 var filtered = predicate == null ? query : query.Where(predicate);
                 return (IReadOnlyList<T>)filtered.ToList();
             });
+        // Servis alıcı başına atamayı izlenerek yeniden okur (GetAsync).
+        mock.Setup(r => r.GetAsync(
+                It.IsAny<Expression<Func<T, bool>>>(),
+                It.IsAny<Func<IQueryable<T>, IIncludableQueryable<T, object>>?>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Expression<Func<T, bool>> predicate,
+                Func<IQueryable<T>, IIncludableQueryable<T, object>>? include,
+                bool tracking,
+                CancellationToken ct) => items.AsQueryable().FirstOrDefault(predicate));
         return mock.Object;
     }
 
@@ -153,11 +163,13 @@ public class MembershipExpiryReminderServiceTests
     public async Task SendDueRemindersAsync_MarksTheAssignmentAsReminded()
     {
         var now = DateTime.UtcNow;
-        var (service, assignmentWriteRepo, _) = CreateService(new List<PackageAssignment> { Assignment(1, now.AddDays(2)) });
+        var assignment = Assignment(1, now.AddDays(2));
+        var (service, _, _) = CreateService(new List<PackageAssignment> { assignment });
 
         await service.SendDueRemindersAsync();
 
-        assignmentWriteRepo.Verify(r => r.Update(It.Is<PackageAssignment>(a => a.Id == 1 && a.ExpiryReminderSentAt != null)), Times.Once);
+        // İzlenerek yeniden okunan atama işaretlenir; bildirimle aynı SaveChanges'ta yazılır.
+        Assert.NotNull(assignment.ExpiryReminderSentAt);
     }
 
     [Fact]

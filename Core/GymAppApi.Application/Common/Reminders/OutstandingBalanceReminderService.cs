@@ -39,7 +39,6 @@ public class OutstandingBalanceReminderService : IOutstandingBalanceReminderServ
             pa => pa.Status != PackageAssignmentStatus.Cancelled &&
                   (pa.LastPaymentReminderSentAt == null || pa.LastPaymentReminderSentAt <= cooldownCutoff),
             include: q => q.Include(pa => pa.Package).Include(pa => pa.MemberUser),
-            enableTracking: true,
             cancellationToken: cancellationToken);
 
         if (candidateAssignments.Count == 0)
@@ -62,10 +61,18 @@ public class OutstandingBalanceReminderService : IOutstandingBalanceReminderServ
                 continue;
             }
 
-            assignment.LastPaymentReminderSentAt = now;
-            _unitOfWork.GetWriteRepository<PackageAssignment>().Update(assignment);
+            // Her alıcı izole: atama alıcı başına izlenerek yeniden okunur ve
+            // işaret bildirimle aynı SaveChanges'ta yazılır. Bir alıcının hatası
+            // change tracker'ı temizlediği için (NotificationDispatcher) önceden
+            // izlenen bir kopyaya yazmak sonrakiler için sessizce kaybolurdu.
+            var trackedAssignment = await _unitOfWork.GetReadRepository<PackageAssignment>()
+                .GetAsync(pa => pa.Id == assignment.Id, enableTracking: true, cancellationToken: cancellationToken);
+            if (trackedAssignment is null)
+            {
+                continue;
+            }
+            trackedAssignment.LastPaymentReminderSentAt = now;
 
-            // Her alıcı izole: bir üyenin bildirim hatası taramayı durdurmaz.
             // Metin üyenin kendi dilinde (PreferredLanguage).
             var language = assignment.MemberUser?.PreferredLanguage ?? "en";
             await NotificationDispatcher.TryNotifyUserAsync(

@@ -43,7 +43,6 @@ public class MembershipExpiryReminderService : IMembershipExpiryReminderService
                   pa.EndDate > now &&
                   pa.ExpiryReminderSentAt == null,
             include: q => q.Include(pa => pa.Package).Include(pa => pa.MemberUser),
-            enableTracking: true,
             cancellationToken: cancellationToken);
 
         if (dueAssignments.Count == 0)
@@ -57,8 +56,15 @@ public class MembershipExpiryReminderService : IMembershipExpiryReminderService
             var packageName = assignment.Package?.Name ?? string.Empty;
             var language = assignment.MemberUser?.PreferredLanguage ?? "en";
 
-            assignment.ExpiryReminderSentAt = now;
-            _unitOfWork.GetWriteRepository<PackageAssignment>().Update(assignment);
+            // Alıcı başına izlenerek yeniden okunur; işaret bildirimle aynı
+            // SaveChanges'ta yazılır (bkz. OutstandingBalanceReminderService).
+            var trackedAssignment = await _unitOfWork.GetReadRepository<PackageAssignment>()
+                .GetAsync(pa => pa.Id == assignment.Id, enableTracking: true, cancellationToken: cancellationToken);
+            if (trackedAssignment is null)
+            {
+                continue;
+            }
+            trackedAssignment.ExpiryReminderSentAt = now;
 
             await NotifySafelyAsync(
                 assignment.MemberUserId,
