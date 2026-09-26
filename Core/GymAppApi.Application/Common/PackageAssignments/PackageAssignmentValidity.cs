@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using GymAppApi.Application.Features.Reservations.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 
@@ -23,6 +24,21 @@ public static class PackageAssignmentValidity
 
     // Bellekteki tek bir atama için (ör. derse kayıt / rezervasyon kontrolü).
     public static bool IsUsable(PackageAssignment assignment, DateTime now) => CompiledDefinition(assignment, now);
+
+    // Check-in yolları (walk-in, randevu, kodla randevu) için ortak kontrol.
+    // Seans hakkı bitmişse mevcut NoRemainingSessions kodu korunur; diğer
+    // geçersizlik (süresi dolmuş, dondurulmuş, iptal) PackageAssignmentNotUsable.
+    public static void EnsureUsableForCheckIn(PackageAssignment assignment, DateTime now)
+    {
+        if (assignment.RemainingSessions is <= 0)
+        {
+            throw new NoRemainingSessionsException();
+        }
+        if (!IsUsable(assignment, now))
+        {
+            throw new PackageAssignmentNotUsableException();
+        }
+    }
 
     // EF sorgusu için: tüm geçerli paketler (ör. firma bazlı üye sayımı).
     public static Expression<Func<PackageAssignment, bool>> Usable(DateTime now)

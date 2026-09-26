@@ -177,6 +177,9 @@ public static class AppMessages
             "No reservation still in 'Booked' status was found for this code.",
             "Bu koda ait, hala 'Booked' durumunda bir rezervasyon bulunamadı."),
         ["NoRemainingSessions"] = ("This package assignment has no remaining sessions.", "Bu paket atamasının kalan seans hakkı yok."),
+        ["PackageAssignmentNotUsable"] = (
+            "This package cannot be used right now (it has expired, is frozen or was cancelled).",
+            "Bu paket şu anda kullanılamaz (süresi dolmuş, dondurulmuş veya iptal edilmiş)."),
         ["PackageAssignmentNotEligibleForReservation"] = (
             "This package assignment is not eligible for a reservation (must be active, session-based, and have remaining sessions).",
             "Bu paket ataması rezervasyon için uygun değil (aktif, seans bazlı ve seans hakkı kalmış olmalı)."),

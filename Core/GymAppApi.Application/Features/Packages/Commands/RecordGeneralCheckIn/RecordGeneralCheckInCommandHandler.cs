@@ -1,6 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
-using GymAppApi.Application.Features.Reservations.Exceptions;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -35,15 +35,14 @@ public class RecordGeneralCheckInCommandHandler : IRequestHandler<RecordGeneralC
             throw new ForbiddenException("ForbiddenCheckIn");
         }
 
+        // Süresi dolmuş/dondurulmuş/iptal paketle giriş yok (PackageAssignmentValidity).
+        PackageAssignmentValidity.EnsureUsableForCheckIn(assignment, DateTime.UtcNow);
+
         // RemainingSessions is null for a Duration-type assignment - no
         // decrement, unlimited entries for the membership's duration. It's a
-        // set number for a SessionBased assignment, and must be > 0.
+        // set number for a SessionBased assignment, checked > 0 above.
         if (assignment.RemainingSessions is not null)
         {
-            if (assignment.RemainingSessions <= 0)
-            {
-                throw new NoRemainingSessionsException();
-            }
             assignment.RemainingSessions -= 1;
             _unitOfWork.GetWriteRepository<PackageAssignment>().Update(assignment);
         }

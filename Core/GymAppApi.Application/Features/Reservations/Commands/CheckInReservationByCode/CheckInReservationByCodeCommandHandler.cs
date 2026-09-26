@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.PackageAssignments;
 using GymAppApi.Application.Features.Reservations.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -50,6 +51,8 @@ public class CheckInReservationByCodeCommandHandler : IRequestHandler<CheckInRes
         {
             throw new NoRemainingSessionsException();
         }
+        // Randevu alındıktan sonra paket süresi dolmuş/dondurulmuş/iptal olabilir.
+        PackageAssignmentValidity.EnsureUsableForCheckIn(assignment, DateTime.UtcNow);
 
         assignment.RemainingSessions -= 1;
         _unitOfWork.GetWriteRepository<PackageAssignment>().Update(assignment);

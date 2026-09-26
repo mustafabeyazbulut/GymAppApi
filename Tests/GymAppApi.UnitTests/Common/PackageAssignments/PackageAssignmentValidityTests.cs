@@ -59,6 +59,28 @@ public class PackageAssignmentValidityTests
     }
 
     [Fact]
+    public void EnsureUsableForCheckIn_NoSessionsLeft_KeepsTheNoRemainingSessionsCode()
+    {
+        Assert.Throws<GymAppApi.Application.Features.Reservations.Exceptions.NoRemainingSessionsException>(() =>
+            PackageAssignmentValidity.EnsureUsableForCheckIn(Assignment(remainingSessions: 0), Now));
+    }
+
+    [Fact]
+    public void EnsureUsableForCheckIn_ExpiredOrFrozen_ThrowsNotUsable()
+    {
+        Assert.Throws<GymAppApi.Application.Features.Reservations.Exceptions.PackageAssignmentNotUsableException>(() =>
+            PackageAssignmentValidity.EnsureUsableForCheckIn(Assignment(remainingSessions: 3, endDate: Now.AddDays(-1)), Now));
+        Assert.Throws<GymAppApi.Application.Features.Reservations.Exceptions.PackageAssignmentNotUsableException>(() =>
+            PackageAssignmentValidity.EnsureUsableForCheckIn(Assignment(status: PackageAssignmentStatus.Frozen), Now));
+    }
+
+    [Fact]
+    public void EnsureUsableForCheckIn_ValidPackage_DoesNotThrow()
+    {
+        PackageAssignmentValidity.EnsureUsableForCheckIn(Assignment(remainingSessions: 1, endDate: Now.AddDays(1)), Now);
+    }
+
+    [Fact]
     public void UsableOwnedBy_ExcludesAnotherMembersValidPackage()
     {
         var predicate = PackageAssignmentValidity.UsableOwnedBy(memberUserId: 7, Now).Compile();
