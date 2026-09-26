@@ -57,12 +57,20 @@ public class CancelClassEnrollmentCommandHandler : IRequestHandler<CancelClassEn
 
         await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, enrollment.CompanyId, cancellationToken);
 
+        // Yarış güvenliği - kilit sırası katılımla aynı (ders -> kayıt -> paket
+        // ataması; paket ataması hep en sonda, deadlock olmasın). Durum ve hak
+        // GÜNCEL (kilitli) satırlar üzerinden: aynı kayıt iki kez iade edilemez,
+        // iade eşzamanlı bir check-in/katılımın düşümünü ezmez (lost update).
+        var classSession = await _unitOfWork.GetForUpdateAsync<ClassSession>(enrollment.ClassSessionId, cancellationToken)
+            ?? throw new NotFoundException("ClassSessionNotFound", enrollment.ClassSessionId);
+        enrollment = await _unitOfWork.GetForUpdateAsync<ClassEnrollment>(enrollment.Id, cancellationToken)
+            ?? throw new NotFoundException("ClassEnrollmentNotFound", request.ClassEnrollmentId);
+
         if (enrollment.Status != ClassEnrollmentStatus.Reserved)
         {
             throw new ClassEnrollmentNotReservedException();
         }
 
-        var classSession = enrollment.ClassSession!;
         var turkeyNow = DateTime.UtcNow.AddHours(TurkeyUtcOffsetHours);
         var sessionStart = classSession.Date.ToDateTime(classSession.StartTime);
         var cutoff = sessionStart.AddHours(-classSession.CancellationCutoffHours);
@@ -72,7 +80,7 @@ public class CancelClassEnrollmentCommandHandler : IRequestHandler<CancelClassEn
             // Cutoff'tan önce iptal - seans iade edilir.
             enrollment.Status = ClassEnrollmentStatus.Cancelled;
 
-            var assignment = enrollment.PackageAssignment;
+            var assignment = await _unitOfWork.GetForUpdateAsync<PackageAssignment>(enrollment.PackageAssignmentId, cancellationToken);
             if (assignment is not null && assignment.RemainingSessions is not null)
             {
                 assignment.RemainingSessions += 1;

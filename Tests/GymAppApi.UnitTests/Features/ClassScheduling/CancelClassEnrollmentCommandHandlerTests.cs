@@ -39,6 +39,10 @@ public class CancelClassEnrollmentCommandHandlerTests
         var uow = new Mock<IUnitOfWork>();
 
         uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
+        // Kilitli (FOR UPDATE) okumalar: ders -> kayıt -> paket ataması.
+        uow.Setup(u => u.GetForUpdateAsync<ClassSession>(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(enrollment?.ClassSession);
+        uow.Setup(u => u.GetForUpdateAsync<ClassEnrollment>(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(enrollment);
+        uow.Setup(u => u.GetForUpdateAsync<PackageAssignment>(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(enrollment?.PackageAssignment);
         uow.Setup(u => u.GetReadRepository<ClassEnrollment>()).Returns(enrollmentReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<ClassEnrollment>()).Returns(enrollmentWriteRepo.Object);
         uow.Setup(u => u.GetWriteRepository<PackageAssignment>()).Returns(assignmentWriteRepo.Object);
