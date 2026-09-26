@@ -1,3 +1,4 @@
+using GymAppApi.Application.Common.Assignments;
 using GymAppApi.Application.Common.ContactVerification;
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
@@ -22,6 +23,9 @@ public class FreezeAccountCommandHandler : IRequestHandler<FreezeAccountCommand>
         {
             throw new NotFoundException("UserNotFound", request.UserId);
         }
+
+        // Kod tüketilmeden/gönderilmeden önce: bir firmanın son Gym Admin'i hesabını donduramaz.
+        await LastGymAdminGuard.EnsureNotLastGymAdminAnywhereAsync(_unitOfWork, user.Id, cancellationToken);
 
         var pendingReadRepo = _unitOfWork.GetReadRepository<PendingContactVerification>();
         var pendingWriteRepo = _unitOfWork.GetWriteRepository<PendingContactVerification>();

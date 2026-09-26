@@ -21,6 +21,8 @@ public class DeleteMeRequestOtpCommandHandlerTests
         var pendingWriteRepo = new Mock<IWriteRepository<PendingContactVerification>>();
 
         var uow = new Mock<IUnitOfWork>();
+        // Son Gym Admin kontrolü: varsayılan olarak kullanıcının Gym Admin ataması yok.
+        uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(new List<Assignment>()).Object);
         uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
         uow.Setup(u => u.GetReadRepository<PendingContactVerification>()).Returns(pendingReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<PendingContactVerification>()).Returns(pendingWriteRepo.Object);

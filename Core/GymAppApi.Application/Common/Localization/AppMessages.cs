@@ -113,8 +113,8 @@ public static class AppMessages
             "This user already holds the GymAdmin or BranchManager role at this company; a single company cannot have both for the same person.",
             "Bu kullanıcı bu firmada zaten Gym Admin veya Branch Manager rolüne sahip; aynı firmada ikisi birden olamaz."),
         ["LastGymAdmin"] = (
-            "A company must always have at least one GymAdmin. Removing the last one requires a SuperAdmin.",
-            "Bir firmanın en az bir Gym Admin'i olmalı. Son Gym Admin'i kaldırmak için Super Admin gerekir."),
+            "A company must always have at least one active Gym Admin. Please assign another Gym Admin first.",
+            "Bir firmanın en az bir aktif Gym Admin'i olmalı. Lütfen önce başka bir Gym Admin atayın."),
         ["UserAlreadyAssigned"] = ("This user is already linked to this company.", "Bu kullanıcı zaten bu firmaya bağlı."),
 
         // UnauthorizedException kodları

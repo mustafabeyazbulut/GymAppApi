@@ -1,3 +1,4 @@
+using GymAppApi.Application.Common.Assignments;
 using GymAppApi.Application.Common.ContactVerification;
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
@@ -26,6 +27,9 @@ public class DeleteMeRequestOtpCommandHandler : IRequestHandler<DeleteMeRequestO
         {
             throw new NotFoundException("UserNotFound", request.UserId);
         }
+
+        // Kod tüketilmeden/gönderilmeden önce: bir firmanın son Gym Admin'i hesabını silemez.
+        await LastGymAdminGuard.EnsureNotLastGymAdminAnywhereAsync(_unitOfWork, user.Id, cancellationToken);
 
         var code = await PendingVerificationCodeService.IssueAsync(_unitOfWork, ContactChannel.Phone, user.Phone, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
