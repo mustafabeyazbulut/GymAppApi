@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Security;
+using GymAppApi.Domain.Entities;
 using GymAppApi.Persistence.Context;
 using GymAppApi.Persistence.Security;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,52 @@ public class LoginAttemptStoreTests
     {
         await using var context = CreateContext(dbName);
         return await new LoginAttemptStore(context).IsLockedAsync(UserId, ipHash, now, CancellationToken.None);
+    }
+
+    // Günlük temizlik (LoginFailureCleanupHostedService): hem kilidi hem son
+    // güncellemesi 30 günden eski satırlar silinir; yeni ya da hâlâ ileri
+    // tarihli kilidi olan satırlar kalır. Otomatik zaman damgası geçmiş tarih
+    // yazmaya izin vermediği için "şimdi" ileri alınarak simüle ediliyor.
+    [Fact]
+    public async Task PurgeStale_DeletesRowsWhoseLockAndLastUpdateAreOlderThanRetention()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var now = DateTime.UtcNow;
+        await using (var context = CreateContext(dbName))
+        {
+            context.LoginFailures.AddRange(
+                new LoginFailure { UserId = 1, IpHash = "eski-kilitsiz", FailedCount = 2 },
+                new LoginFailure { UserId = 2, IpHash = "eski-kilidi-bitmis", LockedUntil = now.AddMinutes(15) },
+                new LoginFailure { UserId = 3, IpHash = "kilidi-hala-ileride", LockedUntil = now.AddDays(35) });
+            await context.SaveChangesAsync();
+        }
+
+        int deleted;
+        await using (var context = CreateContext(dbName))
+        {
+            deleted = await new LoginAttemptStore(context).PurgeStaleAsync(now.AddDays(40), CancellationToken.None);
+        }
+
+        await using (var context = CreateContext(dbName))
+        {
+            var remaining = await context.LoginFailures.Select(f => f.IpHash).ToListAsync();
+            Assert.Equal(2, deleted);
+            Assert.Equal(new[] { "kilidi-hala-ileride" }, remaining);
+        }
+    }
+
+    [Fact]
+    public async Task PurgeStale_KeepsRowsUpdatedWithinRetention()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var now = DateTime.UtcNow;
+        await FailAsync(dbName, IpA, now, times: 1);
+
+        await using var context = CreateContext(dbName);
+        var deleted = await new LoginAttemptStore(context).PurgeStaleAsync(now.AddDays(20), CancellationToken.None);
+
+        Assert.Equal(0, deleted);
+        Assert.Equal(1, await context.LoginFailures.CountAsync());
     }
 
     [Fact]

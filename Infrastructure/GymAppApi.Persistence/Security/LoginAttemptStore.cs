@@ -82,6 +82,18 @@ public class LoginAttemptStore : ILoginAttemptStore
         await DeleteAsync(rows, cancellationToken);
     }
 
+    public async Task<int> PurgeStaleAsync(DateTime now, CancellationToken cancellationToken)
+    {
+        var cutoff = now - LoginLockoutPolicy.StaleRowRetention;
+        // Son etkinlik: güncellenmediyse oluşturulma zamanı. (ExecuteDelete
+        // yerine RemoveRange: InMemory test sağlayıcısı ExecuteDelete'i desteklemiyor.)
+        var rows = await _dbContext.LoginFailures
+            .Where(f => (f.UpdatedAt ?? f.CreatedAt) < cutoff && (f.LockedUntil == null || f.LockedUntil < cutoff))
+            .ToListAsync(cancellationToken);
+        await DeleteAsync(rows, cancellationToken);
+        return rows.Count;
+    }
+
     private async Task DeleteAsync(List<LoginFailure> rows, CancellationToken cancellationToken)
     {
         if (rows.Count == 0)

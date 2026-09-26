@@ -11,6 +11,10 @@ public static class LoginLockoutPolicy
 {
     public const int MaxFailedAttempts = 10;
     public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+    // Bu süreden eski, kilidi de geçmiş sayaç satırları günlük temizlikte
+    // silinir - tablo sınırsız büyümesin, eski IP hash'leri gereğinden uzun
+    // saklanmasın (KVKK).
+    public static readonly TimeSpan StaleRowRetention = TimeSpan.FromDays(30);
 }
 
 public interface ILoginAttemptStore
@@ -26,6 +30,11 @@ public interface ILoginAttemptStore
 
     // Başarılı şifre sıfırlama: hesabın tüm IP'lerdeki sayaç ve kilitlerini temizler.
     Task ClearAllForUserAsync(int userId, CancellationToken cancellationToken);
+
+    // Günlük temizlik: hem kilidi (varsa) hem son güncellemesi
+    // LoginLockoutPolicy.StaleRowRetention'dan eski satırları siler; silinen
+    // satır sayısını döner.
+    Task<int> PurgeStaleAsync(DateTime now, CancellationToken cancellationToken);
 }
 
 // İsteğin istemci IP'sinin gizli anahtarlı hash'i (KVKK: ham IP saklanmaz;

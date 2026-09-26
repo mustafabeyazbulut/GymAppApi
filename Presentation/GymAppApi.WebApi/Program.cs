@@ -27,6 +27,7 @@ builder.Services.AddConfiguredForwardedHeaders();
 builder.Services.AddHostedService<MembershipExpiryReminderHostedService>();
 builder.Services.AddHostedService<OutstandingBalanceReminderHostedService>();
 builder.Services.AddHostedService<SuperAdminPhoneSeedHostedService>();
+builder.Services.AddHostedService<LoginFailureCleanupHostedService>();
 
 // AddStaffMemberCommand.Role is the first request body to expose an enum to
 // clients - without this, "role":"Trainer" fails model binding since
