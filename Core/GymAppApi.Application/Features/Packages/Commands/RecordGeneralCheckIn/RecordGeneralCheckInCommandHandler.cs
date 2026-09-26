@@ -1,6 +1,7 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.PackageAssignments;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -34,6 +35,8 @@ public class RecordGeneralCheckInCommandHandler : IRequestHandler<RecordGeneralC
         {
             throw new ForbiddenException("ForbiddenCheckIn");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, assignment.CompanyId, cancellationToken);
 
         // Süresi dolmuş/dondurulmuş/iptal paketle giriş yok (PackageAssignmentValidity).
         PackageAssignmentValidity.EnsureUsableForCheckIn(assignment, DateTime.UtcNow);

@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -32,6 +33,8 @@ public class CreateClassSessionCommandHandler : IRequestHandler<CreateClassSessi
         {
             throw new ForbiddenException("ForbiddenCreateClassSession");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, branch.CompanyId, cancellationToken);
 
         var classSession = new ClassSession
         {

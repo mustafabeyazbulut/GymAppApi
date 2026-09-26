@@ -1,6 +1,7 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.PackageAssignments;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Reservations.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -44,6 +45,8 @@ public class CheckInReservationByCodeCommandHandler : IRequestHandler<CheckInRes
         {
             throw new ForbiddenException("ForbiddenCheckIn");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, reservation.CompanyId, cancellationToken);
 
         var assignment = await _unitOfWork.GetReadRepository<PackageAssignment>()
             .GetAsync(a => a.Id == reservation.PackageAssignmentId, cancellationToken: cancellationToken);

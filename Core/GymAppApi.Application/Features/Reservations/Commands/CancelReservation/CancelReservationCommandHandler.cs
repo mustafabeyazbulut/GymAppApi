@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Reservations.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -44,6 +45,8 @@ public class CancelReservationCommandHandler : IRequestHandler<CancelReservation
         {
             throw new ForbiddenException("ForbiddenCancelReservation");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, reservation.CompanyId, cancellationToken);
 
         if (reservation.Status != ReservationStatus.Booked)
         {

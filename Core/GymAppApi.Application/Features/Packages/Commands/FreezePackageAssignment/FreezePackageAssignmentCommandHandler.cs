@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -48,6 +49,8 @@ public class FreezePackageAssignmentCommandHandler : IRequestHandler<FreezePacka
         {
             throw new ForbiddenException("ForbiddenFreezePackageAssignment");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, assignment.CompanyId, cancellationToken);
 
         // Sadece Active bir atama dondurulabilir - Cancelled bir atamanın
         // dondurulması anlamsız, zaten Frozen olanın tekrar dondurulması ise

@@ -35,6 +35,8 @@ public class CheckInReservationByCodeCommandHandlerTests
         var checkInWriteRepo = new Mock<IWriteRepository<CheckIn>>();
 
         var uow = new Mock<IUnitOfWork>();
+
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
         uow.Setup(u => u.GetReadRepository<Reservation>()).Returns(reservationReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<Reservation>()).Returns(reservationWriteRepo.Object);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(callerReadRepo.Object);

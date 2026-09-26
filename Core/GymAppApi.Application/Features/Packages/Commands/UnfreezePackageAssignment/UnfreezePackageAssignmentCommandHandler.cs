@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Common.Time;
 using GymAppApi.Application.Features.Packages.Exceptions;
 using GymAppApi.Domain.Entities;
@@ -44,6 +45,8 @@ public class UnfreezePackageAssignmentCommandHandler : IRequestHandler<UnfreezeP
         {
             throw new ForbiddenException("ForbiddenUnfreezePackageAssignment");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, assignment.CompanyId, cancellationToken);
 
         // Sadece Frozen bir atama açılabilir - bu kontrol olmadan bir üye
         // KENDİ İPTAL EDİLMİŞ (Cancelled) paketini unfreeze çağrısıyla

@@ -35,6 +35,8 @@ public class EnrollInClassSessionCommandHandlerTests
         var enrollmentWriteRepo = new Mock<IWriteRepository<ClassEnrollment>>();
 
         var uow = new Mock<IUnitOfWork>();
+
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
         uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(assignmentReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<PackageAssignment>()).Returns(assignmentWriteRepo.Object);
         uow.Setup(u => u.GetReadRepository<ClassEnrollment>()).Returns(enrollmentReadRepo.Object);

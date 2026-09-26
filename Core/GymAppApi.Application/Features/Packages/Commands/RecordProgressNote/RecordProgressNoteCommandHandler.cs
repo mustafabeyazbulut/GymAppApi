@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
 using MediatR;
@@ -39,6 +40,8 @@ public class RecordProgressNoteCommandHandler : IRequestHandler<RecordProgressNo
         {
             throw new ForbiddenException("ForbiddenRecordProgressNote");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, assignment.CompanyId, cancellationToken);
 
         int? mediaFileId = null;
         if (request.MediaFileContent is not null)

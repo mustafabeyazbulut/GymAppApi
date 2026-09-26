@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Reservations.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -41,6 +42,8 @@ public class MarkReservationNoShowCommandHandler : IRequestHandler<MarkReservati
         {
             throw new ForbiddenException("ForbiddenMarkNoShow");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, reservation.CompanyId, cancellationToken);
 
         if (reservation.Status != ReservationStatus.Booked)
         {

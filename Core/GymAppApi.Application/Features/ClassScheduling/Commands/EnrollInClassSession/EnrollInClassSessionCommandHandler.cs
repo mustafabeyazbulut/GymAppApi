@@ -1,6 +1,7 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.PackageAssignments;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.ClassScheduling.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -35,6 +36,8 @@ public class EnrollInClassSessionCommandHandler : IRequestHandler<EnrollInClassS
         {
             throw new ForbiddenException("ForbiddenEnrollInClassSession");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, assignment.CompanyId, cancellationToken);
 
         // ClassSession satırını FOR UPDATE ile kilitle - TransactionBehavior'ın
         // açtığı transaction içindeyiz (ITransactionalRequest), bu yüzden

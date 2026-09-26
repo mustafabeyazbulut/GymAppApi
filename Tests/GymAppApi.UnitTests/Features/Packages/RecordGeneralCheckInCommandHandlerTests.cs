@@ -28,6 +28,8 @@ public class RecordGeneralCheckInCommandHandlerTests
         var checkInWriteRepo = new Mock<IWriteRepository<CheckIn>>();
 
         var uow = new Mock<IUnitOfWork>();
+
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
         uow.Setup(u => u.GetReadRepository<PackageAssignment>()).Returns(assignmentReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<PackageAssignment>()).Returns(assignmentWriteRepo.Object);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(callerReadRepo.Object);

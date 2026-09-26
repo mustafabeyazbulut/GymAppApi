@@ -40,6 +40,8 @@ public class RemoveAssignmentCommandHandlerTests
             .ReturnsAsync(new List<DeviceToken>());
 
         var uow = new Mock<IUnitOfWork>();
+
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(assignmentReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<Assignment>()).Returns(assignmentWriteRepo.Object);
         uow.Setup(u => u.GetWriteRepository<Notification>()).Returns(notificationWriteRepo.Object);

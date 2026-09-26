@@ -29,6 +29,8 @@ public class CreateClassSessionCommandHandlerTests
         var writeRepo = new Mock<IWriteRepository<ClassSession>>();
 
         var uow = new Mock<IUnitOfWork>();
+
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
         uow.Setup(u => u.GetReadRepository<Branch>()).Returns(branchReadRepo.Object);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(callerReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<ClassSession>()).Returns(writeRepo.Object);

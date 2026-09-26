@@ -1,5 +1,6 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.ClassScheduling.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -53,6 +54,8 @@ public class CancelClassEnrollmentCommandHandler : IRequestHandler<CancelClassEn
         {
             throw new ForbiddenException("ForbiddenCancelClassEnrollment");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, enrollment.CompanyId, cancellationToken);
 
         if (enrollment.Status != ClassEnrollmentStatus.Reserved)
         {

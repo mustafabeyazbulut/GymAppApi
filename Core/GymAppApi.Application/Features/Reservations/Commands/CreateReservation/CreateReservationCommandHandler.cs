@@ -1,6 +1,7 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.PackageAssignments;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Reservations.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -50,6 +51,8 @@ public class CreateReservationCommandHandler : IRequestHandler<CreateReservation
         {
             throw new ForbiddenException("ForbiddenCreateReservation");
         }
+
+        await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, assignment.CompanyId, cancellationToken);
 
         // Ortak "geçerli paket" tanımı (PackageAssignmentValidity: aktif,
         // süresi dolmamış, hakkı kalmış) + sadece seans bazlı paket

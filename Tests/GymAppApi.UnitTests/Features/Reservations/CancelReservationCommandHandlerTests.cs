@@ -29,6 +29,8 @@ public class CancelReservationCommandHandlerTests
             .ReturnsAsync(callerAssignments);
 
         var uow = new Mock<IUnitOfWork>();
+
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
         uow.Setup(u => u.GetReadRepository<Reservation>()).Returns(reservationReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<Reservation>()).Returns(writeRepo.Object);
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(callerReadRepo.Object);

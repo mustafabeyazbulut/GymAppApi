@@ -37,6 +37,8 @@ public class CancelClassEnrollmentCommandHandlerTests
             .ReturnsAsync(callerAssignments);
 
         var uow = new Mock<IUnitOfWork>();
+
+        uow.Setup(u => u.GetReadRepository<Company>()).Returns(GymAppApi.UnitTests.TestHelpers.TestCompanies.AllActive());
         uow.Setup(u => u.GetReadRepository<ClassEnrollment>()).Returns(enrollmentReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<ClassEnrollment>()).Returns(enrollmentWriteRepo.Object);
         uow.Setup(u => u.GetWriteRepository<PackageAssignment>()).Returns(assignmentWriteRepo.Object);

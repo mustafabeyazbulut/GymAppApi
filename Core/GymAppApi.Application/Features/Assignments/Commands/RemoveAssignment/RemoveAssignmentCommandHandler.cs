@@ -1,6 +1,7 @@
 using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Application.Common.Notifications;
+using GymAppApi.Application.Common.Security;
 using GymAppApi.Application.Features.Assignments.Exceptions;
 using GymAppApi.Domain.Entities;
 using GymAppApi.Domain.Enums;
@@ -58,6 +59,16 @@ public class RemoveAssignmentCommandHandler : IRequestHandler<RemoveAssignmentCo
         if (!callerIsAuthorized)
         {
             throw new ForbiddenException("ForbiddenRemoveAssignment");
+        }
+
+        // Pasif firmada personel değişikliği yok (senaryo §7). İstisna: Sistem
+        // Sahibi firma yönetimi kapsamında GymAdmin atamasını pasif firmada da
+        // düzenleyebilir.
+        var isCompanyManagementBySystemOwner = assignment.Role == AssignmentRole.GymAdmin &&
+            callerAssignments.Any(a => a.Role == AssignmentRole.SuperAdmin);
+        if (!isCompanyManagementBySystemOwner && assignment.CompanyId is int companyId)
+        {
+            await CompanyStatusGuard.EnsureActiveAsync(_unitOfWork, companyId, cancellationToken);
         }
 
         // Self-removal (a GymAdmin/BranchManager removing their own assignment)
