@@ -64,6 +64,9 @@ public static class AppMessages
         ["ForbiddenCreateContentItem"] = ("You are not authorized to upload content for this company/branch.", "Bu firma/şube için içerik yükleme yetkiniz yok."),
         ["ForbiddenSetContentItemActive"] = ("You are not authorized to activate/deactivate this content item.", "Bu içeriği aktif/pasif yapma yetkiniz yok."),
         ["ForbiddenViewMedia"] = ("You are not authorized to view this media file.", "Bu medya dosyasını görüntüleme yetkiniz yok."),
+        ["InvalidActiveAssignment"] = (
+            "The selected role is not valid for your account. Please select one of your active roles again.",
+            "Seçili rol hesabınız için geçerli değil. Lütfen aktif rollerinizden birini yeniden seçin."),
         ["ForbiddenManageDoorAccess"] = ("You are not authorized to manage door access for this branch.", "Bu şube için kapı erişimini yönetme yetkiniz yok."),
 
         // ConflictException kodları (isimlendirilmiş exception sınıfları)

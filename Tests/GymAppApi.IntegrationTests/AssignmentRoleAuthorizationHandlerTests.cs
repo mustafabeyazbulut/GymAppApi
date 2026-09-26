@@ -24,7 +24,7 @@ public class AssignmentRoleAuthorizationHandlerTests : IClassFixture<CustomWebAp
     private static string UniquePhone() => $"+9055503{Random.Shared.Next(10000, 99999)}";
 
     [Fact]
-    public async Task GymAdminOrSuperAdminPolicy_WithoutActiveCompanyHeader_StillFailsForACompanyThatIsNotTheCallersFirstAssignment()
+    public async Task GymAdminOrSuperAdminPolicy_WithoutAnyHeader_ResolvesMultiRoleStaffToGymAdminByRolePriority()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<GymAppApiDbContext>();
@@ -48,18 +48,15 @@ public class AssignmentRoleAuthorizationHandlerTests : IClassFixture<CustomWebAp
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        // Bilinçli olarak X-Active-Company-Id set edilmiyor - ipucu olmadan
-        // ambient resolution yine de Company A'da (ilk Assignment) kalır, bu
-        // yüzden Company B, CreateBranchCommand'ın kendi Company aramasına
-        // görünmez kalır. AssignmentRoleAuthorizationHandler düzeltmesi tek
-        // başına (ambient olmayan bir şirkette var olan bir role artık kör
-        // değil) gerekli ama header olmadan yeterli değil - bu test bunu
-        // sabitliyor ki gelecekteki bir değişiklik sessizce "header hiçbir
-        // şey yapmıyor" durumuna geri dönmesin.
+        // Hiçbir header gönderilmiyor. Eski davranışta bağlam ilk atamaya (Company A,
+        // Trainer) çözülüyor ve Company B görünmez kalıyordu (404). Adım 2'nin
+        // belirleyici kuralıyla (GymAdmin > BranchManager > Trainer, eşitlikte en
+        // küçük Id) bağlam Company B'deki GymAdmin atamasıdır; istek başarılı olur.
+        // Header gönderen istemci için bkz. ActiveAssignmentContextTests.
 
         var response = await client.PostAsJsonAsync("/api/branches", new { companyId = companyB.Id, name = "Merkez Şube", address = "Adres 1" });
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     [Fact]

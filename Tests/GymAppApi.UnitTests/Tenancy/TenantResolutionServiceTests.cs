@@ -187,4 +187,182 @@ public class TenantResolutionServiceTests
         Assert.False(resolved.IsSuperAdmin);
         Assert.Null(resolved.CompanyId);
     }
+
+    // --- Aktif atama bağlamı (X-Active-Assignment-Id) ---
+
+    // Kullanıcıyı ve atamalarını VERİLEN SIRAYLA (artan Id) ekler; eklenen
+    // atamaların Id'lerini aynı sırayla döndürür.
+    private static async Task<(int UserId, List<int> AssignmentIds)> SeedUserWithAssignmentsAsync(
+        string dbName, params (int? CompanyId, int? BranchId, AssignmentRole Role, bool IsActive)[] assignments)
+    {
+        await using var seedContext = CreateSeedContext(dbName);
+        var user = new User { FullName = "Personel", Phone = $"+90555{Random.Shared.Next(1000000, 9999999)}", PasswordHash = "x" };
+        seedContext.Users.Add(user);
+        await seedContext.SaveChangesAsync();
+
+        var ids = new List<int>();
+        foreach (var (companyId, branchId, role, isActive) in assignments)
+        {
+            var assignment = new Assignment { UserId = user.Id, CompanyId = companyId, BranchId = branchId, Role = role, IsActive = isActive };
+            seedContext.Assignments.Add(assignment);
+            await seedContext.SaveChangesAsync();
+            ids.Add(assignment.Id);
+        }
+
+        return (user.Id, ids);
+    }
+
+    private static async Task<Application.Common.Interfaces.ResolvedTenant> ResolveAsync(string dbName, int userId, int? preferredCompanyId = null, int? activeAssignmentId = null)
+    {
+        await using var context = CreateUnresolvedContext(dbName);
+        return await new TenantResolutionService(context).ResolveForUserAsync(userId, preferredCompanyId, activeAssignmentId);
+    }
+
+    [Theory]
+    [InlineData(0, 10, AssignmentRole.Trainer)]
+    [InlineData(1, 11, AssignmentRole.BranchManager)]
+    public async Task ResolveForUserAsync_WithActiveAssignmentId_BuildsTheScopeEntirelyFromThatAssignment(int index, int expectedBranchId, AssignmentRole expectedRole)
+    {
+        // Aynı firmada A1'de Trainer + A2'de BranchManager.
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName,
+            (1, 10, AssignmentRole.Trainer, true),
+            (1, 11, AssignmentRole.BranchManager, true));
+
+        var resolved = await ResolveAsync(dbName, userId, activeAssignmentId: ids[index]);
+
+        Assert.False(resolved.ActiveAssignmentRejected);
+        Assert.Equal(ids[index], resolved.AssignmentId);
+        Assert.Equal(1, resolved.CompanyId);
+        Assert.Equal(expectedBranchId, resolved.BranchId);
+        Assert.Equal(expectedRole, resolved.Role);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_WithAnotherUsersAssignmentId_IsRejected()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, _) = await SeedUserWithAssignmentsAsync(dbName, (1, 10, AssignmentRole.Trainer, true));
+        var (_, othersIds) = await SeedUserWithAssignmentsAsync(dbName, (2, 20, AssignmentRole.GymAdmin, true));
+
+        var resolved = await ResolveAsync(dbName, userId, activeAssignmentId: othersIds[0]);
+
+        Assert.True(resolved.ActiveAssignmentRejected);
+        Assert.Null(resolved.CompanyId);
+        Assert.Null(resolved.Role);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_WithOwnInactiveAssignmentId_IsRejected()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName,
+            (1, 10, AssignmentRole.Trainer, true),
+            (1, 11, AssignmentRole.BranchManager, false));
+
+        var resolved = await ResolveAsync(dbName, userId, activeAssignmentId: ids[1]);
+
+        Assert.True(resolved.ActiveAssignmentRejected);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_WithOwnNonStaffAssignmentId_IsRejected()
+    {
+        // Eski modelden kalan Member ataması personel bağlamı olamaz.
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName, (1, null, AssignmentRole.Member, true));
+
+        var resolved = await ResolveAsync(dbName, userId, activeAssignmentId: ids[0]);
+
+        Assert.True(resolved.ActiveAssignmentRejected);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_SuperAdminWithOwnStaffAssignmentId_ActsAsThatAssignment()
+    {
+        // Senaryo §4.6: Sistem Sahibi bir firmada iş yapacaksa o firmada
+        // Gym Admin olarak hareket eder - aktif atama seçildiyse bağlam
+        // tamamen o atamadır, platform geneli bypass değil.
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName,
+            (null, null, AssignmentRole.SuperAdmin, true),
+            (3, null, AssignmentRole.GymAdmin, true));
+
+        var resolved = await ResolveAsync(dbName, userId, activeAssignmentId: ids[1]);
+
+        Assert.False(resolved.IsSuperAdmin);
+        Assert.Equal(3, resolved.CompanyId);
+        Assert.Equal(AssignmentRole.GymAdmin, resolved.Role);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_SuperAdminWithoutHeader_HasSuperAdminRole()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, _) = await SeedUserWithAssignmentsAsync(dbName, (null, null, AssignmentRole.SuperAdmin, true));
+
+        var resolved = await ResolveAsync(dbName, userId);
+
+        Assert.True(resolved.IsSuperAdmin);
+        Assert.Equal(AssignmentRole.SuperAdmin, resolved.Role);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_WithoutHeader_SingleStaffAssignment_UsesIt()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName, (1, 10, AssignmentRole.Trainer, true));
+
+        var resolved = await ResolveAsync(dbName, userId);
+
+        Assert.Equal(ids[0], resolved.AssignmentId);
+        Assert.Equal(10, resolved.BranchId);
+        Assert.Equal(AssignmentRole.Trainer, resolved.Role);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_WithoutHeader_MultipleStaff_PrefersGymAdminOverBranchManagerOverTrainer()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName,
+            (1, 10, AssignmentRole.Trainer, true),
+            (1, 11, AssignmentRole.BranchManager, true),
+            (2, null, AssignmentRole.GymAdmin, true));
+
+        var resolved = await ResolveAsync(dbName, userId);
+
+        Assert.Equal(ids[2], resolved.AssignmentId);
+        Assert.Equal(AssignmentRole.GymAdmin, resolved.Role);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_WithoutHeader_BranchManagerBeatsTrainer_AndTiesGoToLowestId()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName,
+            (1, 10, AssignmentRole.Trainer, true),
+            (1, 11, AssignmentRole.BranchManager, true),
+            (1, 12, AssignmentRole.BranchManager, true));
+
+        var resolved = await ResolveAsync(dbName, userId);
+
+        Assert.Equal(ids[1], resolved.AssignmentId);
+        Assert.Equal(11, resolved.BranchId);
+    }
+
+    [Fact]
+    public async Task ResolveForUserAsync_WithoutHeader_WithPreferredCompany_PicksTheBestRoleInThatCompany()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var (userId, ids) = await SeedUserWithAssignmentsAsync(dbName,
+            (2, null, AssignmentRole.GymAdmin, true),
+            (1, 10, AssignmentRole.Trainer, true),
+            (1, null, AssignmentRole.GymAdmin, true));
+
+        var resolved = await ResolveAsync(dbName, userId, preferredCompanyId: 1);
+
+        Assert.Equal(ids[2], resolved.AssignmentId);
+        Assert.Equal(1, resolved.CompanyId);
+        Assert.Null(resolved.BranchId);
+    }
 }

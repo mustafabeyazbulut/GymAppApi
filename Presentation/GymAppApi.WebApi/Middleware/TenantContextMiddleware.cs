@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using GymAppApi.Application.Common.Exceptions;
 using GymAppApi.Application.Common.Interfaces;
 using GymAppApi.Infrastructure.Tenancy;
 
@@ -27,20 +28,45 @@ public class TenantContextMiddleware
     // erişim asla veremez.
     public const string ActiveCompanyHeaderName = "X-Active-Company-Id";
 
+    // Mobilin her istekte gönderdiği, kullanıcının kendi personel
+    // atamalarından birinin Id'si - bağlam (CompanyId, BranchId, Role)
+    // tamamen o atamadan kurulur. Company header'ının aksine bu bir ipucu
+    // DEĞİL: geçersizse (çağırana ait değil, pasif, personel ataması değil
+    // veya sayı değil) istek 403 ile reddedilir.
+    public const string ActiveAssignmentHeaderName = "X-Active-Assignment-Id";
+
     public async Task InvokeAsync(HttpContext context, AmbientTenantContext tenantContext, ITenantResolutionService resolutionService)
     {
         var subClaim = context.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         if (subClaim is not null && int.TryParse(subClaim, out var userId))
         {
-            int? preferredCompanyId = context.Request.Headers.TryGetValue(ActiveCompanyHeaderName, out var headerValue)
-                && int.TryParse(headerValue, out var parsedCompanyId)
+            int? preferredCompanyId = context.Request.Headers.TryGetValue(ActiveCompanyHeaderName, out var companyHeaderValue)
+                && int.TryParse(companyHeaderValue, out var parsedCompanyId)
                     ? parsedCompanyId
                     : null;
 
-            var resolved = await resolutionService.ResolveForUserAsync(userId, preferredCompanyId, context.RequestAborted);
+            int? activeAssignmentId = null;
+            if (context.Request.Headers.TryGetValue(ActiveAssignmentHeaderName, out var assignmentHeaderValue))
+            {
+                if (!int.TryParse(assignmentHeaderValue, out var parsedAssignmentId))
+                {
+                    throw new ForbiddenException("InvalidActiveAssignment");
+                }
+
+                activeAssignmentId = parsedAssignmentId;
+            }
+
+            var resolved = await resolutionService.ResolveForUserAsync(userId, preferredCompanyId, activeAssignmentId, context.RequestAborted);
+            if (resolved.ActiveAssignmentRejected)
+            {
+                throw new ForbiddenException("InvalidActiveAssignment");
+            }
+
             tenantContext.IsSuperAdmin = resolved.IsSuperAdmin;
             tenantContext.CompanyId = resolved.CompanyId;
             tenantContext.BranchId = resolved.BranchId;
+            tenantContext.AssignmentId = resolved.AssignmentId;
+            tenantContext.Role = resolved.Role;
         }
 
         await _next(context);

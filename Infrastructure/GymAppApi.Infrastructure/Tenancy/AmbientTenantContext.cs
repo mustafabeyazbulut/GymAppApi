@@ -1,4 +1,5 @@
 using GymAppApi.Application.Common.Interfaces;
+using GymAppApi.Domain.Enums;
 
 namespace GymAppApi.Infrastructure.Tenancy;
 
@@ -6,12 +7,14 @@ namespace GymAppApi.Infrastructure.Tenancy;
 // right after authentication, from the caller's own Assignment rows (via
 // ITenantResolutionService). A brand-new request that hasn't gone through
 // that middleware yet (or an unauthenticated one) keeps these fail-closed
-// defaults - IsSuperAdmin=false, CompanyId=null - which the existing global
-// query filters already treat as "see nothing" for every tenant-scoped
-// entity except a null-CompanyId row.
+// defaults - IsSuperAdmin=false, CompanyId=null, Role=null - which the
+// existing global query filters and AssignmentRoleAuthorizationHandler
+// already treat as "see nothing" / "no role".
 public class AmbientTenantContext : ITenantContext
 {
     public int? CompanyId { get; set; }
     public int? BranchId { get; set; }
     public bool IsSuperAdmin { get; set; }
+    public int? AssignmentId { get; set; }
+    public AssignmentRole? Role { get; set; }
 }
