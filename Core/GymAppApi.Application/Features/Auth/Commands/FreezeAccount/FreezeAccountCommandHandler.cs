@@ -40,24 +40,29 @@ public class FreezeAccountCommandHandler : IRequestHandler<FreezeAccountCommand>
             throw new InvalidContactVerificationCodeException(phoneFailed: true, emailFailed: false);
         }
 
-        user.IsAccountFrozen = true;
-        _unitOfWork.GetWriteRepository<User>().Update(user);
-        pendingWriteRepo.Remove(pending!);
-
-        // Freezing takes effect everywhere immediately, not just for future
-        // requests - revoke every currently-active session, matching
-        // ResetPasswordCommandHandler's precedent for security-relevant
-        // account changes.
-        var refreshReadRepo = _unitOfWork.GetReadRepository<RefreshToken>();
-        var refreshWriteRepo = _unitOfWork.GetWriteRepository<RefreshToken>();
-        var activeTokens = await refreshReadRepo.GetAllAsync(
-            t => t.UserId == user.Id && t.RevokedAt == null, cancellationToken: cancellationToken);
-        foreach (var token in activeTokens)
+        // Son Gym Admin kontrolü dondurmayla aynı transaction'da, firma satırı
+        // kilitliyken tekrarlanır (bkz. LastGymAdminGuard.RunSerializedAsync).
+        await LastGymAdminGuard.RunSerializedAsync(_unitOfWork, user.Id, async () =>
         {
-            token.RevokedAt = DateTime.UtcNow;
-            refreshWriteRepo.Update(token);
-        }
+            user.IsAccountFrozen = true;
+            _unitOfWork.GetWriteRepository<User>().Update(user);
+            pendingWriteRepo.Remove(pending!);
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            // Freezing takes effect everywhere immediately, not just for future
+            // requests - revoke every currently-active session, matching
+            // ResetPasswordCommandHandler's precedent for security-relevant
+            // account changes.
+            var refreshReadRepo = _unitOfWork.GetReadRepository<RefreshToken>();
+            var refreshWriteRepo = _unitOfWork.GetWriteRepository<RefreshToken>();
+            var activeTokens = await refreshReadRepo.GetAllAsync(
+                t => t.UserId == user.Id && t.RevokedAt == null, cancellationToken: cancellationToken);
+            foreach (var token in activeTokens)
+            {
+                token.RevokedAt = DateTime.UtcNow;
+                refreshWriteRepo.Update(token);
+            }
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
     }
 }

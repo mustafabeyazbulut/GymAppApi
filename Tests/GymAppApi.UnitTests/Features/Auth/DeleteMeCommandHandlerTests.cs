@@ -26,6 +26,9 @@ public class DeleteMeCommandHandlerTests
         var uow = new Mock<IUnitOfWork>();
         // Son Gym Admin kontrolü: varsayılan olarak kullanıcının Gym Admin ataması yok.
         uow.Setup(u => u.GetReadRepository<Assignment>()).Returns(GymAppApi.UnitTests.TestHelpers.FakeReadRepository.For(new List<Assignment>()).Object);
+        // Yazma, son Gym Admin kontrolüyle tek transaction içinde (delegate hemen çalıştırılır).
+        uow.Setup(u => u.ExecuteWithRetryAsync(It.IsAny<Func<Task<bool>>>())).Returns((Func<Task<bool>> operation) => operation());
+        uow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Mock.Of<IAsyncDisposable>());
         uow.Setup(u => u.GetReadRepository<User>()).Returns(userReadRepo.Object);
         uow.Setup(u => u.GetWriteRepository<User>()).Returns(userWriteRepo.Object);
         uow.Setup(u => u.GetReadRepository<PendingContactVerification>()).Returns(pendingReadRepo.Object);

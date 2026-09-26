@@ -45,8 +45,13 @@ public class DeleteMeCommandHandler : IRequestHandler<DeleteMeCommand>
         // verification row isn't FK-linked to User (it exists independently
         // of any account, see PendingContactVerification's own comment), so
         // it's removed explicitly here.
-        _unitOfWork.GetWriteRepository<User>().Remove(user);
-        pendingWriteRepo.Remove(pending!);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        // Son Gym Admin kontrolü silmeyle aynı transaction'da, firma satırı
+        // kilitliyken tekrarlanır - eşzamanlı iki silme firmayı adminsiz bırakmasın.
+        await LastGymAdminGuard.RunSerializedAsync(_unitOfWork, user.Id, async () =>
+        {
+            _unitOfWork.GetWriteRepository<User>().Remove(user);
+            pendingWriteRepo.Remove(pending!);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
     }
 }

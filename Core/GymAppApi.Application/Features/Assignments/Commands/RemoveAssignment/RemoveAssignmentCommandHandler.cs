@@ -83,6 +83,10 @@ public class RemoveAssignmentCommandHandler : IRequestHandler<RemoveAssignmentCo
         // Gym Admin'leri göremez, her zaman "yok" derdi.
         if (assignment.Role == AssignmentRole.GymAdmin)
         {
+            // Firma satırı kilidi: aynı firmada eşzamanlı iki kaldırma (veya
+            // hesap silme/dondurma, bkz. LastGymAdminGuard.RunSerializedAsync)
+            // sıraya girer; ikincisi güncel sayımı görür.
+            await _unitOfWork.GetForUpdateAsync<Company>(assignment.CompanyId!.Value, cancellationToken);
             var otherActiveGymAdmins = await assignmentReadRepo.GetAllAsync(
                 a => a.CompanyId == assignment.CompanyId && a.BranchId == null &&
                      a.Role == AssignmentRole.GymAdmin && a.IsActive && a.Id != assignment.Id,

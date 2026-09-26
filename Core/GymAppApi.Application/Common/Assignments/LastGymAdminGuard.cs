@@ -12,6 +12,46 @@ namespace GymAppApi.Application.Common.Assignments;
 // yoksa bunu yapamaz - önce başka bir Gym Admin atanmalı.
 public static class LastGymAdminGuard
 {
+    // Yarış güvenli kullanım: kontrol + yazma tek transaction içinde ve
+    // kullanıcının Gym Admin olduğu firmaların satırları FOR UPDATE ile
+    // kilitli. Aynı firmanın iki Gym Admin'i aynı anda hesabını silerse /
+    // dondurursa (ya da biri diğerini kaldırırsa - RemoveAssignment da aynı
+    // firma satırını kilitler) işlemler sıraya girer; ikincisi güncel durumu
+    // görür ve 409 LastGymAdmin alır. Execution strategy deseni:
+    // transaction'ın tamamı ExecuteWithRetryAsync delegate'inin içinde.
+    public static Task RunSerializedAsync(IUnitOfWork unitOfWork, int userId, Func<Task> writeAsync, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteWithRetryAsync(async () =>
+        {
+            await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                await LockGymAdminCompaniesAsync(unitOfWork, userId, cancellationToken);
+                await EnsureNotLastGymAdminAnywhereAsync(unitOfWork, userId, cancellationToken);
+                await writeAsync();
+                await unitOfWork.CommitTransactionAsync(cancellationToken);
+                return true;
+            }
+            catch
+            {
+                await unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
+        });
+
+    // Kilitler hep artan Id sırasıyla alınır - farklı firma kümelerini kilitleyen
+    // iki işlem birbirini kilitlenmeye (deadlock) sokmasın.
+    private static async Task LockGymAdminCompaniesAsync(IUnitOfWork unitOfWork, int userId, CancellationToken cancellationToken)
+    {
+        var gymAdminAssignments = await unitOfWork.GetReadRepository<Assignment>().GetAllAsync(
+            a => a.UserId == userId && a.Role == AssignmentRole.GymAdmin && a.IsActive && a.CompanyId != null,
+            include: q => q.IgnoreQueryFilters().Include(a => a.Company),
+            cancellationToken: cancellationToken);
+        foreach (var companyId in gymAdminAssignments.Select(a => a.CompanyId!.Value).Distinct().OrderBy(id => id))
+        {
+            await unitOfWork.GetForUpdateAsync<Company>(companyId, cancellationToken);
+        }
+    }
+
     public static async Task EnsureNotLastGymAdminAnywhereAsync(IUnitOfWork unitOfWork, int userId, CancellationToken cancellationToken)
     {
         var assignmentReadRepo = unitOfWork.GetReadRepository<Assignment>();

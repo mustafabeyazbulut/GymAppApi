@@ -35,6 +35,16 @@ public class UnitOfWork : IUnitOfWork
 
     public async Task<T?> GetForUpdateAsync<T>(int id, CancellationToken cancellationToken = default) where T : class, IEntityBase
     {
+        // İlişkisel olmayan sağlayıcı (testlerdeki EF InMemory): satır kilidi ve
+        // FromSqlRaw yok, eşzamanlı transaction da yok - aynı satırın filtresiz,
+        // izlenen okuması yeterli. Gerçek kilit davranışı Postgres yarış
+        // testleriyle doğrulanır.
+        if (!_context.Database.IsRelational())
+        {
+            return await _context.Set<T>().IgnoreQueryFilters().AsTracking()
+                .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+        }
+
         var entityType = _context.Model.FindEntityType(typeof(T))
             ?? throw new InvalidOperationException($"'{typeof(T).Name}' is not a mapped entity type.");
         var tableName = entityType.GetTableName()
